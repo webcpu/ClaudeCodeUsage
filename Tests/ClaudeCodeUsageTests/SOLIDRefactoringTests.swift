@@ -265,7 +265,6 @@ final class SOLIDRefactoringTests: XCTestCase {
         let repository = UsageRepository(
             fileSystem: mockFS,
             parser: JSONLUsageParser(),
-            deduplication: HashBasedDeduplication(),
             pathDecoder: ProjectPathDecoder(),
             aggregator: StatisticsAggregator(),
             basePath: "/test/.claude"

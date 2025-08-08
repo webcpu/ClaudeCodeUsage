@@ -11,7 +11,6 @@ import Foundation
 public class UsageRepository {
     private let fileSystem: FileSystemProtocol
     private let parser: UsageDataParserProtocol
-    private let deduplication: DeduplicationStrategy
     private let pathDecoder: ProjectPathDecoderProtocol
     private let aggregator: StatisticsAggregatorProtocol
     private let basePath: String
@@ -20,14 +19,12 @@ public class UsageRepository {
     public init(
         fileSystem: FileSystemProtocol,
         parser: UsageDataParserProtocol,
-        deduplication: DeduplicationStrategy,
         pathDecoder: ProjectPathDecoderProtocol,
         aggregator: StatisticsAggregatorProtocol,
         basePath: String
     ) {
         self.fileSystem = fileSystem
         self.parser = parser
-        self.deduplication = deduplication
         self.pathDecoder = pathDecoder
         self.aggregator = aggregator
         self.basePath = basePath
@@ -38,7 +35,6 @@ public class UsageRepository {
         self.init(
             fileSystem: FileSystemService(),
             parser: JSONLUsageParser(),
-            deduplication: HashBasedDeduplication(),
             pathDecoder: ProjectPathDecoder(),
             aggregator: StatisticsAggregator(),
             basePath: basePath
@@ -54,13 +50,13 @@ public class UsageRepository {
             return createEmptyStats()
         }
         
-        // Reset deduplication for fresh calculation
-        deduplication.reset()
+        // Create a new deduplication instance for this operation to avoid race conditions
+        let deduplication = HashBasedDeduplication()
         
         // Collect and process all JSONL files
         let filesToProcess = try collectJSONLFiles(from: projectsPath)
         let sortedFiles = sortFilesByTimestamp(filesToProcess)
-        let entries = try processFiles(sortedFiles)
+        let entries = try processFiles(sortedFiles, deduplication: deduplication)
         
         #if DEBUG
         print("[UsageRepository] Loaded \(entries.count) entries from \(sortedFiles.count) files")
@@ -87,11 +83,12 @@ public class UsageRepository {
             return []
         }
         
-        deduplication.reset()
+        // Create a new deduplication instance for this operation to avoid race conditions
+        let deduplication = HashBasedDeduplication()
         
         let filesToProcess = try collectJSONLFiles(from: projectsPath)
         let sortedFiles = sortFilesByTimestamp(filesToProcess)
-        var entries = try processFiles(sortedFiles)
+        var entries = try processFiles(sortedFiles, deduplication: deduplication)
         
         // Sort by timestamp (newest first)
         entries.sort { $0.timestamp > $1.timestamp }
@@ -138,18 +135,18 @@ public class UsageRepository {
         return files.sorted { $0.earliestTimestamp < $1.earliestTimestamp }
     }
     
-    private func processFiles(_ files: [(path: String, projectDir: String, earliestTimestamp: String)]) throws -> [UsageEntry] {
+    private func processFiles(_ files: [(path: String, projectDir: String, earliestTimestamp: String)], deduplication: DeduplicationStrategy) throws -> [UsageEntry] {
         var allEntries: [UsageEntry] = []
         
         for (filePath, projectDir, _) in files {
-            let entries = try processJSONLFile(at: filePath, projectDir: projectDir)
+            let entries = try processJSONLFile(at: filePath, projectDir: projectDir, deduplication: deduplication)
             allEntries.append(contentsOf: entries)
         }
         
         return allEntries
     }
     
-    private func processJSONLFile(at path: String, projectDir: String) throws -> [UsageEntry] {
+    private func processJSONLFile(at path: String, projectDir: String, deduplication: DeduplicationStrategy) throws -> [UsageEntry] {
         let content = try fileSystem.readFile(atPath: path)
         let lines = content.components(separatedBy: .newlines).filter { !$0.isEmpty }
         
