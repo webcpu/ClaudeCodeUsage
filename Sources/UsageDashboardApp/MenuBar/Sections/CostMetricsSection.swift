@@ -29,17 +29,19 @@ struct CostMetricsSection: View {
     
     // MARK: - Today's Cost View
     private var todaysCostView: some View {
-        HStack {
+        HStack(spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Today")
                     .font(MenuBarTheme.Typography.metricTitle)
                     .foregroundColor(MenuBarTheme.Colors.UI.secondaryText)
                 
-                HStack(spacing: 6) {
+                HStack(spacing: 4) {
                     Text(dataModel.todaysCost)
                         .font(MenuBarTheme.Typography.metricValue)
                         .foregroundColor(todaysCostColor)
                         .monospacedDigit()
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
                     
                     if dataModel.todaysCostProgress > 1.0 {
                         Image(systemName: "flame.fill")
@@ -48,19 +50,26 @@ struct CostMetricsSection: View {
                     }
                 }
             }
+            .frame(minWidth: 80)
             
-            Spacer()
+            Spacer(minLength: 10)
             
-            // Hourly cost bar chart
+            // Hourly cost bar chart with y-axis labels
             if !chartDataService.todayHourlyCosts.isEmpty {
-                BarChartView(
-                    dataPoints: chartDataService.todayHourlyCosts
-                )
-                .frame(
-                    width: 220,
-                    height: 45
-                )
-                .padding(.leading, 45) // Add space for y-axis labels
+                HStack(spacing: 5) {
+                    // Y-axis labels container
+                    YAxisLabels(maxValue: chartDataService.todayHourlyCosts.max() ?? 1.0)
+                        .frame(width: 35, height: 45)
+                    
+                    // Bar chart
+                    BarChartView(
+                        dataPoints: chartDataService.todayHourlyCosts
+                    )
+                    .frame(
+                        width: 200,
+                        height: 45
+                    )
+                }
             }
         }
         .padding(.horizontal, MenuBarTheme.Layout.horizontalPadding)
@@ -97,5 +106,57 @@ struct CostMetricsSection: View {
     // MARK: - Helper Properties
     private var todaysCostColor: Color {
         ColorService.colorForCostProgress(dataModel.todaysCostProgress)
+    }
+}
+
+// MARK: - Y-Axis Labels Component
+private struct YAxisLabels: View {
+    let maxValue: Double
+    
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 0) {
+            Text(formatCostValue(maxValue))
+                .font(.system(size: 8, weight: .regular, design: .monospaced))
+                .foregroundColor(.gray)
+            
+            Spacer()
+            
+            Text(formatCostValue(maxValue * 0.75))
+                .font(.system(size: 8, weight: .regular, design: .monospaced))
+                .foregroundColor(.gray)
+            
+            Spacer()
+            
+            Text(formatCostValue(maxValue * 0.5))
+                .font(.system(size: 8, weight: .regular, design: .monospaced))
+                .foregroundColor(.gray)
+            
+            Spacer()
+            
+            Text(formatCostValue(maxValue * 0.25))
+                .font(.system(size: 8, weight: .regular, design: .monospaced))
+                .foregroundColor(.gray)
+            
+            Spacer()
+            
+            Text("$0")
+                .font(.system(size: 8, weight: .regular, design: .monospaced))
+                .foregroundColor(.gray)
+        }
+        .padding(.bottom, 12) // Align with chart baseline
+    }
+    
+    private func formatCostValue(_ value: Double) -> String {
+        if value == 0 {
+            return "$0"
+        } else if value < 1 {
+            return String(format: "$%.2f", value)
+        } else if value < 10 {
+            return String(format: "$%.1f", value)
+        } else if value < 100 {
+            return String(format: "$%.0f", value)
+        } else {
+            return String(format: "$%.0f", value)
+        }
     }
 }

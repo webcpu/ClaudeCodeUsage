@@ -200,54 +200,7 @@ private struct AxisLabels: View {
                             y: geometry.size.height - 6
                         )
                 }
-                
-                // Y-axis labels (cost values)
-                VStack(alignment: .trailing, spacing: 0) {
-                    Text(formatCostValue(maxValue))
-                        .font(.system(size: 8, weight: .regular, design: .monospaced))
-                        .foregroundColor(.gray)
-                    
-                    Spacer()
-                    
-                    Text(formatCostValue(maxValue * 0.75))
-                        .font(.system(size: 8, weight: .regular, design: .monospaced))
-                        .foregroundColor(.gray)
-                    
-                    Spacer()
-                    
-                    Text(formatCostValue(maxValue * 0.5))
-                        .font(.system(size: 8, weight: .regular, design: .monospaced))
-                        .foregroundColor(.gray)
-                    
-                    Spacer()
-                    
-                    Text(formatCostValue(maxValue * 0.25))
-                        .font(.system(size: 8, weight: .regular, design: .monospaced))
-                        .foregroundColor(.gray)
-                    
-                    Spacer()
-                    
-                    Text("$0")
-                        .font(.system(size: 8, weight: .regular, design: .monospaced))
-                        .foregroundColor(.gray)
-                }
-                .frame(width: 40, height: geometry.size.height - 12)
-                .position(x: -15, y: (geometry.size.height - 12) / 2)
             }
-        }
-    }
-    
-    private func formatCostValue(_ value: Double) -> String {
-        if value == 0 {
-            return "$0"
-        } else if value < 1 {
-            return String(format: "$%.2f", value)
-        } else if value < 10 {
-            return String(format: "$%.1f", value)
-        } else if value < 100 {
-            return String(format: "$%.0f", value)
-        } else {
-            return String(format: "$%.0f", value)
         }
     }
 }
