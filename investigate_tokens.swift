@@ -109,7 +109,7 @@ let cost3 = Double(totalInput) * sonnetInputPrice +
 
 print("   With cache write only: $\(String(format: "%.2f", cost3))")
 
-print("\n📌 Expected from Claudia: $4.00")
+print("\n📌 Expected from Claude: $4.00")
 
 // Check if values might be in different units
 print("\n🔢 Unit Analysis:")

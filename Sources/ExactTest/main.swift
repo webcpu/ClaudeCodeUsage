@@ -1,7 +1,7 @@
 import Foundation
 import ClaudeCodeUsage
 
-// Exact expected values from Claudia's display
+// Exact expected values from Claude's display
 let expectedExactValues: [(date: String, input: Int, output: Int, cost: Double)] = [
     ("2025-07-30", 420, 15590, 4.00),
     ("2025-07-31", 404, 19440, 10.04),
@@ -14,19 +14,19 @@ let expectedExactValues: [(date: String, input: Int, output: Int, cost: Double)]
     ("2025-08-07", 3400, 30784, 63.21)
 ]
 
-print("✅ ClaudiaUsageSDK Exact Match Verification")
+print("✅ ClaudeUsageSDK Exact Match Verification")
 print(String(repeating: "=", count: 72))
 
-let client = ClaudiaUsageClient(dataSource: .localFiles(basePath: NSHomeDirectory() + "/.claude"))
+let client = ClaudeUsageClient(dataSource: .localFiles(basePath: NSHomeDirectory() + "/.claude"))
 
 Task {
     do {
-        // Get stats with exact Claudia values (default behavior)
+        // Get stats with exact Claude values (default behavior)
         let stats = try await client.getUsageStats()
         
-        print("\n📊 Verifying Exact Match with Claudia:")
+        print("\n📊 Verifying Exact Match with Claude:")
         print("┌────────────┬──────────────────────┬──────────────────────┬────────────┬────────┐")
-        print("│ Date       │ Expected (Claudia)   │ SDK Returns          │ Cost Match │ Status │")
+        print("│ Date       │ Expected (Claude)   │ SDK Returns          │ Cost Match │ Status │")
         print("├────────────┼──────────────────────┼──────────────────────┼────────────┼────────┤")
         
         var allMatch = true
@@ -101,9 +101,9 @@ Task {
                          stats.totalOutputTokens == expectedTotalOutput
         
         if allMatch && totalMatch && tokensMatch {
-            print("\n✅ PERFECT MATCH! SDK returns exactly what Claudia displays!")
+            print("\n✅ PERFECT MATCH! SDK returns exactly what Claude displays!")
         } else {
-            print("\n❌ Mismatch detected. SDK does not return exact Claudia values.")
+            print("\n❌ Mismatch detected. SDK does not return exact Claude values.")
             
             // Show the SDK calculation
             print("\n🔍 SDK Calculation:")

@@ -7,7 +7,7 @@ print("🔍 Minimal SDK Test")
 print(String(repeating: "=", count: 50))
 
 // Create client with real data
-let client = ClaudiaUsageClient(dataSource: .localFiles(basePath: NSHomeDirectory() + "/.claude"))
+let client = ClaudeUsageClient(dataSource: .localFiles(basePath: NSHomeDirectory() + "/.claude"))
 
 // Test getting usage details synchronously
 print("\n📊 Testing getUsageDetails...")

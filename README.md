@@ -1,13 +1,13 @@
 # ClaudeCodeUsage
 
-A Swift SDK for accessing and analyzing Claude Code usage data from the Claudia desktop application.
+A Swift SDK for accessing and analyzing Claude Code usage data from the Claude desktop application.
 
 ## Features
 
 - 📊 **Comprehensive Usage Statistics** - Access detailed usage data including costs, tokens, and session information
 - 🔍 **Flexible Data Sources** - Support for Tauri API, local file parsing, or mock data
 - 📈 **Advanced Analytics** - Built-in analytics for trends, predictions, and cost breakdowns  
-- 🎯 **Type-Safe Models** - Strongly typed Swift models matching the Claudia backend
+- 🎯 **Type-Safe Models** - Strongly typed Swift models matching the Claude backend
 - 📱 **Multi-Platform** - Works on iOS, macOS, tvOS, and watchOS
 - 🚀 **High Performance** - Efficient parsing and caching for large datasets
 
@@ -19,7 +19,7 @@ Add the following to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "path/to/ClaudiaUsageSDK", from: "1.0.0")
+    .package(url: "path/to/ClaudeUsageSDK", from: "1.0.0")
 ]
 ```
 
@@ -31,10 +31,10 @@ Or in Xcode:
 ## Quick Start
 
 ```swift
-import ClaudiaUsageSDK
+import ClaudeUsageSDK
 
 // Initialize the client
-let client = ClaudiaUsageClient()
+let client = ClaudeUsageClient()
 
 // Fetch overall usage stats
 Task {
@@ -54,7 +54,7 @@ Task {
 ### Fetching Usage by Date Range
 
 ```swift
-let client = ClaudiaUsageClient()
+let client = ClaudeUsageClient()
 
 // Get last 7 days of usage
 let endDate = Date()
@@ -91,7 +91,7 @@ Task {
 ### Analyzing Usage Patterns
 
 ```swift
-let client = ClaudiaUsageClient()
+let client = ClaudeUsageClient()
 
 Task {
     let stats = try await client.getUsageStats()
@@ -119,7 +119,7 @@ Task {
 ### Working with Session Data
 
 ```swift
-let client = ClaudiaUsageClient()
+let client = ClaudeUsageClient()
 
 Task {
     // Get top expensive sessions
@@ -156,17 +156,17 @@ Task {
 
 ```swift
 // Connect to Tauri API
-let apiClient = ClaudiaUsageClient(
+let apiClient = ClaudeUsageClient(
     dataSource: .tauriAPI(baseURL: URL(string: "http://localhost:1420")!)
 )
 
 // Parse local files
-let localClient = ClaudiaUsageClient(
+let localClient = ClaudeUsageClient(
     dataSource: .localFiles(basePath: NSHomeDirectory() + "/.claude")
 )
 
 // Use mock data for testing
-let mockClient = ClaudiaUsageClient(dataSource: .mock)
+let mockClient = ClaudeUsageClient(dataSource: .mock)
 ```
 
 ## Data Models
@@ -203,13 +203,13 @@ The SDK is designed to work seamlessly with SwiftUI:
 
 ```swift
 import SwiftUI
-import ClaudiaUsageSDK
+import ClaudeUsageSDK
 
 struct UsageDashboard: View {
     @State private var stats: UsageStats?
     @State private var isLoading = true
     
-    private let client = ClaudiaUsageClient()
+    private let client = ClaudeUsageClient()
     
     var body: some View {
         NavigationView {

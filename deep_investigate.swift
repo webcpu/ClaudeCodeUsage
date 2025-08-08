@@ -166,7 +166,7 @@ if let assistantType = typeCount["assistant"] {
     print("   Cost: $\(String(format: "%.2f", cost5))")
 }
 
-print("\n🎯 Expected from Claudia:")
+print("\n🎯 Expected from Claude:")
 print("   Input: 420, Output: 15,590")
 print("   Cost: $4.00")
 

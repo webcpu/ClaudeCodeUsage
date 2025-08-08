@@ -1,6 +1,6 @@
 //
 //  UsageAnalytics.swift
-//  ClaudiaUsageSDK
+//  ClaudeCodeUsage
 //
 //  Analytics and filtering utilities for usage data
 //

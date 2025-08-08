@@ -2,7 +2,7 @@
 //  main.swift
 //  UsageDashboardCLI
 //
-//  Command-line example app for ClaudiaUsageSDK
+//  Command-line example app for ClaudeUsageSDK
 //
 
 import Foundation
@@ -21,12 +21,12 @@ struct UsageDashboardCLI {
     
     @MainActor
     static func runDashboard() async {
-        print("🚀 Claudia Usage Dashboard")
+        print("🚀 Claude Usage Dashboard")
         print("=" * 50)
         
         // Initialize client with real data from ~/.claude/projects/
         let claudePath = NSHomeDirectory() + "/.claude"
-        let client = ClaudiaUsageClient(dataSource: .localFiles(basePath: claudePath))
+        let client = ClaudeUsageClient(dataSource: .localFiles(basePath: claudePath))
         
         do {
             // Fetch overall stats
@@ -131,7 +131,7 @@ struct UsageDashboardCLI {
         return formatter.string(from: NSNumber(value: num)) ?? "\(num)"
     }
     
-    static func displayAnalytics(_ stats: UsageStats, client: ClaudiaUsageClient) async {
+    static func displayAnalytics(_ stats: UsageStats, client: ClaudeUsageClient) async {
         print("\n📊 ANALYTICS")
         print("-" * 30)
         
@@ -156,7 +156,7 @@ struct UsageDashboardCLI {
         print("Cache Savings: \(savings.description)")
     }
     
-    static func displayTopProjects(client: ClaudiaUsageClient) async {
+    static func displayTopProjects(client: ClaudeUsageClient) async {
         print("\n📁 TOP PROJECTS BY COST")
         print("-" * 30)
         

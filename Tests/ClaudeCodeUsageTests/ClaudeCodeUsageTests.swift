@@ -1,6 +1,6 @@
 //
-//  ClaudiaUsageSDKTests.swift
-//  ClaudiaUsageSDK Tests
+//  ClaudeCodeUsageTests.swift
+//  ClaudeCodeUsage Tests
 //
 //  Unit tests for the SDK
 //
@@ -8,14 +8,14 @@
 import XCTest
 @testable import ClaudeCodeUsage
 
-final class ClaudiaUsageSDKTests: XCTestCase {
+final class ClaudeCodeUsageTests: XCTestCase {
     
-    var client: ClaudiaUsageClient!
+    var client: ClaudeUsageClient!
     
     override func setUp() {
         super.setUp()
         // Use mock data for testing
-        client = ClaudiaUsageClient(dataSource: .mock)
+        client = ClaudeUsageClient(dataSource: .mock)
     }
     
     override func tearDown() {

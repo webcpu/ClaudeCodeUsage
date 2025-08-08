@@ -1,6 +1,6 @@
 //
 //  UsageDashboardApp.swift
-//  Minimal SwiftUI App for ClaudiaUsageSDK
+//  Minimal SwiftUI App for ClaudeUsageSDK
 //
 
 import SwiftUI
@@ -22,7 +22,7 @@ struct ContentView: View {
     @State private var errorMessage: String?
     
     // Use real data from Claude sessions
-    private let client = ClaudiaUsageClient(dataSource: .localFiles(basePath: NSHomeDirectory() + "/.claude"))
+    private let client = ClaudeUsageClient(dataSource: .localFiles(basePath: NSHomeDirectory() + "/.claude"))
     
     var body: some View {
         if #available(macOS 13.0, *) {

@@ -1,6 +1,6 @@
 //
 //  UsageDashboardExample.swift
-//  ClaudiaUsageSDK Example
+//  ClaudeUsageSDK Example
 //
 //  Example SwiftUI application demonstrating the SDK
 //
@@ -74,7 +74,7 @@ class UsageDashboardViewModel: ObservableObject {
     @Published var error: Error?
     @Published var selectedTimeRange: TimeRange = .last7Days
     
-    private let client = ClaudiaUsageClient()
+    private let client = ClaudeUsageClient()
     
     func loadData() async {
         isLoading = true

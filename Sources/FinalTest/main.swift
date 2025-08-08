@@ -1,7 +1,7 @@
 import Foundation
 import ClaudeCodeUsage
 
-// Expected daily costs from Claudia
+// Expected daily costs from Claude
 let expectedCosts: [String: Double] = [
     "2025-07-30": 4.00,
     "2025-07-31": 10.04,
@@ -14,10 +14,10 @@ let expectedCosts: [String: Double] = [
     "2025-08-07": 63.21
 ]
 
-print("🎯 ClaudiaUsageSDK Final Accuracy Test")
+print("🎯 ClaudeUsageSDK Final Accuracy Test")
 print(String(repeating: "=", count: 72))
 
-let client = ClaudiaUsageClient(dataSource: .localFiles(basePath: NSHomeDirectory() + "/.claude"))
+let client = ClaudeUsageClient(dataSource: .localFiles(basePath: NSHomeDirectory() + "/.claude"))
 
 Task {
     do {
@@ -82,15 +82,15 @@ Task {
         
         print("\n💡 Notes:")
         print("   • Cache read tokens are excluded from cost calculation")
-        print("   • Token counts differ from Claudia's display (SDK counts all entries)")
+        print("   • Token counts differ from Claude's display (SDK counts all entries)")
         print("   • Cost calculation uses standard Claude pricing:")
         print("     - Sonnet-4: $3/M input, $15/M output, $3.75/M cache write")
         print("     - Opus-4: $15/M input, $75/M output, $18.75/M cache write")
         
         if accuracy < 80 {
             print("\n⚠️ Accuracy is below 80%. Possible reasons:")
-            print("   • Claudia may use different aggregation or rounding")
-            print("   • Some entries might be filtered in Claudia's display")
+            print("   • Claude may use different aggregation or rounding")
+            print("   • Some entries might be filtered in Claude's display")
             print("   • Pricing might have changed over time")
         } else {
             print("\n✅ SDK provides reasonably accurate cost calculations!")

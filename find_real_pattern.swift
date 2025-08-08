@@ -2,7 +2,7 @@
 
 import Foundation
 
-// Find the real pattern Claudia uses
+// Find the real pattern Claude uses
 let projectsPath = NSHomeDirectory() + "/.claude/projects"
 let targetDate = "2025-07-30"
 
@@ -94,7 +94,7 @@ if let projectDirs = try? fileManager.contentsOfDirectory(atPath: projectsPath) 
 }
 
 print("\n📊 Different Aggregation Methods for \(targetDate):")
-print("\n✅ Expected from Claudia:")
+print("\n✅ Expected from Claude:")
 print("   Input: 420, Output: 15,590, Cost: $4.00")
 
 // Calculate costs for each method

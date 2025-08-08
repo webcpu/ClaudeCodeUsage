@@ -1,6 +1,6 @@
 //
 //  UsageModels.swift
-//  ClaudiaUsageSDK
+//  ClaudeCodeUsage
 //
 //  Data models for Claude Code usage statistics
 //
@@ -328,7 +328,7 @@ public struct ModelPricing {
     }
     
     /// Calculate cost for given token counts
-    /// Note: Cache read tokens are included to match Claudia's Rust backend calculation
+    /// Note: Cache read tokens are included to match Claude's Rust backend calculation
     public func calculateCost(inputTokens: Int, outputTokens: Int, cacheWriteTokens: Int = 0, cacheReadTokens: Int = 0) -> Double {
         let inputCost = (Double(inputTokens) / 1_000_000) * inputPricePerMillion
         let outputCost = (Double(outputTokens) / 1_000_000) * outputPricePerMillion

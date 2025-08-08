@@ -5,7 +5,7 @@ import ClaudeCodeUsage
 
 print("Testing SDK...")
 
-let client = ClaudiaUsageClient(dataSource: .mock)
+let client = ClaudeUsageClient(dataSource: .mock)
 
 Task {
     do {

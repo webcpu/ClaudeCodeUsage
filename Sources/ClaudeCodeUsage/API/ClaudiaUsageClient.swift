@@ -1,6 +1,6 @@
 //
-//  ClaudiaUsageClient.swift
-//  ClaudiaUsageSDK
+//  ClaudeUsageClient.swift
+//  ClaudeCodeUsage
 //
 //  API client for fetching Claude Code usage data
 //
@@ -25,30 +25,22 @@ public enum SortOrder: String {
 }
 
 /// Main client for accessing Claude Code usage data
-public class ClaudiaUsageClient: UsageDataSource {
+public class ClaudeUsageClient: UsageDataSource {
     
     /// Shared instance
-    public static let shared = ClaudiaUsageClient()
+    public static let shared = ClaudeUsageClient()
     
     /// Data source mode
     public enum DataSource {
-        case tauriAPI(baseURL: URL)
         case localFiles(basePath: String)
         case mock
     }
     
     private let dataSource: DataSource
-    private let decoder = JSONDecoder()
-    private let session: URLSession
     
     /// Initialize with a specific data source
     public init(dataSource: DataSource = .localFiles(basePath: NSHomeDirectory() + "/.claude")) {
         self.dataSource = dataSource
-        
-        let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 30
-        config.timeoutIntervalForResource = 60
-        self.session = URLSession(configuration: config)
     }
     
     // MARK: - Public API
@@ -56,9 +48,6 @@ public class ClaudiaUsageClient: UsageDataSource {
     /// Get overall usage statistics
     public func getUsageStats() async throws -> UsageStats {
         switch dataSource {
-        case .tauriAPI(let baseURL):
-            return try await fetchFromAPI(endpoint: "get_usage_stats", baseURL: baseURL)
-            
         case .localFiles(let basePath):
             return try await parseLocalUsageFiles(basePath: basePath)
             
@@ -70,14 +59,6 @@ public class ClaudiaUsageClient: UsageDataSource {
     /// Get usage statistics filtered by date range
     public func getUsageByDateRange(startDate: Date, endDate: Date) async throws -> UsageStats {
         switch dataSource {
-        case .tauriAPI(let baseURL):
-            let formatter = ISO8601DateFormatter()
-            let params = [
-                "startDate": formatter.string(from: startDate),
-                "endDate": formatter.string(from: endDate)
-            ]
-            return try await fetchFromAPI(endpoint: "get_usage_by_date_range", baseURL: baseURL, parameters: params)
-            
         case .localFiles(let basePath):
             let allStats = try await parseLocalUsageFiles(basePath: basePath)
             return filterStatsByDateRange(allStats, start: startDate, end: endDate)
@@ -90,23 +71,6 @@ public class ClaudiaUsageClient: UsageDataSource {
     /// Get session-level statistics
     public func getSessionStats(since: Date? = nil, until: Date? = nil, order: SortOrder? = nil) async throws -> [ProjectUsage] {
         switch dataSource {
-        case .tauriAPI(let baseURL):
-            var params: [String: String] = [:]
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyyyMMdd"
-            
-            if let since = since {
-                params["since"] = formatter.string(from: since)
-            }
-            if let until = until {
-                params["until"] = formatter.string(from: until)
-            }
-            if let order = order {
-                params["order"] = order.rawValue
-            }
-            
-            return try await fetchFromAPI(endpoint: "get_session_stats", baseURL: baseURL, parameters: params)
-            
         case .localFiles(let basePath):
             let allStats = try await parseLocalUsageFiles(basePath: basePath)
             var projects = allStats.byProject
@@ -138,10 +102,6 @@ public class ClaudiaUsageClient: UsageDataSource {
     /// Get detailed usage entries
     public func getUsageDetails(limit: Int? = nil) async throws -> [UsageEntry] {
         switch dataSource {
-        case .tauriAPI(let baseURL):
-            let params = limit.map { ["limit": String($0)] } ?? [:]
-            return try await fetchFromAPI(endpoint: "get_usage_details", baseURL: baseURL, parameters: params)
-            
         case .localFiles(let basePath):
             let entries = try await parseLocalUsageEntries(basePath: basePath)
             if let limit = limit {
@@ -155,24 +115,6 @@ public class ClaudiaUsageClient: UsageDataSource {
     }
     
     // MARK: - Private Methods
-    
-    private func fetchFromAPI<T: Decodable>(endpoint: String, baseURL: URL, parameters: [String: String] = [:]) async throws -> T {
-        var components = URLComponents(url: baseURL.appendingPathComponent(endpoint), resolvingAgainstBaseURL: false)
-        components?.queryItems = parameters.map { URLQueryItem(name: $0.key, value: $0.value) }
-        
-        guard let url = components?.url else {
-            throw UsageClientError.invalidURL
-        }
-        
-        let (data, response) = try await session.data(from: url)
-        
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) else {
-            throw UsageClientError.httpError((response as? HTTPURLResponse)?.statusCode ?? 0)
-        }
-        
-        return try decoder.decode(T.self, from: data)
-    }
     
     private func parseLocalUsageFiles(basePath: String) async throws -> UsageStats {
         let projectsPath = basePath + "/projects"
@@ -418,7 +360,7 @@ public class ClaudiaUsageClient: UsageDataSource {
                     outputTokens: modelUsage.outputTokens + entry.outputTokens,
                     cacheCreationTokens: modelUsage.cacheCreationTokens + entry.cacheWriteTokens,
                     cacheReadTokens: modelUsage.cacheReadTokens + entry.cacheReadTokens,
-                    sessionCount: modelUsage.sessionCount
+                    sessionCount: modelUsage.sessionCount + 1
                 )
                 modelStats[entry.model] = modelUsage
             } else {
@@ -637,8 +579,8 @@ public class ClaudiaUsageClient: UsageDataSource {
     private func mockProjectUsage() -> [ProjectUsage] {
         [
             ProjectUsage(
-                projectPath: "/Users/liang/Downloads/Data/tmp/claudia",
-                projectName: "claudia",
+                projectPath: "/Users/liang/Downloads/Data/tmp/Claude",
+                projectName: "Claude",
                 totalCost: 108.85,
                 totalTokens: 47_813,
                 sessionCount: 1,
@@ -674,20 +616,11 @@ public class ClaudiaUsageClient: UsageDataSource {
 
 /// Errors that can occur in the usage client
 public enum UsageClientError: LocalizedError {
-    case invalidURL
-    case httpError(Int)
-    case decodingError(Error)
     case fileNotFound
     case parsingError
     
     public var errorDescription: String? {
         switch self {
-        case .invalidURL:
-            return "Invalid URL"
-        case .httpError(let code):
-            return "HTTP error: \(code)"
-        case .decodingError(let error):
-            return "Decoding error: \(error.localizedDescription)"
         case .fileNotFound:
             return "File not found"
         case .parsingError:

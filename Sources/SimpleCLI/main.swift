@@ -1,14 +1,14 @@
 import Foundation
 import ClaudeCodeUsage
 
-print("🚀 Claudia Usage Dashboard - Real Data")
+print("🚀 Claude Usage Dashboard - Real Data")
 print(String(repeating: "=", count: 72))
 
 // Use real data from ~/.claude/projects/
 let claudePath = NSHomeDirectory() + "/.claude"
 print("Using path: \(claudePath)")
 
-let client = ClaudiaUsageClient(dataSource: .localFiles(basePath: claudePath))
+let client = ClaudeUsageClient(dataSource: .localFiles(basePath: claudePath))
 print("Client created")
 
 Task {

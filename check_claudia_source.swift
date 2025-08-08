@@ -2,11 +2,11 @@
 
 import Foundation
 
-// Check if Claudia might be storing aggregated data somewhere
+// Check if Claude might be storing aggregated data somewhere
 let claudePath = NSHomeDirectory() + "/.claude"
 let fileManager = FileManager.default
 
-print("🔍 Looking for Claudia's aggregated data source")
+print("🔍 Looking for Claude's aggregated data source")
 print(String(repeating: "=", count: 72))
 
 // Look for JSON files that might contain usage data
@@ -78,10 +78,10 @@ searchForUsageData(in: claudePath)
 // Check if there's a cache or state file
 print("\n\n📦 Checking for cache/state files:")
 let possibleCacheLocations = [
-    NSHomeDirectory() + "/Library/Caches/com.anthropic.claudia",
-    NSHomeDirectory() + "/Library/Application Support/Claudia",
-    NSHomeDirectory() + "/.cache/claudia",
-    "/tmp/claudia"
+    NSHomeDirectory() + "/Library/Caches/com.anthropic.Claude",
+    NSHomeDirectory() + "/Library/Application Support/Claude",
+    NSHomeDirectory() + "/.cache/Claude",
+    "/tmp/Claude"
 ]
 
 for location in possibleCacheLocations {
@@ -97,7 +97,7 @@ for location in possibleCacheLocations {
     }
 }
 
-// Check environment for any Claudia-specific paths
+// Check environment for any Claude-specific paths
 print("\n\n🌍 Environment variables:")
 let env = ProcessInfo.processInfo.environment
 for (key, value) in env {
@@ -107,7 +107,7 @@ for (key, value) in env {
 }
 
 print("\n\n💡 Hypothesis:")
-print("   If we can't find pre-aggregated data, Claudia might be:")
+print("   If we can't find pre-aggregated data, Claude might be:")
 print("   1. Calculating on-the-fly with different logic")
 print("   2. Using a remote API that returns these values")
 print("   3. Applying a transformation we don't know about")

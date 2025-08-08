@@ -4,7 +4,7 @@ import ClaudeCodeUsage
 print("🔧 Testing SDK with Deduplication Logic")
 print(String(repeating: "=", count: 60))
 
-let client = ClaudiaUsageClient(dataSource: .localFiles(basePath: NSHomeDirectory() + "/.claude"))
+let client = ClaudeUsageClient(dataSource: .localFiles(basePath: NSHomeDirectory() + "/.claude"))
 
 do {
     let stats = try await client.getUsageStats()
@@ -23,8 +23,8 @@ do {
         print("   \(daily.date): $\(String(format: "%.2f", daily.totalCost)) - \(daily.totalTokens) tokens")
     }
     
-    print("\n✅ Comparison with Claudia's 2025-07-30:")
-    print("   Claudia shows: 420 input, 15,590 output, $4.00")
+    print("\n✅ Comparison with Claude's 2025-07-30:")
+    print("   Claude shows: 420 input, 15,590 output, $4.00")
     if let july30 = stats.byDate.first(where: { $0.date == "2025-07-30" }) {
         print("   SDK returns: $\(String(format: "%.2f", july30.totalCost))")
         let match = abs(july30.totalCost - 4.00) < 0.01

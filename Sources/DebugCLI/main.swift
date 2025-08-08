@@ -1,7 +1,7 @@
 import Foundation
 import ClaudeCodeUsage
 
-// Expected daily costs from Claudia
+// Expected daily costs from Claude
 let expectedCosts: [String: Double] = [
     "2025-07-30": 4.00,
     "2025-07-31": 10.04,
@@ -14,11 +14,11 @@ let expectedCosts: [String: Double] = [
     "2025-08-07": 63.21
 ]
 
-print("🔍 Debugging ClaudiaUsageSDK Cost Calculations")
+print("🔍 Debugging ClaudeUsageSDK Cost Calculations")
 print(String(repeating: "=", count: 72))
 
 let claudePath = NSHomeDirectory() + "/.claude"
-let client = ClaudiaUsageClient(dataSource: .localFiles(basePath: claudePath))
+let client = ClaudeUsageClient(dataSource: .localFiles(basePath: claudePath))
 
 Task {
     do {

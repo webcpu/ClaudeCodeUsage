@@ -2,7 +2,7 @@
 
 import Foundation
 
-// Test different hypotheses about how Claudia might be calculating the values
+// Test different hypotheses about how Claude might be calculating the values
 let projectsPath = NSHomeDirectory() + "/.claude/projects"
 let targetDate = "2025-07-30"
 
@@ -55,7 +55,7 @@ print("   Output: \(outputTokens)")
 print("   Cache Write: \(cacheWriteTokens)")
 print("   Cache Read: \(cacheReadTokens)")
 
-print("\n🎯 Expected from Claudia:")
+print("\n🎯 Expected from Claude:")
 print("   Input: 420")
 print("   Output: 15,590")
 print("   Cost: $4.00")
@@ -142,7 +142,7 @@ print("\n🤔 Conclusion:")
 if abs(cost2 - 4.00) < 0.3 {
     print("   The SDK calculation ($\(String(format: "%.2f", cost2))) is very close to expected ($4.00)")
     print("   The difference might be due to:")
-    print("   • Rounding in Claudia's display")
+    print("   • Rounding in Claude's display")
     print("   • Different aggregation timing")
     print("   • Minor calculation differences")
 } else {

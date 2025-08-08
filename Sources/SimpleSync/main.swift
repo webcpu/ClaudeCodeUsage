@@ -1,7 +1,7 @@
 import Foundation
 import ClaudeCodeUsage
 
-print("🚀 Claudia Usage Dashboard - Synchronous Test")
+print("🚀 Claude Usage Dashboard - Synchronous Test")
 print(String(repeating: "=", count: 72))
 
 // Direct synchronous parsing test

@@ -1,13 +1,13 @@
 //
-//  ClaudiaUsageSDK.swift
-//  ClaudiaUsageSDK
+//  ClaudeUsageSDK.swift
+//  ClaudeUsageSDK
 //
 //  Main SDK entry point - exports all public APIs
 //
 
 import Foundation
 
-/// ClaudiaUsageSDK
+/// ClaudeUsageSDK
 /// 
 /// A Swift SDK for accessing and analyzing Claude Code usage data.
 /// 
@@ -15,11 +15,11 @@ import Foundation
 /// ```swift
 /// import ClaudeCodeUsage
 /// 
-/// let client = ClaudiaUsageClient()
+/// let client = ClaudeUsageClient()
 /// let stats = try await client.getUsageStats()
 /// print("Total cost: \(stats.totalCost)")
 /// ```
-public struct ClaudiaUsageSDK {
+public struct ClaudeUsageSDK {
     /// SDK Version
     public static let version = "1.0.0"
     
@@ -38,7 +38,7 @@ public struct ClaudiaUsageSDK {
     /// Get SDK information
     public static var info: String {
         """
-        ClaudiaUsageSDK v\(version)
+        ClaudeUsageSDK v\(version)
         Build Date: \(buildDate)
         Platform Support: \(isSupported ? "Yes" : "No")
         """
