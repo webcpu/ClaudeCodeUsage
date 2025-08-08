@@ -64,7 +64,7 @@ struct ImprovedProgressBar: View {
                 }
             }
         }
-        .frame(height: 8)
+        .frame(height: 10)
     }
 }
 
@@ -159,7 +159,7 @@ struct EnhancedGraphView: View {
                 }
             }
         }
-        .frame(height: 40) // Larger height for better visibility
+        .frame(height: 45) // Larger height for better visibility
     }
 }
 
@@ -199,15 +199,15 @@ struct MetricRow: View {
                         .font(.system(size: 11))
                         .foregroundColor(.secondary)
                     
-                    HStack(spacing: 4) {
+                    HStack(spacing: 6) {
                         Text(displayPercentage)
                             .font(.system(size: 15, weight: .semibold, design: .rounded))
                             .foregroundColor(percentageColor)
                             .monospacedDigit()
                         
                         if showWarning && percentage >= 100 {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .font(.system(size: 10))
+                            Image(systemName: "flame.fill")
+                                .font(.system(size: 11))
                                 .foregroundColor(.red)
                         }
                     }
@@ -221,7 +221,8 @@ struct MetricRow: View {
                         dataPoints: trendData,
                         color: percentageColor
                     )
-                    .frame(width: 100, height: 40)
+                    .frame(width: 100, height: 45)
+                    .padding(.trailing, 6)
                 }
                 
                 // Values
@@ -230,14 +231,19 @@ struct MetricRow: View {
                         .font(.system(size: 11, weight: .medium))
                         .foregroundColor(.primary)
                         .monospacedDigit()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                     
                     if let subvalue = subvalue {
                         Text(subvalue)
                             .font(.system(size: 9))
                             .foregroundColor(.secondary)
                             .monospacedDigit()
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
                     }
                 }
+                .fixedSize(horizontal: false, vertical: true)
             }
             
             // Progress bar
@@ -246,10 +252,9 @@ struct MetricRow: View {
                 segments: segments,
                 showOverflow: percentage > 100
             )
-            .frame(height: 8)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 10)
     }
 }
 
@@ -284,8 +289,8 @@ struct ImprovedSectionHeader: View {
             
             Spacer()
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 10)
         .background(Color.gray.opacity(0.05))
     }
 }
@@ -295,10 +300,10 @@ struct ImprovedSectionHeader: View {
 struct ImprovedMenuBarContentView: View {
     @EnvironmentObject var dataModel: UsageDataModel
     @Environment(\.openWindow) private var openWindow
-    @State private var costHistory: [Double] = []
+    @State private var todayHourlyCosts: [Double] = []
     
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: 2) {
             // Live Session Section
             if let session = dataModel.activeSession, session.isActive {
                 ImprovedSectionHeader(
@@ -311,7 +316,7 @@ struct ImprovedMenuBarContentView: View {
                 sessionMetrics
                 
                 Divider()
-                    .padding(.vertical, 4)
+                    .padding(.vertical, 6)
             }
             
             // Usage Section
@@ -325,7 +330,7 @@ struct ImprovedMenuBarContentView: View {
             usageMetrics
             
             Divider()
-                .padding(.vertical, 4)
+                .padding(.vertical, 6)
             
             // Cost Section
             ImprovedSectionHeader(
@@ -338,20 +343,20 @@ struct ImprovedMenuBarContentView: View {
             costMetrics
             
             Divider()
-                .padding(.vertical, 8)
+                .padding(.vertical, 10)
             
             // Actions
             actionButtons
         }
-        .frame(width: 360) // Wider for better layout
+        .frame(width: 360) // Don't change it
         .background(Color(NSColor.controlBackgroundColor))
         .onAppear {
-            updateCostHistory()
+            updateTodayHourlyCosts()
         }
     }
     
     private var sessionMetrics: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 14) {
             if let session = dataModel.activeSession {
                 // Time progress
                 MetricRow(
@@ -401,15 +406,15 @@ struct ImprovedMenuBarContentView: View {
                             .foregroundColor(.orange)
                             .monospacedDigit()
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 8)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 10)
                 }
             }
         }
     }
     
     private var usageMetrics: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 14) {
             if let stats = dataModel.stats {
                 MetricRow(
                     title: "Sessions",
@@ -427,21 +432,41 @@ struct ImprovedMenuBarContentView: View {
     }
     
     private var costMetrics: some View {
-        VStack(spacing: 12) {
-            let costPercentage = dataModel.todaysCostProgress * 100
-            MetricRow(
-                title: "Today",
-                value: dataModel.todaysCost,
-                subvalue: "Budget: $\(String(format: "%.0f", dataModel.dailyCostThreshold))",
-                percentage: costPercentage,
-                segments: [
-                    ImprovedProgressBar.Segment(range: 0...0.5, color: .blue),
-                    ImprovedProgressBar.Segment(range: 0.5...0.8, color: .purple),
-                    ImprovedProgressBar.Segment(range: 0.8...1.5, color: .red)
-                ],
-                trendData: costHistory.isEmpty ? nil : costHistory,
-                showWarning: costPercentage >= 100
-            )
+        VStack(spacing: 14) {
+            // Today's cost with hourly graph
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Today")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                    
+                    HStack(spacing: 6) {
+                        Text(dataModel.todaysCost)
+                            .font(.system(size: 15, weight: .semibold, design: .rounded))
+                            .foregroundColor(todaysCostColor)
+                            .monospacedDigit()
+                        
+                        if dataModel.todaysCostProgress > 1.0 {
+                            Image(systemName: "flame.fill")
+                                .font(.system(size: 11))
+                                .foregroundColor(.red)
+                        }
+                    }
+                }
+                
+                Spacer()
+                
+                // Hourly cost graph
+                if !todayHourlyCosts.isEmpty {
+                    EnhancedGraphView(
+                        dataPoints: todayHourlyCosts,
+                        color: todaysCostColor
+                    )
+                    .frame(width: 200, height: 50)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 10)
             
             // Summary stats
             if let stats = dataModel.stats {
@@ -466,8 +491,8 @@ struct ImprovedMenuBarContentView: View {
                             .monospacedDigit()
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 8)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 10)
             }
         }
     }
@@ -483,7 +508,7 @@ struct ImprovedMenuBarContentView: View {
             Button("Refresh") {
                 Task {
                     await dataModel.loadData()
-                    updateCostHistory()
+                    updateTodayHourlyCosts()
                 }
             }
             .buttonStyle(MenuButtonStyle(style: .primary))
@@ -493,13 +518,41 @@ struct ImprovedMenuBarContentView: View {
             }
             .buttonStyle(MenuButtonStyle(style: .secondary))
         }
-        .padding(.horizontal, 16)
-        .padding(.bottom, 12)
+        .padding(.horizontal, 20)
+        .padding(.bottom, 14)
     }
     
-    private func updateCostHistory() {
-        if let stats = dataModel.stats {
-            costHistory = stats.byDate.suffix(10).map { $0.totalCost }
+    private func updateTodayHourlyCosts() {
+        Task {
+            do {
+                // Get real usage entries for today
+                let client = ClaudeUsageClient(dataSource: .localFiles(basePath: NSHomeDirectory() + "/.claude"))
+                let todayEntries = try await client.getTodayUsageEntries()
+                
+                // Convert to hourly accumulation
+                let hourlyData = UsageAnalytics.todayHourlyAccumulation(from: todayEntries)
+                
+                // Update UI on main thread
+                await MainActor.run {
+                    self.todayHourlyCosts = hourlyData
+                }
+            } catch {
+                print("Failed to load real hourly costs: \(error)")
+                // Fall back to empty array if real data can't be loaded
+                await MainActor.run {
+                    self.todayHourlyCosts = []
+                }
+            }
+        }
+    }
+    
+    private var todaysCostColor: Color {
+        let percentage = dataModel.todaysCostProgress
+        switch percentage {
+        case 0..<0.6: return .green
+        case 0.6..<0.8: return .orange
+        case 0.8..<1.0: return .orange
+        default: return .red
         }
     }
 }

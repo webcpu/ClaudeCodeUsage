@@ -73,7 +73,7 @@ struct ContentView: View {
                     }
                     
                     NavigationLink {
-                        MenuBarContentView()
+                        ImprovedMenuBarContentView()
                             .environmentObject(dataModel)
                     } label: {
                         Label("Live Metrics", systemImage: "arrow.triangle.2.circlepath")

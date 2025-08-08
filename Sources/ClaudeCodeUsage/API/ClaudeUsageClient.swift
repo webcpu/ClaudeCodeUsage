@@ -91,6 +91,19 @@ public class ClaudeUsageClient: UsageDataSource {
         }
         return try await repository.getUsageEntries(limit: limit)
     }
+    
+    /// Get today's usage entries with timestamps
+    public func getTodayUsageEntries() async throws -> [UsageEntry] {
+        let allEntries = try await getUsageDetails()
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let tomorrow = calendar.date(byAdding: .day, value: 1, to: today)!
+        
+        return allEntries.filter { entry in
+            guard let date = entry.date else { return false }
+            return date >= today && date < tomorrow
+        }
+    }
 }
 
 // MARK: - Filter Service

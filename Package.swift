@@ -24,55 +24,7 @@ let package = Package(
             targets: ["UsageDashboardApp"]),
         .executable(
             name: "SimpleCLI",
-            targets: ["SimpleCLI"]),
-        .executable(
-            name: "SimpleSync",
-            targets: ["SimpleSync"]),
-        .executable(
-            name: "TestCLI",
-            targets: ["TestCLI"]),
-        .executable(
-            name: "DebugCLI",
-            targets: ["DebugCLI"]),
-        .executable(
-            name: "FinalTest",
-            targets: ["FinalTest"]),
-        .executable(
-            name: "ExactTest",
-            targets: ["ExactTest"]),
-        .executable(
-            name: "RefactoredTest",
-            targets: ["RefactoredTest"]),
-        .executable(
-            name: "TestTimerCLI",
-            targets: ["TestTimerCLI"]),
-        .executable(
-            name: "TestRefreshCLI",
-            targets: ["TestRefreshCLI"]),
-        .executable(
-            name: "TestCPUFix",
-            targets: ["TestCPUFix"]),
-        .executable(
-            name: "TestMenuBar",
-            targets: ["TestMenuBar"]),
-        .executable(
-            name: "TestLiveMonitor",
-            targets: ["TestLiveMonitor"]),
-        .executable(
-            name: "TestLiveDebug",
-            targets: ["TestLiveDebug"]),
-        .executable(
-            name: "TestSessionDebug",
-            targets: ["TestSessionDebug"]),
-        .executable(
-            name: "TestWhichSession",
-            targets: ["TestWhichSession"]),
-        .executable(
-            name: "TestBothSessions",
-            targets: ["TestBothSessions"]),
-        .executable(
-            name: "TestCostStability",
-            targets: ["TestCostStability"])
+            targets: ["SimpleCLI"])
     ],
     dependencies: [
         // Dependencies declare other packages that this package depends on.
@@ -100,85 +52,6 @@ let package = Package(
             name: "SimpleCLI",
             dependencies: ["ClaudeCodeUsage"],
             path: "Sources/SimpleCLI"),
-        .executableTarget(
-            name: "SimpleSync",
-            dependencies: ["ClaudeCodeUsage"],
-            path: "Sources/SimpleSync"),
-        .executableTarget(
-            name: "TestCLI",
-            dependencies: ["ClaudeCodeUsage"],
-            path: "Sources/TestCLI"),
-        .executableTarget(
-            name: "DebugCLI",
-            dependencies: ["ClaudeCodeUsage"],
-            path: "Sources/DebugCLI"),
-        .executableTarget(
-            name: "FinalTest",
-            dependencies: ["ClaudeCodeUsage"],
-            path: "Sources/FinalTest"),
-        .executableTarget(
-            name: "ExactTest",
-            dependencies: ["ClaudeCodeUsage"],
-            path: "Sources/ExactTest"),
-        .executableTarget(
-            name: "RefactoredTest",
-            dependencies: ["ClaudeCodeUsage"],
-            path: "Sources/RefactoredTest"),
-        .executableTarget(
-            name: "TestTimerCLI",
-            dependencies: ["ClaudeCodeUsage"],
-            path: "Sources/TestTimerCLI"),
-        .executableTarget(
-            name: "TestRefreshCLI",
-            dependencies: ["ClaudeCodeUsage"],
-            path: "Sources/TestRefreshCLI"),
-        .executableTarget(
-            name: "TestCPUFix",
-            dependencies: ["ClaudeCodeUsage"],
-            path: "Sources/TestCPUFix"),
-        .executableTarget(
-            name: "TestMenuBar",
-            dependencies: ["ClaudeCodeUsage"],
-            path: "Sources/TestMenuBar"),
-        .executableTarget(
-            name: "TestLiveMonitor",
-            dependencies: [
-                "ClaudeCodeUsage",
-                .product(name: "ClaudeLiveMonitorLib", package: "ClaudeLiveMonitor")
-            ],
-            path: "Sources/TestLiveMonitor"),
-        .executableTarget(
-            name: "TestLiveDebug",
-            dependencies: [
-                "ClaudeCodeUsage",
-                .product(name: "ClaudeLiveMonitorLib", package: "ClaudeLiveMonitor")
-            ],
-            path: "Sources/TestLiveDebug"),
-        .executableTarget(
-            name: "TestSessionDebug",
-            dependencies: [
-                "ClaudeCodeUsage",
-                .product(name: "ClaudeLiveMonitorLib", package: "ClaudeLiveMonitor")
-            ],
-            path: "Sources/TestSessionDebug"),
-        .executableTarget(
-            name: "TestWhichSession",
-            dependencies: [
-                "ClaudeCodeUsage",
-                .product(name: "ClaudeLiveMonitorLib", package: "ClaudeLiveMonitor")
-            ],
-            path: "Sources/TestWhichSession"),
-        .executableTarget(
-            name: "TestBothSessions",
-            dependencies: [
-                "ClaudeCodeUsage",
-                .product(name: "ClaudeLiveMonitorLib", package: "ClaudeLiveMonitor")
-            ],
-            path: "Sources/TestBothSessions"),
-        .executableTarget(
-            name: "TestCostStability",
-            dependencies: ["ClaudeCodeUsage"],
-            path: "Sources/TestCostStability"),
         .testTarget(
             name: "ClaudeCodeUsageTests",
             dependencies: ["ClaudeCodeUsage"],

@@ -289,6 +289,46 @@ public struct ChartDataPoint: Identifiable {
     }
 }
 
+// MARK: - Hourly Accumulation
+public extension UsageAnalytics {
+    /// Get hourly cost accumulation for today from usage entries
+    static func todayHourlyAccumulation(from entries: [UsageEntry]) -> [Double] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let currentHour = calendar.component(.hour, from: Date())
+        
+        // Filter entries for today
+        let todayEntries = entries.filter { entry in
+            guard let date = entry.date else { return false }
+            return calendar.isDate(date, inSameDayAs: today)
+        }
+        
+        // Sort by timestamp
+        let sortedEntries = todayEntries.sorted { 
+            ($0.date ?? Date.distantPast) < ($1.date ?? Date.distantPast) 
+        }
+        
+        // Group costs by hour
+        var hourlyCosts = [Int: Double]()
+        for entry in sortedEntries {
+            guard let date = entry.date else { continue }
+            let hour = calendar.component(.hour, from: date)
+            hourlyCosts[hour, default: 0] += entry.cost
+        }
+        
+        // Create cumulative array
+        var cumulative: [Double] = []
+        var total = 0.0
+        
+        for hour in 0...currentHour {
+            total += hourlyCosts[hour] ?? 0
+            cumulative.append(total)
+        }
+        
+        return cumulative
+    }
+}
+
 public extension UsageStats {
     
     /// Convert daily usage to chart data
