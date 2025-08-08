@@ -52,8 +52,6 @@ struct CostMetricsSection: View {
             }
             .frame(minWidth: 80)
             
-            Spacer(minLength: 10)
-            
             // Hourly cost bar chart with y-axis labels
             if !chartDataService.todayHourlyCosts.isEmpty {
                 HStack(spacing: 5) {
