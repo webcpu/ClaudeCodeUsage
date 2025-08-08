@@ -75,22 +75,17 @@ class UsageDataModel: ObservableObject {
     }
     
     var todaySessionCount: Int {
-        guard let stats = stats else { return 0 }
-        
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        let todayString = formatter.string(from: Date())
-        
-        // Count sessions for today from all models
-        var sessionCount = 0
-        for model in stats.byModel {
-            // Since we don't have per-day session count, we'll estimate based on proportion
-            if stats.byDate.contains(where: { $0.date == todayString }) {
-                // This is a simplified calculation - in reality we'd need per-day session data
-                sessionCount += max(1, model.sessionCount / max(1, stats.byDate.count))
-            }
+        // Count active sessions from live monitor if available
+        if let _ = activeSession {
+            return 1 // At least one active session today
         }
-        return sessionCount
+        return 0 // No active sessions currently
+    }
+    
+    var estimatedDailySessions: Int {
+        guard let stats = stats, stats.byDate.count > 0 else { return 0 }
+        // Calculate average sessions per day based on historical data
+        return max(1, stats.totalSessions / stats.byDate.count)
     }
     
     func loadData() async {

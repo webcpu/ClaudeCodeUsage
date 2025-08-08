@@ -20,22 +20,18 @@ struct UsageDashboardApp: App {
         // Menu bar icon for macOS 13+
         if #available(macOS 13.0, *) {
             MenuBarExtra {
-                MenuBarContentView()
+                ImprovedMenuBarContentView()
                     .environmentObject(dataModel)
             } label: {
                 HStack(spacing: 4) {
-//                    if let session = dataModel.activeSession, session.isActive {
-//                        Circle()
-//                            .fill(Color.green)
-//                            .frame(width: 8, height: 8)
-//                        Text(session.costUSD.asCurrency)
-//                            .font(.system(.body, design: .monospaced))
-//                            .foregroundColor(.green)
-//                    } else {
-                        Image(systemName: "dollarsign.circle.fill")
-                        Text(dataModel.todaysCost)
-                            .font(.system(.body, design: .monospaced))
-//                    }
+                    if let session = dataModel.activeSession, session.isActive {
+                        Circle()
+                            .fill(Color.green)
+                            .frame(width: 6, height: 6)
+                    }
+                    Image(systemName: "dollarsign.circle.fill")
+                    Text(dataModel.todaysCost)
+                        .font(.system(.body, design: .monospaced))
                 }
             }
             .menuBarExtraStyle(.window)
