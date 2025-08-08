@@ -57,7 +57,22 @@ let package = Package(
             targets: ["TestMenuBar"]),
         .executable(
             name: "TestLiveMonitor",
-            targets: ["TestLiveMonitor"])
+            targets: ["TestLiveMonitor"]),
+        .executable(
+            name: "TestLiveDebug",
+            targets: ["TestLiveDebug"]),
+        .executable(
+            name: "TestSessionDebug",
+            targets: ["TestSessionDebug"]),
+        .executable(
+            name: "TestWhichSession",
+            targets: ["TestWhichSession"]),
+        .executable(
+            name: "TestBothSessions",
+            targets: ["TestBothSessions"]),
+        .executable(
+            name: "TestCostStability",
+            targets: ["TestCostStability"])
     ],
     dependencies: [
         // Dependencies declare other packages that this package depends on.
@@ -132,6 +147,38 @@ let package = Package(
                 .product(name: "ClaudeLiveMonitorLib", package: "ClaudeLiveMonitor")
             ],
             path: "Sources/TestLiveMonitor"),
+        .executableTarget(
+            name: "TestLiveDebug",
+            dependencies: [
+                "ClaudeCodeUsage",
+                .product(name: "ClaudeLiveMonitorLib", package: "ClaudeLiveMonitor")
+            ],
+            path: "Sources/TestLiveDebug"),
+        .executableTarget(
+            name: "TestSessionDebug",
+            dependencies: [
+                "ClaudeCodeUsage",
+                .product(name: "ClaudeLiveMonitorLib", package: "ClaudeLiveMonitor")
+            ],
+            path: "Sources/TestSessionDebug"),
+        .executableTarget(
+            name: "TestWhichSession",
+            dependencies: [
+                "ClaudeCodeUsage",
+                .product(name: "ClaudeLiveMonitorLib", package: "ClaudeLiveMonitor")
+            ],
+            path: "Sources/TestWhichSession"),
+        .executableTarget(
+            name: "TestBothSessions",
+            dependencies: [
+                "ClaudeCodeUsage",
+                .product(name: "ClaudeLiveMonitorLib", package: "ClaudeLiveMonitor")
+            ],
+            path: "Sources/TestBothSessions"),
+        .executableTarget(
+            name: "TestCostStability",
+            dependencies: ["ClaudeCodeUsage"],
+            path: "Sources/TestCostStability"),
         .testTarget(
             name: "ClaudeCodeUsageTests",
             dependencies: ["ClaudeCodeUsage"],

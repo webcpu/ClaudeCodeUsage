@@ -24,22 +24,21 @@ struct UsageDashboardApp: App {
                     .environmentObject(dataModel)
             } label: {
                 HStack(spacing: 4) {
-                    if let session = dataModel.activeSession, session.isActive {
-                        // Show live indicator
-                        Circle()
-                            .fill(Color.green)
-                            .frame(width: 8, height: 8)
-                        Text(session.costUSD.asCurrency)
-                            .font(.system(.body, design: .monospaced))
-                            .foregroundColor(.green)
-                    } else {
+//                    if let session = dataModel.activeSession, session.isActive {
+//                        Circle()
+//                            .fill(Color.green)
+//                            .frame(width: 8, height: 8)
+//                        Text(session.costUSD.asCurrency)
+//                            .font(.system(.body, design: .monospaced))
+//                            .foregroundColor(.green)
+//                    } else {
                         Image(systemName: "dollarsign.circle.fill")
                         Text(dataModel.todaysCost)
                             .font(.system(.body, design: .monospaced))
-                    }
+//                    }
                 }
             }
-            .menuBarExtraStyle(.menu)
+            .menuBarExtraStyle(.window)
         }
     }
 }
@@ -51,53 +50,60 @@ struct ContentView: View {
     var body: some View {
         if #available(macOS 13.0, *) {
             NavigationSplitView {
-            // Sidebar
-            List {
-                NavigationLink {
-                    OverviewView(stats: dataModel.stats, isLoading: dataModel.isLoading)
-                } label: {
-                    Label("Overview", systemImage: "chart.line.uptrend.xyaxis")
+                // Sidebar
+                List {
+                    NavigationLink {
+                        OverviewView(stats: dataModel.stats, isLoading: dataModel.isLoading)
+                    } label: {
+                        Label("Overview", systemImage: "chart.line.uptrend.xyaxis")
+                    }
+                    
+                    NavigationLink {
+                        ModelUsageView(stats: dataModel.stats)
+                    } label: {
+                        Label("Models", systemImage: "cpu")
+                    }
+                    
+                    NavigationLink {
+                        DailyUsageView(stats: dataModel.stats)
+                    } label: {
+                        Label("Daily Usage", systemImage: "calendar")
+                    }
+                    
+                    NavigationLink {
+                        AnalyticsView(stats: dataModel.stats)
+                    } label: {
+                        Label("Analytics", systemImage: "chart.bar.xaxis")
+                    }
+                    
+                    NavigationLink {
+                        MenuBarContentView()
+                            .environmentObject(dataModel)
+                    } label: {
+                        Label("Live Metrics", systemImage: "arrow.triangle.2.circlepath")
+                    }
                 }
-                
-                NavigationLink {
-                    ModelUsageView(stats: dataModel.stats)
-                } label: {
-                    Label("Models", systemImage: "cpu")
-                }
-                
-                NavigationLink {
-                    DailyUsageView(stats: dataModel.stats)
-                } label: {
-                    Label("Daily Usage", systemImage: "calendar")
-                }
-                
-                NavigationLink {
-                    AnalyticsView(stats: dataModel.stats)
-                } label: {
-                    Label("Analytics", systemImage: "chart.bar.xaxis")
-                }
+                .navigationTitle("Usage Dashboard")
+                .frame(minWidth: 200)
+            } detail: {
+                OverviewView(stats: dataModel.stats, isLoading: dataModel.isLoading)
             }
-            .navigationTitle("Usage Dashboard")
-            .frame(minWidth: 200)
-        } detail: {
-            OverviewView(stats: dataModel.stats, isLoading: dataModel.isLoading)
-        }
-        .task {
-            await dataModel.loadData()
-            dataModel.startRefreshTimer()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            dataModel.handleAppBecameActive()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
-            dataModel.handleAppResignActive()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
-            dataModel.handleWindowFocus()
-        }
-        .onDisappear {
-            dataModel.stopRefreshTimer()
-        }
+            .task {
+                await dataModel.loadData()
+                dataModel.startRefreshTimer()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+                dataModel.handleAppBecameActive()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
+                dataModel.handleAppResignActive()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
+                dataModel.handleWindowFocus()
+            }
+            .onDisappear {
+                dataModel.stopRefreshTimer()
+            }
         } else {
             // Fallback for macOS 12
             NavigationView {
