@@ -139,6 +139,8 @@ final class UsageViewModel: ObservableObject {
         }
         
         await stateManager.setLoadTask(task)
+        // IMPORTANT: Wait for the task to complete before returning
+        await task.value
     }
     
     func startAutoRefresh() {
