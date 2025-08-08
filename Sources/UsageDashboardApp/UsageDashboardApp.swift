@@ -24,9 +24,15 @@ struct ContentView: View {
     @State private var errorMessage: String?
     @State private var refreshTimer: Timer?
     @State private var isAppActive = true
+    @State private var lastRefreshTime = Date()
+    @State private var isManualRefreshing = false
     
     // Use real data from Claude sessions
     private let client = ClaudeUsageClient(dataSource: .localFiles(basePath: NSHomeDirectory() + "/.claude"))
+    
+    // Refresh intervals
+    private let autoRefreshInterval: TimeInterval = 30.0  // 30 seconds instead of 2
+    private let minimumRefreshInterval: TimeInterval = 5.0  // Prevent too frequent refreshes
     
     var body: some View {
         if #available(macOS 13.0, *) {
@@ -69,8 +75,13 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             // App became active (foreground)
             isAppActive = true
-            Task {
-                await loadData()  // Refresh data when app becomes active
+            
+            // Only refresh if enough time has passed since last refresh
+            let timeSinceLastRefresh = Date().timeIntervalSince(lastRefreshTime)
+            if timeSinceLastRefresh >= minimumRefreshInterval {
+                Task {
+                    await loadData()
+                }
             }
             startRefreshTimer()
         }
@@ -80,9 +91,12 @@ struct ContentView: View {
             stopRefreshTimer()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
-            // Window gained focus - refresh data
-            Task {
-                await loadData()
+            // Window gained focus - only refresh if enough time has passed
+            let timeSinceLastRefresh = Date().timeIntervalSince(lastRefreshTime)
+            if timeSinceLastRefresh >= minimumRefreshInterval {
+                Task {
+                    await loadData()
+                }
             }
         }
         .onDisappear {
@@ -108,8 +122,13 @@ struct ContentView: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
                 isAppActive = true
-                Task {
-                    await loadData()
+                
+                // Only refresh if enough time has passed since last refresh
+                let timeSinceLastRefresh = Date().timeIntervalSince(lastRefreshTime)
+                if timeSinceLastRefresh >= minimumRefreshInterval {
+                    Task {
+                        await loadData()
+                    }
                 }
                 startRefreshTimer()
             }
@@ -118,8 +137,12 @@ struct ContentView: View {
                 stopRefreshTimer()
             }
             .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
-                Task {
-                    await loadData()
+                // Window gained focus - only refresh if enough time has passed
+                let timeSinceLastRefresh = Date().timeIntervalSince(lastRefreshTime)
+                if timeSinceLastRefresh >= minimumRefreshInterval {
+                    Task {
+                        await loadData()
+                    }
                 }
             }
             .onDisappear {
@@ -134,6 +157,9 @@ struct ContentView: View {
             isLoading = true
         }
         errorMessage = nil
+        
+        // Update last refresh time
+        lastRefreshTime = Date()
         
         do {
             // Only use real data - no mock fallback
@@ -169,8 +195,8 @@ struct ContentView: View {
         // Only start timer if app is active
         guard isAppActive else { return }
         
-        // Create a new timer that fires every 2 seconds
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
+        // Create a new timer that fires every 30 seconds (reduced from 2 seconds to prevent high CPU usage)
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: autoRefreshInterval, repeats: true) { _ in
             // Only refresh if app is still active
             if isAppActive {
                 Task {
@@ -179,7 +205,7 @@ struct ContentView: View {
             }
         }
         
-        print("Started refresh timer (2 second interval)")
+        print("Started refresh timer (\(Int(autoRefreshInterval)) second interval)")
     }
     
     func stopRefreshTimer() {
