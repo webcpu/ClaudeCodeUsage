@@ -48,7 +48,13 @@ let package = Package(
             targets: ["TestTimerCLI"]),
         .executable(
             name: "TestRefreshCLI",
-            targets: ["TestRefreshCLI"])
+            targets: ["TestRefreshCLI"]),
+        .executable(
+            name: "TestCPUFix",
+            targets: ["TestCPUFix"]),
+        .executable(
+            name: "TestMenuBar",
+            targets: ["TestMenuBar"])
     ],
     dependencies: [
         // Dependencies declare other packages that this package depends on.
@@ -104,6 +110,14 @@ let package = Package(
             name: "TestRefreshCLI",
             dependencies: ["ClaudeCodeUsage"],
             path: "Sources/TestRefreshCLI"),
+        .executableTarget(
+            name: "TestCPUFix",
+            dependencies: ["ClaudeCodeUsage"],
+            path: "Sources/TestCPUFix"),
+        .executableTarget(
+            name: "TestMenuBar",
+            dependencies: ["ClaudeCodeUsage"],
+            path: "Sources/TestMenuBar"),
         .testTarget(
             name: "ClaudeCodeUsageTests",
             dependencies: ["ClaudeCodeUsage"],

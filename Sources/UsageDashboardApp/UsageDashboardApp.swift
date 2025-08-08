@@ -9,30 +9,34 @@ import Combine
 
 @main
 struct UsageDashboardApp: App {
+    @StateObject private var dataModel = UsageDataModel()
+    
     var body: some Scene {
-        WindowGroup {
+        WindowGroup(id: "main") {
             ContentView()
+                .environmentObject(dataModel)
+        }
+        
+        // Menu bar icon for macOS 13+
+        if #available(macOS 13.0, *) {
+            MenuBarExtra {
+                MenuBarContentView()
+                    .environmentObject(dataModel)
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "dollarsign.circle.fill")
+                    Text(dataModel.todaysCost)
+                        .font(.system(.body, design: .monospaced))
+                }
+            }
+            .menuBarExtraStyle(.menu)
         }
     }
 }
 
 struct ContentView: View {
-    @State private var stats: UsageStats?
-    @State private var isLoading = true
-    @State private var hasInitiallyLoaded = false
+    @EnvironmentObject var dataModel: UsageDataModel
     @State private var selectedTimeRange: TimeRange = .allTime  // Show all data by default
-    @State private var errorMessage: String?
-    @State private var refreshTimer: Timer?
-    @State private var isAppActive = true
-    @State private var lastRefreshTime = Date()
-    @State private var isManualRefreshing = false
-    
-    // Use real data from Claude sessions
-    private let client = ClaudeUsageClient(dataSource: .localFiles(basePath: NSHomeDirectory() + "/.claude"))
-    
-    // Refresh intervals
-    private let autoRefreshInterval: TimeInterval = 30.0  // 30 seconds instead of 2
-    private let minimumRefreshInterval: TimeInterval = 5.0  // Prevent too frequent refreshes
     
     var body: some View {
         if #available(macOS 13.0, *) {
@@ -40,25 +44,25 @@ struct ContentView: View {
             // Sidebar
             List {
                 NavigationLink {
-                    OverviewView(stats: stats, isLoading: isLoading)
+                    OverviewView(stats: dataModel.stats, isLoading: dataModel.isLoading)
                 } label: {
                     Label("Overview", systemImage: "chart.line.uptrend.xyaxis")
                 }
                 
                 NavigationLink {
-                    ModelUsageView(stats: stats)
+                    ModelUsageView(stats: dataModel.stats)
                 } label: {
                     Label("Models", systemImage: "cpu")
                 }
                 
                 NavigationLink {
-                    DailyUsageView(stats: stats)
+                    DailyUsageView(stats: dataModel.stats)
                 } label: {
                     Label("Daily Usage", systemImage: "calendar")
                 }
                 
                 NavigationLink {
-                    AnalyticsView(stats: stats)
+                    AnalyticsView(stats: dataModel.stats)
                 } label: {
                     Label("Analytics", systemImage: "chart.bar.xaxis")
                 }
@@ -66,152 +70,55 @@ struct ContentView: View {
             .navigationTitle("Usage Dashboard")
             .frame(minWidth: 200)
         } detail: {
-            OverviewView(stats: stats, isLoading: isLoading)
+            OverviewView(stats: dataModel.stats, isLoading: dataModel.isLoading)
         }
         .task {
-            await loadData()
-            startRefreshTimer()
+            await dataModel.loadData()
+            dataModel.startRefreshTimer()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            // App became active (foreground)
-            isAppActive = true
-            
-            // Only refresh if enough time has passed since last refresh
-            let timeSinceLastRefresh = Date().timeIntervalSince(lastRefreshTime)
-            if timeSinceLastRefresh >= minimumRefreshInterval {
-                Task {
-                    await loadData()
-                }
-            }
-            startRefreshTimer()
+            dataModel.handleAppBecameActive()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
-            // App became inactive (background)
-            isAppActive = false
-            stopRefreshTimer()
+            dataModel.handleAppResignActive()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
-            // Window gained focus - only refresh if enough time has passed
-            let timeSinceLastRefresh = Date().timeIntervalSince(lastRefreshTime)
-            if timeSinceLastRefresh >= minimumRefreshInterval {
-                Task {
-                    await loadData()
-                }
-            }
+            dataModel.handleWindowFocus()
         }
         .onDisappear {
-            stopRefreshTimer()
+            dataModel.stopRefreshTimer()
         }
         } else {
             // Fallback for macOS 12
             NavigationView {
                 List {
-                    NavigationLink("Overview", destination: OverviewView(stats: stats, isLoading: isLoading))
-                    NavigationLink("Models", destination: ModelUsageView(stats: stats))
-                    NavigationLink("Daily Usage", destination: DailyUsageView(stats: stats))
-                    NavigationLink("Analytics", destination: AnalyticsView(stats: stats))
+                    NavigationLink("Overview", destination: OverviewView(stats: dataModel.stats, isLoading: dataModel.isLoading))
+                    NavigationLink("Models", destination: ModelUsageView(stats: dataModel.stats))
+                    NavigationLink("Daily Usage", destination: DailyUsageView(stats: dataModel.stats))
+                    NavigationLink("Analytics", destination: AnalyticsView(stats: dataModel.stats))
                 }
                 .navigationTitle("Usage Dashboard")
                 .frame(minWidth: 200)
                 
-                OverviewView(stats: stats, isLoading: isLoading)
+                OverviewView(stats: dataModel.stats, isLoading: dataModel.isLoading)
             }
             .task {
-                await loadData()
-                startRefreshTimer()
+                await dataModel.loadData()
+                dataModel.startRefreshTimer()
             }
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-                isAppActive = true
-                
-                // Only refresh if enough time has passed since last refresh
-                let timeSinceLastRefresh = Date().timeIntervalSince(lastRefreshTime)
-                if timeSinceLastRefresh >= minimumRefreshInterval {
-                    Task {
-                        await loadData()
-                    }
-                }
-                startRefreshTimer()
+                dataModel.handleAppBecameActive()
             }
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
-                isAppActive = false
-                stopRefreshTimer()
+                dataModel.handleAppResignActive()
             }
             .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
-                // Window gained focus - only refresh if enough time has passed
-                let timeSinceLastRefresh = Date().timeIntervalSince(lastRefreshTime)
-                if timeSinceLastRefresh >= minimumRefreshInterval {
-                    Task {
-                        await loadData()
-                    }
-                }
+                dataModel.handleWindowFocus()
             }
             .onDisappear {
-                stopRefreshTimer()
+                dataModel.stopRefreshTimer()
             }
         }
-    }
-    
-    func loadData() async {
-        // Only show loading indicator on initial load
-        if !hasInitiallyLoaded {
-            isLoading = true
-        }
-        errorMessage = nil
-        
-        // Update last refresh time
-        lastRefreshTime = Date()
-        
-        do {
-            // Only use real data - no mock fallback
-            let range = selectedTimeRange.dateRange
-            stats = try await client.getUsageByDateRange(
-                startDate: range.start,
-                endDate: range.end
-            )
-            
-            if stats?.totalSessions == 0 {
-                print("No usage data found in ~/.claude/projects/ for the selected time range")
-                errorMessage = "No usage data found. Run Claude Code sessions to generate usage data."
-            } else {
-                let refreshType = hasInitiallyLoaded ? "Refreshed" : "Loaded"
-                print("\(refreshType) \(stats?.totalSessions ?? 0) sessions with total cost: $\(stats?.totalCost ?? 0)")
-            }
-        } catch {
-            print("Error loading data: \(error)")
-            errorMessage = "Error loading data: \(error.localizedDescription)"
-        }
-        
-        // Mark initial load as complete and hide loading indicator
-        if !hasInitiallyLoaded {
-            hasInitiallyLoaded = true
-            isLoading = false
-        }
-    }
-    
-    func startRefreshTimer() {
-        // Stop any existing timer first
-        stopRefreshTimer()
-        
-        // Only start timer if app is active
-        guard isAppActive else { return }
-        
-        // Create a new timer that fires every 30 seconds (reduced from 2 seconds to prevent high CPU usage)
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: autoRefreshInterval, repeats: true) { _ in
-            // Only refresh if app is still active
-            if isAppActive {
-                Task {
-                    await loadData()
-                }
-            }
-        }
-        
-        print("Started refresh timer (\(Int(autoRefreshInterval)) second interval)")
-    }
-    
-    func stopRefreshTimer() {
-        refreshTimer?.invalidate()
-        refreshTimer = nil
-        print("Stopped refresh timer")
     }
 }
 
