@@ -42,17 +42,10 @@ struct ModernNavigationView: View {
                 dataModel: dataModel
             )
         }
-        .task {
-            await dataModel.loadData()
-            dataModel.startRefreshTimer()
-        }
         .onReceive(NotificationCenter.default.publisher(for: .refreshData)) { _ in
             Task {
                 await dataModel.loadData()
             }
-        }
-        .onDisappear {
-            dataModel.stopRefreshTimer()
         }
     }
 }

@@ -11,13 +11,20 @@ import ClaudeCodeUsage
 struct UsageDashboardApp: App {
     @State private var appState = AppState()
     @State private var lifecycleManager = AppLifecycleManager()
+    @State private var hasAppeared = false
     
     var body: some Scene {
         WindowGroup(id: "main") {
             RootCoordinatorView()
                 .environment(appState.dataModel)
                 .onAppear {
-                    lifecycleManager.configure(with: appState.dataModel)
+                    if !hasAppeared {
+                        hasAppeared = true
+                        lifecycleManager.configure(with: appState.dataModel)
+                        Task {
+                            await appState.initializeIfNeeded()
+                        }
+                    }
                 }
         }
         .windowStyle(.automatic)
@@ -61,9 +68,6 @@ struct MenuBarLabel: View {
             Image(systemName: "dollarsign.circle.fill")
             Text(dataModel.todaysCost)
                 .font(.system(.body, design: .monospaced))
-        }
-        .task {
-            await appState.initializeIfNeeded()
         }
     }
 }
