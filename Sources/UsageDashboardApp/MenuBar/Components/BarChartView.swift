@@ -189,31 +189,17 @@ private struct AxisLabels: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                // X-axis labels (hours)
-                HStack(spacing: 0) {
-                    Text("02")
+                // X-axis labels (hours) - show labels at 0, 6, 12, 18
+                let barWidth = geometry.size.width / 24
+                ForEach([0, 6, 12, 18], id: \.self) { hour in
+                    Text(String(format: "%02d", hour))
                         .font(.system(size: 9, weight: .regular, design: .monospaced))
                         .foregroundColor(.gray)
-                        .frame(width: geometry.size.width / 12)
-                        .offset(x: geometry.size.width / 24)
-                    
-                    Spacer()
-                    
-                    Text("08")
-                        .font(.system(size: 9, weight: .regular, design: .monospaced))
-                        .foregroundColor(.gray)
-                        .frame(width: geometry.size.width / 12)
-                    
-                    Spacer()
-                    
-                    Text("14")
-                        .font(.system(size: 9, weight: .regular, design: .monospaced))
-                        .foregroundColor(.gray)
-                        .frame(width: geometry.size.width / 12)
-                        .offset(x: -geometry.size.width / 24)
+                        .position(
+                            x: CGFloat(hour) * barWidth + barWidth / 2,
+                            y: geometry.size.height - 6
+                        )
                 }
-                .frame(height: 12)
-                .position(x: geometry.size.width / 2, y: geometry.size.height - 6)
                 
                 // Y-axis labels
                 VStack(alignment: .trailing, spacing: 0) {
