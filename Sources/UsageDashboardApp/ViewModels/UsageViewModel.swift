@@ -109,12 +109,20 @@ final class UsageViewModel: ObservableObject {
     
     // MARK: - Public Methods
     func loadData() async {
+        #if DEBUG
+        print("[UsageViewModel] loadData() called at \(Date())")
+        #endif
+        
         await stateManager.cancelCurrentLoad()
         
         let task = Task {
             do {
                 // Load usage stats
                 let stats = try await usageDataService.loadStats()
+                
+                #if DEBUG
+                print("[UsageViewModel] Stats loaded: totalCost=\(stats.totalCost), entries=\(stats.byDate.count)")
+                #endif
                 await stateManager.updateStats(stats)
                 
                 // Load session data
@@ -180,6 +188,19 @@ final class UsageViewModel: ObservableObject {
         let todayValue = todaysCostValue
         todaysCost = todayValue.asCurrency
         todaysCostProgress = min(todayValue / dailyCostThreshold, 1.5)
+        
+        #if DEBUG
+        print("[UsageViewModel] Today's cost updated: \(todaysCost) (value: \(todayValue))")
+        print("[UsageViewModel] Total stats cost: \(stats.totalCost)")
+        print("[UsageViewModel] Number of daily entries: \(stats.byDate.count)")
+        if let todayEntry = stats.byDate.first(where: { 
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            return $0.date == formatter.string(from: Date())
+        }) {
+            print("[UsageViewModel] Today's entry found: \(todayEntry.date) = $\(todayEntry.totalCost)")
+        }
+        #endif
         
         // Session counts
         todaySessionCount = activeSession != nil ? 1 : 0

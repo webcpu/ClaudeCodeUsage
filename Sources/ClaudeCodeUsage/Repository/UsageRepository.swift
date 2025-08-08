@@ -62,6 +62,16 @@ public class UsageRepository {
         let sortedFiles = sortFilesByTimestamp(filesToProcess)
         let entries = try processFiles(sortedFiles)
         
+        #if DEBUG
+        print("[UsageRepository] Loaded \(entries.count) entries from \(sortedFiles.count) files")
+        let todayEntries = entries.filter { entry in
+            guard let date = entry.date else { return false }
+            return Calendar.current.isDateInToday(date)
+        }
+        let todayCost = todayEntries.reduce(0) { $0 + $1.cost }
+        print("[UsageRepository] Today's entries: \(todayEntries.count), total cost: $\(todayCost)")
+        #endif
+        
         // Calculate session count
         let sessionCount = countUniqueSessions(from: sortedFiles)
         
