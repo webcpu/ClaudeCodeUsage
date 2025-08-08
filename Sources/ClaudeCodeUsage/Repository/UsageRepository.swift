@@ -13,7 +13,7 @@ public class UsageRepository {
     private let parser: UsageDataParserProtocol
     private let pathDecoder: ProjectPathDecoderProtocol
     private let aggregator: StatisticsAggregatorProtocol
-    private let basePath: String
+    public let basePath: String
     
     /// Initialize with all dependencies injected
     public init(
@@ -56,7 +56,14 @@ public class UsageRepository {
         // Collect and process all JSONL files
         let filesToProcess = try collectJSONLFiles(from: projectsPath)
         let sortedFiles = sortFilesByTimestamp(filesToProcess)
-        let entries = try processFiles(sortedFiles, deduplication: deduplication)
+        
+        // Use batch processing for very large datasets
+        let entries: [UsageEntry]
+        if sortedFiles.count > 100 {
+            entries = try await processFilesInBatches(sortedFiles, batchSize: 20, deduplication: deduplication)
+        } else {
+            entries = try processFiles(sortedFiles, deduplication: deduplication)
+        }
         
         #if DEBUG
         print("[UsageRepository] Loaded \(entries.count) entries from \(sortedFiles.count) files")
@@ -136,11 +143,80 @@ public class UsageRepository {
     }
     
     private func processFiles(_ files: [(path: String, projectDir: String, earliestTimestamp: String)], deduplication: DeduplicationStrategy) throws -> [UsageEntry] {
+        // Use parallel processing for better performance with large datasets
+        if files.count > 5 {
+            return try processFilesInParallel(files, deduplication: deduplication)
+        } else {
+            return try processFilesSequentially(files, deduplication: deduplication)
+        }
+    }
+    
+    private func processFilesSequentially(_ files: [(path: String, projectDir: String, earliestTimestamp: String)], deduplication: DeduplicationStrategy) throws -> [UsageEntry] {
         var allEntries: [UsageEntry] = []
         
         for (filePath, projectDir, _) in files {
             let entries = try processJSONLFile(at: filePath, projectDir: projectDir, deduplication: deduplication)
             allEntries.append(contentsOf: entries)
+        }
+        
+        return allEntries
+    }
+    
+    private func processFilesInParallel(_ files: [(path: String, projectDir: String, earliestTimestamp: String)], deduplication: DeduplicationStrategy) throws -> [UsageEntry] {
+        let queue = DispatchQueue(label: "com.claudecodeusage.fileprocessing", attributes: .concurrent)
+        let group = DispatchGroup()
+        var allEntries: [UsageEntry] = []
+        var processingError: Error?
+        let lock = NSLock()
+        
+        for (filePath, projectDir, _) in files {
+            queue.async(group: group) {
+                do {
+                    let entries = try self.processJSONLFile(at: filePath, projectDir: projectDir, deduplication: deduplication)
+                    lock.lock()
+                    allEntries.append(contentsOf: entries)
+                    lock.unlock()
+                } catch {
+                    lock.lock()
+                    processingError = error
+                    lock.unlock()
+                }
+            }
+        }
+        
+        group.wait()
+        
+        if let error = processingError {
+            throw error
+        }
+        
+        return allEntries
+    }
+    
+    /// Process files in batches to manage memory for very large datasets
+    private func processFilesInBatches(_ files: [(path: String, projectDir: String, earliestTimestamp: String)], batchSize: Int, deduplication: DeduplicationStrategy) async throws -> [UsageEntry] {
+        var allEntries: [UsageEntry] = []
+        let totalBatches = (files.count + batchSize - 1) / batchSize
+        
+        #if DEBUG
+        print("[UsageRepository] Processing \(files.count) files in \(totalBatches) batches of \(batchSize)")
+        #endif
+        
+        for batchIndex in 0..<totalBatches {
+            let startIndex = batchIndex * batchSize
+            let endIndex = min(startIndex + batchSize, files.count)
+            let batch = Array(files[startIndex..<endIndex])
+            
+            #if DEBUG
+            print("[UsageRepository] Processing batch \(batchIndex + 1)/\(totalBatches) with \(batch.count) files")
+            #endif
+            
+            // Process batch in parallel
+            let batchEntries = try processFilesInParallel(batch, deduplication: deduplication)
+            allEntries.append(contentsOf: batchEntries)
+            
+            // Allow other operations to proceed between batches
+            await Task.yield()
         }
         
         return allEntries
