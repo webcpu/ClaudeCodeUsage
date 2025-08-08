@@ -56,5 +56,13 @@ let package = Package(
             name: "ClaudeCodeUsageTests",
             dependencies: ["ClaudeCodeUsage"],
             path: "Tests/ClaudeCodeUsageTests"),
+        .testTarget(
+            name: "UsageDashboardAppTests",
+            dependencies: [
+                "UsageDashboardApp",
+                "ClaudeCodeUsage",
+                .product(name: "ClaudeLiveMonitorLib", package: "ClaudeLiveMonitor")
+            ],
+            path: "Tests/UsageDashboardAppTests"),
     ]
 )
