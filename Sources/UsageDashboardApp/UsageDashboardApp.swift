@@ -14,7 +14,7 @@ struct UsageDashboardApp: App {
     @State private var hasAppeared = false
     
     var body: some Scene {
-        WindowGroup(id: "main") {
+        Window("Usage Dashboard", id: "main") {
             RootCoordinatorView()
                 .environment(appState.dataModel)
                 .onAppear {
@@ -29,6 +29,7 @@ struct UsageDashboardApp: App {
         }
         .windowStyle(.automatic)
         .windowToolbarStyle(.unified)
+        .defaultSize(width: 900, height: 600)
         .commands {
             AppCommands()
         }
