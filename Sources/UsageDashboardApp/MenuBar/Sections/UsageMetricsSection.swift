@@ -13,17 +13,6 @@ struct UsageMetricsSection: View {
     var body: some View {
         VStack(spacing: MenuBarTheme.Layout.sectionSpacing) {
             if let stats = dataModel.stats {
-                // Sessions
-                MetricRow(
-                    title: "Sessions",
-                    value: FormatterService.formatSessionCount(dataModel.todaySessionCount),
-                    subvalue: "Total: \(stats.totalSessions)",
-                    percentage: Double(dataModel.estimatedDailySessions) * 5, // Scale for visibility
-                    segments: ColorService.singleColorSegment(color: MenuBarTheme.Colors.Sections.usage),
-                    trendData: nil,
-                    showWarning: false
-                )
-                
                 // Token usage (moved from Session section)
                 if let session = dataModel.activeSession,
                    let tokenLimit = dataModel.autoTokenLimit {
@@ -68,3 +57,14 @@ struct UsageMetricsSection: View {
         .padding(.bottom, MenuBarTheme.Layout.verticalPadding)
     }
 }
+
+//// Sessions
+//MetricRow(
+//    title: "Sessions",
+//    value: FormatterService.formatSessionCount(dataModel.todaySessionCount),
+//    subvalue: "Total: \(stats.totalSessions)",
+//    percentage: Double(dataModel.estimatedDailySessions) * 5, // Scale for visibility
+//    segments: ColorService.singleColorSegment(color: MenuBarTheme.Colors.Sections.usage),
+//    trendData: nil,
+//    showWarning: false
+//)
