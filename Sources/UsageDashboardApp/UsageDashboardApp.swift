@@ -20,7 +20,7 @@ struct UsageDashboardApp: App {
         // Menu bar icon for macOS 13+
         if #available(macOS 13.0, *) {
             MenuBarExtra {
-                ImprovedMenuBarContentView()
+                MenuBarContentView()
                     .environmentObject(dataModel)
             } label: {
                 HStack(spacing: 4) {
@@ -73,7 +73,7 @@ struct ContentView: View {
                     }
                     
                     NavigationLink {
-                        ImprovedMenuBarContentView()
+                        MenuBarContentView()
                             .environmentObject(dataModel)
                     } label: {
                         Label("Live Metrics", systemImage: "arrow.triangle.2.circlepath")

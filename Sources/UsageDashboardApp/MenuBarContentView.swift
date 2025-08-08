@@ -1,5 +1,5 @@
 //
-//  ImprovedMenuBar.swift
+//  MenuBar.swift
 //  Refactored professional menu bar UI with clean architecture
 //
 
@@ -8,7 +8,7 @@ import ClaudeCodeUsage
 
 // MARK: - Main Menu Bar Content View
 @available(macOS 13.0, *)
-struct ImprovedMenuBarContentView: View {
+struct MenuBarContentView: View {
     @EnvironmentObject var dataModel: UsageDataModel
     
     var body: some View {
