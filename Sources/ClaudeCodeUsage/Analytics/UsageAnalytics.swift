@@ -263,7 +263,7 @@ public extension UsageAnalytics {
             
             #if DEBUG
             if entry.cost > 0 {
-                print("Entry at \(date) (UTC) -> hour \(hour) (local): $\(entry.cost)")
+                //print("Entry at \(date) (UTC) -> hour \(hour) (local): $\(entry.cost)")
             }
             #endif
         }

@@ -39,7 +39,7 @@ struct MenuBarScene: Scene {
             MenuBarContentView()
                 .environment(appState.dataModel)
         } label: {
-            MenuBarLabel()
+            MenuBarLabel(appState: appState)
                 .environment(appState.dataModel)
         }
         .menuBarExtraStyle(.window)
@@ -49,6 +49,7 @@ struct MenuBarScene: Scene {
 // MARK: - Menu Bar Label
 struct MenuBarLabel: View {
     @Environment(UsageDataModel.self) private var dataModel
+    let appState: AppState
     
     var body: some View {
         HStack(spacing: 4) {
@@ -60,6 +61,9 @@ struct MenuBarLabel: View {
             Image(systemName: "dollarsign.circle.fill")
             Text(dataModel.todaysCost)
                 .font(.system(.body, design: .monospaced))
+        }
+        .task {
+            await appState.initializeIfNeeded()
         }
     }
 }
@@ -96,15 +100,18 @@ struct AppCommands: Commands {
 @MainActor
 final class AppState {
     let dataModel: UsageDataModel
+    private var hasInitialized = false
     
     init() {
         self.dataModel = UsageDataModel(container: ProductionContainer.shared)
+    }
+    
+    func initializeIfNeeded() async {
+        guard !hasInitialized else { return }
+        hasInitialized = true
         
-        // Start loading data immediately when app launches
-        Task {
-            await dataModel.loadData()
-            dataModel.startRefreshTimer()
-        }
+        await dataModel.loadData()
+        dataModel.startRefreshTimer()
     }
 }
 
