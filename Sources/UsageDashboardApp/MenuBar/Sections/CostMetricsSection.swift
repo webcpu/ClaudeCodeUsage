@@ -60,6 +60,7 @@ struct CostMetricsSection: View {
                     width: 220,
                     height: 45
                 )
+                .padding(.leading, 45) // Add space for y-axis labels
             }
         }
         .padding(.horizontal, MenuBarTheme.Layout.horizontalPadding)
