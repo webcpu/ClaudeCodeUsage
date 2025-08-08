@@ -54,10 +54,14 @@ let package = Package(
             targets: ["TestCPUFix"]),
         .executable(
             name: "TestMenuBar",
-            targets: ["TestMenuBar"])
+            targets: ["TestMenuBar"]),
+        .executable(
+            name: "TestLiveMonitor",
+            targets: ["TestLiveMonitor"])
     ],
     dependencies: [
         // Dependencies declare other packages that this package depends on.
+        .package(path: "Packages/ClaudeLiveMonitor")
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -72,7 +76,10 @@ let package = Package(
             path: "Sources/UsageDashboardCLI"),
         .executableTarget(
             name: "UsageDashboardApp",
-            dependencies: ["ClaudeCodeUsage"],
+            dependencies: [
+                "ClaudeCodeUsage",
+                .product(name: "ClaudeLiveMonitorLib", package: "ClaudeLiveMonitor")
+            ],
             path: "Sources/UsageDashboardApp"),
         .executableTarget(
             name: "SimpleCLI",
@@ -118,6 +125,13 @@ let package = Package(
             name: "TestMenuBar",
             dependencies: ["ClaudeCodeUsage"],
             path: "Sources/TestMenuBar"),
+        .executableTarget(
+            name: "TestLiveMonitor",
+            dependencies: [
+                "ClaudeCodeUsage",
+                .product(name: "ClaudeLiveMonitorLib", package: "ClaudeLiveMonitor")
+            ],
+            path: "Sources/TestLiveMonitor"),
         .testTarget(
             name: "ClaudeCodeUsageTests",
             dependencies: ["ClaudeCodeUsage"],

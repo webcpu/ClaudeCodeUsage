@@ -5,6 +5,7 @@
 
 import SwiftUI
 import ClaudeCodeUsage
+import ClaudeLiveMonitorLib
 
 // Shared data model for both main window and menu bar
 @MainActor
@@ -14,13 +15,23 @@ class UsageDataModel: ObservableObject {
     @Published var hasInitiallyLoaded = false
     @Published var errorMessage: String?
     @Published var lastRefreshTime = Date()
+    @Published var activeSession: SessionBlock?
+    @Published var burnRate: BurnRate?
     
     private var refreshTimer: Timer?
     private var isAppActive = true
     
     let client = ClaudeUsageClient(dataSource: .localFiles(basePath: NSHomeDirectory() + "/.claude"))
-    private let autoRefreshInterval: TimeInterval = 30.0
-    private let minimumRefreshInterval: TimeInterval = 5.0
+    let liveMonitor = LiveMonitor(config: LiveMonitorConfig(
+        claudePaths: [NSHomeDirectory() + "/.claude/projects"],
+        sessionDurationHours: 5,
+        tokenLimit: nil,
+        refreshInterval: 2.0,
+        order: .descending
+    ))
+    
+    private let autoRefreshInterval: TimeInterval = 5.0  // Faster refresh for live monitoring
+    private let minimumRefreshInterval: TimeInterval = 2.0
     
     var todaysCost: String {
         guard let stats = stats else { return "$0.00" }
@@ -71,12 +82,21 @@ class UsageDataModel: ObservableObject {
                 endDate: range.end
             )
             
+            // Get active session from live monitor
+            activeSession = liveMonitor.getActiveBlock()
+            if let session = activeSession {
+                burnRate = session.burnRate
+            }
+            
             if stats?.totalSessions == 0 {
                 print("No usage data found in ~/.claude/projects/")
                 errorMessage = "No usage data found. Run Claude Code sessions to generate usage data."
             } else {
                 let refreshType = hasInitiallyLoaded ? "Refreshed" : "Loaded"
                 print("\(refreshType) \(stats?.totalSessions ?? 0) sessions, today's cost: \(todaysCost)")
+                if let session = activeSession {
+                    print("Active session: \(session.costUSD.asCurrency) | Burn: \(session.burnRate.tokensPerMinute) tokens/min")
+                }
             }
         } catch {
             print("Error loading data: \(error)")
@@ -144,6 +164,50 @@ struct MenuBarContentView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
+            // Active session indicator
+            if let session = dataModel.activeSession, session.isActive {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(Color.green)
+                        .frame(width: 8, height: 8)
+                        .overlay(
+                            Circle()
+                                .stroke(Color.green.opacity(0.3), lineWidth: 3)
+                                .scaleEffect(1.5)
+                                .opacity(0.5)
+                        )
+                    Text("LIVE SESSION")
+                        .font(.caption2)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.green)
+                    Spacer()
+                    Text(session.costUSD.asCurrency)
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .monospacedDigit()
+                }
+                .padding(.horizontal, 4)
+                .padding(.vertical, 2)
+                .background(Color.green.opacity(0.1))
+                .cornerRadius(4)
+                
+                // Burn rate
+                if let burnRate = dataModel.burnRate {
+                    HStack {
+                        Label("\(burnRate.tokensPerMinute) tokens/min", systemImage: "flame.fill")
+                            .font(.caption2)
+                            .foregroundColor(.orange)
+                        Spacer()
+                        Text("$\(String(format: "%.2f", burnRate.costPerHour))/hr")
+                            .font(.caption2)
+                            .foregroundColor(.orange)
+                    }
+                    .padding(.horizontal, 4)
+                }
+                
+                Divider()
+            }
+            
             // Today's cost header
             HStack {
                 Image(systemName: "calendar.day.timeline.left")

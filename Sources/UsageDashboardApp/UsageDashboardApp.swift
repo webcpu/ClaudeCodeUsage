@@ -24,9 +24,19 @@ struct UsageDashboardApp: App {
                     .environmentObject(dataModel)
             } label: {
                 HStack(spacing: 4) {
-                    Image(systemName: "dollarsign.circle.fill")
-                    Text(dataModel.todaysCost)
-                        .font(.system(.body, design: .monospaced))
+                    if let session = dataModel.activeSession, session.isActive {
+                        // Show live indicator
+                        Circle()
+                            .fill(Color.green)
+                            .frame(width: 8, height: 8)
+                        Text(session.costUSD.asCurrency)
+                            .font(.system(.body, design: .monospaced))
+                            .foregroundColor(.green)
+                    } else {
+                        Image(systemName: "dollarsign.circle.fill")
+                        Text(dataModel.todaysCost)
+                            .font(.system(.body, design: .monospaced))
+                    }
                 }
             }
             .menuBarExtraStyle(.menu)
