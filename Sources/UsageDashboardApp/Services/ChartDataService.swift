@@ -24,7 +24,7 @@ final class ChartDataService {
         do {
             let client = ClaudeUsageClient(dataSource: .localFiles(basePath: NSHomeDirectory() + "/.claude"))
             let todayEntries = try await client.getTodayUsageEntries()
-            let hourlyData = UsageAnalytics.todayHourlyAccumulation(from: todayEntries)
+            let hourlyData = UsageAnalytics.todayHourlyCosts(from: todayEntries)
             
             self.todayHourlyCosts = hourlyData
             self.isLoading = false

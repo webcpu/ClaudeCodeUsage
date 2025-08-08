@@ -51,15 +51,14 @@ struct CostMetricsSection: View {
             
             Spacer()
             
-            // Hourly cost graph
+            // Hourly cost bar chart
             if !chartDataService.todayHourlyCosts.isEmpty {
-                GraphView(
-                    dataPoints: chartDataService.todayHourlyCosts,
-                    color: todaysCostColor
+                BarChartView(
+                    dataPoints: chartDataService.todayHourlyCosts
                 )
                 .frame(
-                    width: MenuBarTheme.Layout.largeGraphWidth,
-                    height: MenuBarTheme.Layout.costGraphHeight
+                    width: 220,
+                    height: 45
                 )
             }
         }
