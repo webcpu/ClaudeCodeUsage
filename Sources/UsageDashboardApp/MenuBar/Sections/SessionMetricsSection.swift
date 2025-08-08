@@ -7,9 +7,8 @@ import SwiftUI
 import ClaudeCodeUsage
 import ClaudeLiveMonitorLib
 
-@available(macOS 13.0, *)
 struct SessionMetricsSection: View {
-    @EnvironmentObject var dataModel: UsageDataModel
+    @Environment(UsageDataModel.self) private var dataModel
     
     var body: some View {
         VStack(spacing: MenuBarTheme.Layout.sectionSpacing) {

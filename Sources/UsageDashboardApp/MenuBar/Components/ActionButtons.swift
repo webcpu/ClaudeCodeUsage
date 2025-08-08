@@ -6,9 +6,7 @@
 import SwiftUI
 import ClaudeCodeUsage
 
-@available(macOS 13.0, *)
 struct ActionButtons: View {
-    @EnvironmentObject var dataModel: UsageDataModel
     @Environment(\.openWindow) private var openWindow
     let onRefresh: () -> Void
     

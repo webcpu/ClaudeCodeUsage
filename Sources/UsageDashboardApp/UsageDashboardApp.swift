@@ -1,20 +1,21 @@
 //
 //  UsageDashboardApp.swift
-//  Clean architecture main app entry point
+//  Modern SwiftUI app using @Observable
 //
 
 import SwiftUI
+import Observation
 import ClaudeCodeUsage
 
 @main
 struct UsageDashboardApp: App {
-    @StateObject private var appState = AppState()
-    @StateObject private var lifecycleManager = AppLifecycleManager()
+    @State private var appState = AppState()
+    @State private var lifecycleManager = AppLifecycleManager()
     
     var body: some Scene {
         WindowGroup(id: "main") {
             RootCoordinatorView()
-                .environmentObject(appState.dataModel)
+                .environment(appState.dataModel)
                 .onAppear {
                     lifecycleManager.configure(with: appState.dataModel)
                 }
@@ -25,34 +26,29 @@ struct UsageDashboardApp: App {
             AppCommands()
         }
         
-        if #available(macOS 13.0, *) {
-            MenuBarScene(appState: appState)
-        }
+        MenuBarScene(appState: appState)
     }
 }
 
-
 // MARK: - Menu Bar Scene
-@available(macOS 13.0, *)
 struct MenuBarScene: Scene {
     let appState: AppState
     
     var body: some Scene {
         MenuBarExtra {
             MenuBarContentView()
-                .environmentObject(appState.dataModel)
+                .environment(appState.dataModel)
         } label: {
             MenuBarLabel()
-                .environmentObject(appState.dataModel)
+                .environment(appState.dataModel)
         }
         .menuBarExtraStyle(.window)
     }
 }
 
 // MARK: - Menu Bar Label
-@available(macOS 13.0, *)
 struct MenuBarLabel: View {
-    @EnvironmentObject var dataModel: UsageDataModel
+    @Environment(UsageDataModel.self) private var dataModel
     
     var body: some View {
         HStack(spacing: 4) {
@@ -96,12 +92,19 @@ struct AppCommands: Commands {
 }
 
 // MARK: - App State
+@Observable
 @MainActor
-final class AppState: ObservableObject {
+final class AppState {
     let dataModel: UsageDataModel
     
     init() {
         self.dataModel = UsageDataModel(container: ProductionContainer.shared)
+        
+        // Start loading data immediately when app launches
+        Task {
+            await dataModel.loadData()
+            dataModel.startRefreshTimer()
+        }
     }
 }
 

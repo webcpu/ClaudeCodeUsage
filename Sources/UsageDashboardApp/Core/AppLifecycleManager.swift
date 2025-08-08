@@ -4,10 +4,12 @@
 //
 
 import SwiftUI
+import Observation
 import Combine
 
+@Observable
 @MainActor
-final class AppLifecycleManager: ObservableObject {
+final class AppLifecycleManager {
     private var cancellables = Set<AnyCancellable>()
     private weak var dataModel: UsageDataModel?
     

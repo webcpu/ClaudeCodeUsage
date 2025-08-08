@@ -7,7 +7,7 @@ import SwiftUI
 import ClaudeCodeUsage
 
 struct ModelsScreen: View {
-    @EnvironmentObject var dataModel: UsageDataModel
+    @Environment(UsageDataModel.self) private var dataModel
     
     var body: some View {
         ScrollView {

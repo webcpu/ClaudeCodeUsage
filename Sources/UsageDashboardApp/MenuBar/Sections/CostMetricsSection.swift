@@ -6,10 +6,9 @@
 import SwiftUI
 import ClaudeCodeUsage
 
-@available(macOS 13.0, *)
 struct CostMetricsSection: View {
-    @EnvironmentObject var dataModel: UsageDataModel
-    @StateObject private var chartDataService = ChartDataService()
+    @Environment(UsageDataModel.self) private var dataModel
+    @State private var chartDataService = ChartDataService()
     
     var body: some View {
         VStack(spacing: MenuBarTheme.Layout.sectionSpacing) {

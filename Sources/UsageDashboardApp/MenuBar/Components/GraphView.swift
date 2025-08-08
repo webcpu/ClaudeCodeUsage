@@ -5,7 +5,6 @@
 
 import SwiftUI
 
-@available(macOS 13.0, *)
 struct GraphView: View {
     let dataPoints: [Double]
     let color: Color
@@ -23,25 +22,53 @@ struct GraphView: View {
                     )
                 
                 if dataPoints.count > 1 {
-                    let processedData = ChartDataService.processDataPoints(dataPoints)
+                    let normalizedData = normalizeDataPoints(dataPoints)
                     
                     // Grid lines
                     gridLines(in: geometry)
                     
                     // Area fill
-                    areaFill(for: processedData, in: geometry)
+                    areaFill(for: normalizedData, in: geometry)
                     
                     // Line graph
-                    lineGraph(for: processedData, in: geometry)
+                    lineGraph(for: normalizedData, in: geometry)
                     
                     // Data dots (if enabled)
                     if showDots {
-                        dataDots(for: processedData, in: geometry)
+                        dataDots(for: normalizedData, in: geometry)
                     }
                 }
             }
         }
         .frame(height: MenuBarTheme.Layout.graphHeight)
+    }
+    
+    // MARK: - Data Processing
+    private func normalizeDataPoints(_ points: [Double]) -> [Double] {
+        guard !points.isEmpty else { return [] }
+        
+        let maxValue = points.max() ?? 1.0
+        let minValue = points.min() ?? 0.0
+        let range = maxValue - minValue
+        
+        if range == 0 {
+            return Array(repeating: 0.5, count: points.count)
+        }
+        
+        return points.map { ($0 - minValue) / range }
+    }
+    
+    private func calculateCoordinates(for normalizedData: [Double], in size: CGSize) -> [CGPoint] {
+        guard normalizedData.count > 1 else { return [] }
+        
+        let xStep = size.width / CGFloat(normalizedData.count - 1)
+        let padding: CGFloat = 4
+        
+        return normalizedData.enumerated().map { index, value in
+            let x = CGFloat(index) * xStep
+            let y = padding + (1.0 - CGFloat(value)) * (size.height - padding * 2)
+            return CGPoint(x: x, y: y)
+        }
     }
     
     // MARK: - Grid Lines
@@ -57,12 +84,9 @@ struct GraphView: View {
     }
     
     // MARK: - Line Graph
-    private func lineGraph(for processedData: ProcessedChartData, in geometry: GeometryProxy) -> some View {
+    private func lineGraph(for normalizedData: [Double], in geometry: GeometryProxy) -> some View {
         Path { path in
-            let coordinates = ChartDataService.calculateChartCoordinates(
-                for: processedData,
-                in: geometry.size
-            )
+            let coordinates = calculateCoordinates(for: normalizedData, in: geometry.size)
             
             for (index, point) in coordinates.enumerated() {
                 if index == 0 {
@@ -76,12 +100,9 @@ struct GraphView: View {
     }
     
     // MARK: - Area Fill
-    private func areaFill(for processedData: ProcessedChartData, in geometry: GeometryProxy) -> some View {
+    private func areaFill(for normalizedData: [Double], in geometry: GeometryProxy) -> some View {
         Path { path in
-            let coordinates = ChartDataService.calculateChartCoordinates(
-                for: processedData,
-                in: geometry.size
-            )
+            let coordinates = calculateCoordinates(for: normalizedData, in: geometry.size)
             
             path.move(to: CGPoint(x: 0, y: geometry.size.height))
             
@@ -103,11 +124,8 @@ struct GraphView: View {
     }
     
     // MARK: - Data Dots
-    private func dataDots(for processedData: ProcessedChartData, in geometry: GeometryProxy) -> some View {
-        let coordinates = ChartDataService.calculateChartCoordinates(
-            for: processedData,
-            in: geometry.size
-        )
+    private func dataDots(for normalizedData: [Double], in geometry: GeometryProxy) -> some View {
+        let coordinates = calculateCoordinates(for: normalizedData, in: geometry.size)
         
         return ForEach(coordinates.indices, id: \.self) { index in
             let point = coordinates[index]

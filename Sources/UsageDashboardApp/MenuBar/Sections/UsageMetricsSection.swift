@@ -6,9 +6,8 @@
 import SwiftUI
 import ClaudeCodeUsage
 
-@available(macOS 13.0, *)
 struct UsageMetricsSection: View {
-    @EnvironmentObject var dataModel: UsageDataModel
+    @Environment(UsageDataModel.self) private var dataModel
     
     var body: some View {
         VStack(spacing: MenuBarTheme.Layout.sectionSpacing) {

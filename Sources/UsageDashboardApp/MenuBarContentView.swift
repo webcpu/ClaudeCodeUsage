@@ -7,9 +7,8 @@ import SwiftUI
 import ClaudeCodeUsage
 
 // MARK: - Main Menu Bar Content View
-@available(macOS 13.0, *)
 struct MenuBarContentView: View {
-    @EnvironmentObject var dataModel: UsageDataModel
+    @Environment(UsageDataModel.self) private var dataModel
     
     var body: some View {
         VStack(spacing: 2) {
@@ -81,11 +80,6 @@ struct MenuBarContentView: View {
 
 // MARK: - Backward Compatibility Aliases
 // These maintain compatibility with existing code that may reference the old component names
-@available(macOS 13.0, *)
 typealias ImprovedProgressBar = ProgressBar
-
-@available(macOS 13.0, *)
 typealias EnhancedGraphView = GraphView
-
-@available(macOS 13.0, *)
 typealias ImprovedSectionHeader = SectionHeader
