@@ -7,6 +7,8 @@ import SwiftUI
 
 struct BarChartView: View {
     let dataPoints: [Double]
+    @State private var hoveredHour: Int? = nil
+    @State private var hoverLocation: CGPoint = .zero
     
     private var maxValue: Double {
         dataPoints.max() ?? 1.0
@@ -27,8 +29,23 @@ struct BarChartView: View {
                             maxValue: maxValue,
                             height: geometry.size.height - 12, // Leave space for labels
                             isCurrentHour: hour == currentHour,
-                            isPastHour: hour <= currentHour
+                            isPastHour: hour <= currentHour,
+                            isHovered: hoveredHour == hour
                         )
+                        .onHover { isHovered in
+                            if isHovered {
+                                hoveredHour = hour
+                                // Calculate position for tooltip
+                                let barWidth = geometry.size.width / 24
+                                let xPosition = (CGFloat(hour) + 0.5) * barWidth
+                                let yPosition = geometry.size.height - 12 - 
+                                    (hour < dataPoints.count ? 
+                                     CGFloat(dataPoints[hour] / maxValue) * (geometry.size.height - 12) : 0)
+                                hoverLocation = CGPoint(x: xPosition, y: yPosition)
+                            } else if hoveredHour == hour {
+                                hoveredHour = nil
+                            }
+                        }
                     }
                 }
                 .padding(.bottom, 12) // Space for x-axis labels
@@ -40,6 +57,16 @@ struct BarChartView: View {
                 // Axis labels
                 AxisLabels(maxValue: maxValue)
                     .allowsHitTesting(false)
+                
+                // Hover tooltip
+                if let hour = hoveredHour {
+                    TooltipView(
+                        hour: hour,
+                        cost: hour < dataPoints.count ? dataPoints[hour] : 0,
+                        location: hoverLocation
+                    )
+                    .allowsHitTesting(false)
+                }
             }
         }
     }
@@ -52,6 +79,7 @@ private struct BarView: View {
     let height: CGFloat
     let isCurrentHour: Bool
     let isPastHour: Bool
+    let isHovered: Bool
     
     private var barHeight: CGFloat {
         guard maxValue > 0 else { return 0 }
@@ -96,7 +124,8 @@ private struct BarView: View {
                     .fill(barColor)
                     .frame(height: value > 10.0 ? barHeight * 0.85 : max(barHeight, value == 0 ? 2 : 0))
                     .cornerRadius(0.5, corners: value > 10.0 ? [] : [.topLeft, .topRight])
-                    .opacity(isCurrentHour ? 1.0 : 0.85)
+                    .opacity(isHovered ? 1.0 : (isCurrentHour ? 1.0 : 0.85))
+                    .scaleEffect(isHovered ? 1.05 : 1.0)
             } else {
                 // Future hour - empty space
                 Rectangle()
@@ -300,5 +329,36 @@ private struct RoundedCorner: Shape {
         
         path.closeSubpath()
         return path
+    }
+}
+
+// MARK: - Tooltip View
+private struct TooltipView: View {
+    let hour: Int
+    let cost: Double
+    let location: CGPoint
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("\(String(format: "%02d", hour)):00")
+                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                .foregroundColor(.white)
+            
+            Text(cost > 0 ? String(format: "$%.2f", cost) : "$0.00")
+                .font(.system(size: 10, weight: .regular, design: .monospaced))
+                .foregroundColor(.white.opacity(0.9))
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 4)
+                .fill(Color.black.opacity(0.85))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 4)
+                .stroke(Color.white.opacity(0.1), lineWidth: 0.5)
+        )
+        .position(x: location.x, y: max(location.y - 20, 15))
+        .animation(.easeInOut(duration: 0.1), value: location)
     }
 }
