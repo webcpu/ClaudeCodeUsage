@@ -24,11 +24,11 @@ public enum SortOrder: String {
     case descending = "desc"
 }
 
-/// Main client for accessing Claude Code usage data
-public class ClaudeUsageClient: UsageDataSource {
+/// Legacy client for accessing Claude Code usage data (deprecated - use ClaudeUsageClient instead)
+public class ClaudiaUsageClientLegacy: UsageDataSource {
     
     /// Shared instance
-    public static let shared = ClaudeUsageClient()
+    public static let shared = ClaudiaUsageClientLegacy()
     
     /// Data source mode
     public enum DataSource {

@@ -5,6 +5,7 @@
 
 import SwiftUI
 import ClaudeCodeUsage
+import Combine
 
 @main
 struct UsageDashboardApp: App {
@@ -18,8 +19,11 @@ struct UsageDashboardApp: App {
 struct ContentView: View {
     @State private var stats: UsageStats?
     @State private var isLoading = true
+    @State private var hasInitiallyLoaded = false
     @State private var selectedTimeRange: TimeRange = .allTime  // Show all data by default
     @State private var errorMessage: String?
+    @State private var refreshTimer: Timer?
+    @State private var isAppActive = true
     
     // Use real data from Claude sessions
     private let client = ClaudeUsageClient(dataSource: .localFiles(basePath: NSHomeDirectory() + "/.claude"))
@@ -60,6 +64,29 @@ struct ContentView: View {
         }
         .task {
             await loadData()
+            startRefreshTimer()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            // App became active (foreground)
+            isAppActive = true
+            Task {
+                await loadData()  // Refresh data when app becomes active
+            }
+            startRefreshTimer()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
+            // App became inactive (background)
+            isAppActive = false
+            stopRefreshTimer()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
+            // Window gained focus - refresh data
+            Task {
+                await loadData()
+            }
+        }
+        .onDisappear {
+            stopRefreshTimer()
         }
         } else {
             // Fallback for macOS 12
@@ -77,12 +104,35 @@ struct ContentView: View {
             }
             .task {
                 await loadData()
+                startRefreshTimer()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+                isAppActive = true
+                Task {
+                    await loadData()
+                }
+                startRefreshTimer()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
+                isAppActive = false
+                stopRefreshTimer()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
+                Task {
+                    await loadData()
+                }
+            }
+            .onDisappear {
+                stopRefreshTimer()
             }
         }
     }
     
     func loadData() async {
-        isLoading = true
+        // Only show loading indicator on initial load
+        if !hasInitiallyLoaded {
+            isLoading = true
+        }
         errorMessage = nil
         
         do {
@@ -97,14 +147,45 @@ struct ContentView: View {
                 print("No usage data found in ~/.claude/projects/ for the selected time range")
                 errorMessage = "No usage data found. Run Claude Code sessions to generate usage data."
             } else {
-                print("Loaded \(stats?.totalSessions ?? 0) sessions with total cost: $\(stats?.totalCost ?? 0)")
+                let refreshType = hasInitiallyLoaded ? "Refreshed" : "Loaded"
+                print("\(refreshType) \(stats?.totalSessions ?? 0) sessions with total cost: $\(stats?.totalCost ?? 0)")
             }
         } catch {
             print("Error loading data: \(error)")
             errorMessage = "Error loading data: \(error.localizedDescription)"
         }
         
-        isLoading = false
+        // Mark initial load as complete and hide loading indicator
+        if !hasInitiallyLoaded {
+            hasInitiallyLoaded = true
+            isLoading = false
+        }
+    }
+    
+    func startRefreshTimer() {
+        // Stop any existing timer first
+        stopRefreshTimer()
+        
+        // Only start timer if app is active
+        guard isAppActive else { return }
+        
+        // Create a new timer that fires every 2 seconds
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
+            // Only refresh if app is still active
+            if isAppActive {
+                Task {
+                    await loadData()
+                }
+            }
+        }
+        
+        print("Started refresh timer (2 second interval)")
+    }
+    
+    func stopRefreshTimer() {
+        refreshTimer?.invalidate()
+        refreshTimer = nil
+        print("Stopped refresh timer")
     }
 }
 

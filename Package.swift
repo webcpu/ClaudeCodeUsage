@@ -39,7 +39,16 @@ let package = Package(
             targets: ["FinalTest"]),
         .executable(
             name: "ExactTest",
-            targets: ["ExactTest"])
+            targets: ["ExactTest"]),
+        .executable(
+            name: "RefactoredTest",
+            targets: ["RefactoredTest"]),
+        .executable(
+            name: "TestTimerCLI",
+            targets: ["TestTimerCLI"]),
+        .executable(
+            name: "TestRefreshCLI",
+            targets: ["TestRefreshCLI"])
     ],
     dependencies: [
         // Dependencies declare other packages that this package depends on.
@@ -83,6 +92,18 @@ let package = Package(
             name: "ExactTest",
             dependencies: ["ClaudeCodeUsage"],
             path: "Sources/ExactTest"),
+        .executableTarget(
+            name: "RefactoredTest",
+            dependencies: ["ClaudeCodeUsage"],
+            path: "Sources/RefactoredTest"),
+        .executableTarget(
+            name: "TestTimerCLI",
+            dependencies: ["ClaudeCodeUsage"],
+            path: "Sources/TestTimerCLI"),
+        .executableTarget(
+            name: "TestRefreshCLI",
+            dependencies: ["ClaudeCodeUsage"],
+            path: "Sources/TestRefreshCLI"),
         .testTarget(
             name: "ClaudeCodeUsageTests",
             dependencies: ["ClaudeCodeUsage"],
