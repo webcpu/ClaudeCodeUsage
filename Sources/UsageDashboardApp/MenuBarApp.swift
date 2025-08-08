@@ -36,6 +36,9 @@ final class UsageDataModel {
     var todaySessionCount: Int = 0
     var estimatedDailySessions: Int = 0
     
+    // Chart data
+    var chartDataService = ChartDataService()
+    
     private var cancellables = Set<AnyCancellable>()
     
     init(container: DependencyContainer = ProductionContainer.shared) {
@@ -171,6 +174,7 @@ final class UsageDataModel {
     func loadData() async {
         lastRefreshTime = Date()
         await viewModel.loadData()
+        await chartDataService.loadTodayHourlyCosts()
     }
     
     func startRefreshTimer() {

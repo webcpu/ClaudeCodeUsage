@@ -13,6 +13,7 @@ import ClaudeLiveMonitorLib
 final class ChartDataService {
     
     private(set) var todayHourlyCosts: [Double] = []
+    private(set) var detailedHourlyData: [HourlyChartData] = []
     private(set) var isLoading: Bool = false
     private(set) var error: Error?
     
@@ -25,12 +26,15 @@ final class ChartDataService {
             let client = ClaudeUsageClient(dataSource: .localFiles(basePath: NSHomeDirectory() + "/.claude"))
             let todayEntries = try await client.getTodayUsageEntries()
             let hourlyData = UsageAnalytics.todayHourlyCosts(from: todayEntries)
+            let detailedData = UsageAnalytics.detailedHourlyCosts(from: todayEntries)
             
             self.todayHourlyCosts = hourlyData
+            self.detailedHourlyData = detailedData
             self.isLoading = false
         } catch {
             self.error = error
             self.todayHourlyCosts = []
+            self.detailedHourlyData = []
             self.isLoading = false
             print("Failed to load real hourly costs: \(error)")
         }

@@ -4,11 +4,11 @@
 //
 
 import SwiftUI
+import Charts
 import ClaudeCodeUsage
 
 struct CostMetricsSection: View {
     @Environment(UsageDataModel.self) private var dataModel
-    @State private var chartDataService = ChartDataService()
     
     var body: some View {
         VStack(spacing: MenuBarTheme.Layout.sectionSpacing) {
@@ -18,11 +18,6 @@ struct CostMetricsSection: View {
             // Summary stats
             if let stats = dataModel.stats {
                 summaryStatsView(stats)
-            }
-        }
-        .onAppear {
-            Task {
-                await chartDataService.loadTodayHourlyCosts()
             }
         }
     }
@@ -52,22 +47,11 @@ struct CostMetricsSection: View {
             }
             .frame(minWidth: 80)
             
-            // Hourly cost bar chart with y-axis labels
-            if !chartDataService.todayHourlyCosts.isEmpty {
-                HStack(spacing: 5) {
-                    // Y-axis labels container
-                    YAxisLabels(maxValue: chartDataService.todayHourlyCosts.max() ?? 1.0)
-                        .frame(width: 35, height: 45)
-                    
-                    // Bar chart
-                    BarChartView(
-                        dataPoints: chartDataService.todayHourlyCosts
-                    )
-                    .frame(
-                        width: 200,
-                        height: 45
-                    )
-                }
+            // Swift Charts-based hourly cost chart
+            if !dataModel.chartDataService.todayHourlyCosts.isEmpty {
+                HourlyCostChartSimple(hourlyData: dataModel.chartDataService.todayHourlyCosts)
+            } else if !dataModel.chartDataService.detailedHourlyData.isEmpty {
+                HourlyCostChartSimple(from: dataModel.chartDataService.detailedHourlyData)
             }
         }
         .padding(.horizontal, MenuBarTheme.Layout.horizontalPadding)
