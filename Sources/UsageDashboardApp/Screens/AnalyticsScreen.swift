@@ -377,12 +377,12 @@ private struct YearlyCostHeatmapCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                HStack {
-                    Image(systemName: "calendar.badge.plus")
-                        .foregroundColor(.green)
-                    Text("Daily Cost Activity")
-                        .font(.headline)
-                }
+//                HStack {
+//                    Image(systemName: "calendar.badge.plus")
+//                        .foregroundColor(.green)
+//                    Text("Daily Cost Activity")
+//                        .font(.headline)
+//                }
                 
                 Spacer()
                 

@@ -81,11 +81,12 @@ struct HeatmapMonth: Identifiable {
 // MARK: - Color Scheme - Optimized
 enum HeatmapColorScheme {
     // Pre-computed color values to avoid repeated calculations
-    static let emptyColor = Color.gray.opacity(0.1)
-    static let lowColor = Color.green.opacity(0.3)
-    static let mediumLowColor = Color.green.opacity(0.5)
-    static let mediumHighColor = Color.green.opacity(0.7)
-    static let highColor = Color.green.opacity(0.9)
+    // GitHub-style contribution colors: Level 0 (no data) = gray, Levels 1-4 = progressive green
+    static let emptyColor = Color.gray.opacity(0.3)  // More visible gray for Level 0
+    static let lowColor = Color.green.opacity(0.25)   // Level 1: Lightest green
+    static let mediumLowColor = Color.green.opacity(0.45)  // Level 2: Light green  
+    static let mediumHighColor = Color.green.opacity(0.65) // Level 3: Medium green
+    static let highColor = Color.green //.opacity(0.85)       // Level 4: Darkest green
     
     static func colorForCost(_ cost: Double, maxCost: Double) -> Color {
         if cost == 0 { return emptyColor }
@@ -105,12 +106,13 @@ enum HeatmapColorScheme {
         }
     }
     
+    // Legend colors array: 5 levels from no activity to high activity
     static let legendColors = [
-        emptyColor,
-        lowColor,
-        mediumLowColor,
-        mediumHighColor,
-        highColor
+        emptyColor,      // Level 0: No contributions (gray)
+        lowColor,        // Level 1: Low contributions (lightest green)
+        mediumLowColor,  // Level 2: Medium-low contributions (light green)
+        mediumHighColor, // Level 3: Medium-high contributions (medium green)
+        highColor        // Level 4: High contributions (darkest green)
     ]
 }
 
@@ -210,9 +212,13 @@ struct YearlyCostHeatmap: View {
             // Header
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Daily Cost Activity")
-                        .font(.headline)
-                        .fontWeight(.semibold)
+                    HStack {
+                        Image(systemName: "calendar.badge.plus")
+                            .foregroundColor(.green)
+                        Text("Daily Cost Activity")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                    }
                     
                     Text("\(totalDaysWithUsage) days of usage in last 365 days")
                         .font(.caption)
@@ -322,12 +328,17 @@ struct YearlyCostHeatmap: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
                 
-                HStack(spacing: 2) {
+                // Legend showing 5 contribution levels (0-4)
+                HStack(spacing: 3) {
                     ForEach(0..<HeatmapColorScheme.legendColors.count, id: \.self) { index in
                         Rectangle()
                             .fill(HeatmapColorScheme.legendColors[index])
-                            .frame(width: 10, height: 10)
+                            .frame(width: 11, height: 11)
                             .cornerRadius(2)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 2)
+                                    .stroke(Color.gray.opacity(0.2), lineWidth: 0.5)
+                            )
                     }
                 }
                 
