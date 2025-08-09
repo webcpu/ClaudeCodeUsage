@@ -76,6 +76,7 @@ public struct YearlyCostHeatmap: View {
                 legendSection
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(configuration.padding)
         .background(Color(NSColor.controlBackgroundColor))
         .cornerRadius(12)
@@ -240,6 +241,7 @@ public struct YearlyCostHeatmap: View {
                     viewModel.endHover()
                 }
             )
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(height: gridLayout.totalSize.height)
         .accessibilityLabel("Heatmap showing daily cost activity over the last 365 days")

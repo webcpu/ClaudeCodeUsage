@@ -29,7 +29,7 @@ struct UsageDashboardApp: App {
         }
         .windowStyle(.automatic)
         .windowToolbarStyle(.unified)
-        .defaultSize(width: 900, height: 600)
+        .defaultSize(width: 840, height: 600)
         .commands {
             AppCommands()
         }

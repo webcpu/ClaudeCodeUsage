@@ -116,9 +116,14 @@ public struct HeatmapGrid: View {
     
     /// Calculate the horizontal offset for a month label based on its week span
     private func monthLabelOffset(for month: HeatmapMonth) -> CGFloat {
-        let weekStartOffset = CGFloat(month.weekSpan.lowerBound) * configuration.cellSize
-        let paddingOffset: CGFloat = 4 // Match the padding from gridContent
-        return weekStartOffset + paddingOffset
+        let weekStartIndex = CGFloat(month.weekSpan.lowerBound)
+        
+        // Calculate offset: (week_index * square_size) + (week_index * spacing) + horizontal_padding
+        let squareOffset = weekStartIndex * configuration.squareSize
+        let spacingOffset = weekStartIndex * configuration.spacing
+        let paddingOffset: CGFloat = 4 // Match the horizontal padding from gridContent
+        
+        return squareOffset + spacingOffset + paddingOffset
     }
     
     /// Calculate the total width of the grid to match the scrollable content
@@ -374,7 +379,12 @@ public struct HeatmapGridLayout {
     ///   - dayIndex: Day index within the week
     /// - Returns: Position of the day square
     public func dayPosition(weekIndex: Int, dayIndex: Int) -> CGPoint {
-        let x = CGFloat(weekIndex) * configuration.cellSize + 4 // 4 for padding
+        // Calculate x position: (week_index * square_size) + (week_index * spacing) + horizontal_padding
+        let squareOffset = CGFloat(weekIndex) * configuration.squareSize
+        let spacingOffset = CGFloat(weekIndex) * configuration.spacing
+        let x = squareOffset + spacingOffset + 4 // 4 for horizontal padding
+        
+        // Calculate y position: (day_index * square_size) + (day_index * spacing)
         let y = CGFloat(dayIndex) * configuration.cellSize
         return CGPoint(x: x, y: y)
     }

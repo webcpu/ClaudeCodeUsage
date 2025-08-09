@@ -227,11 +227,23 @@ public final class HeatmapDateCalculator {
             let monthName = calendar.monthSymbols[currentMonth - 1]
             let monthAbbrev = String(monthName.prefix(3))
             
-            // Check if this month would duplicate the first month (common in rolling year views)
-            // For rolling year views, we only check month name to avoid confusion with duplicate labels
+            // Handle duplicate month names in rolling year views
             let isDuplicate = months.first?.name == monthAbbrev
             
-            if !isDuplicate {
+            if isDuplicate, let firstMonth = months.first, currentMonth == firstMonth.monthNumber {
+                // This is the same month as the first month in a rolling year view
+                // Extend the first month's span to include the final weeks
+                let updatedFirstMonth = MonthInfo(
+                    name: firstMonth.name,
+                    fullName: firstMonth.fullName,
+                    monthNumber: firstMonth.monthNumber,
+                    year: firstMonth.year,
+                    firstWeek: firstMonth.firstWeek,
+                    lastWeek: weekIndex - 1  // Extend to include final weeks
+                )
+                months[0] = updatedFirstMonth
+            } else if !isDuplicate {
+                // Different month, add normally
                 months.append(MonthInfo(
                     name: monthAbbrev,
                     fullName: monthName,
