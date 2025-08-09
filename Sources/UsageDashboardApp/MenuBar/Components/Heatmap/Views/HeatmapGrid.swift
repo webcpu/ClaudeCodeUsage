@@ -109,7 +109,10 @@ public struct HeatmapGrid: View {
                         .offset(x: monthLabelOffset(for: month), y: 0)
                 }
             }
+            
+            Spacer() // Push content to leading edge
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
     
     // MARK: - Month Label Positioning
