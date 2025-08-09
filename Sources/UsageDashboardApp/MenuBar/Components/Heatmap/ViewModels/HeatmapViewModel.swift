@@ -166,8 +166,8 @@ public final class HeatmapViewModel: ObservableObject {
         do {
             let startTime = CFAbsoluteTimeGetCurrent()
             
-            // Calculate date range (365 days ending today)
-            let dateRange = dateCalculator.rollingDateRange(numberOfDays: 365)
+            // Calculate date range (365 days ending today, adjusted for complete weeks)
+            let dateRange = dateCalculator.rollingDateRangeWithCompleteWeeks(numberOfDays: 365)
             
             // Validate date range
             let validationErrors = dateCalculator.validateDateRange(

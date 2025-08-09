@@ -61,6 +61,33 @@ public final class HeatmapDateCalculator {
         return (start: start, end: end)
     }
     
+    /// Calculates the rolling date range with complete weeks only for heatmap display
+    /// - Parameters:
+    ///   - endDate: The end date of the range (typically today)
+    ///   - numberOfDays: Target number of days to include (will be adjusted to complete weeks)
+    /// - Returns: Tuple containing adjusted start and end dates for complete weeks
+    public func rollingDateRangeWithCompleteWeeks(
+        endingOn endDate: Date = Date(),
+        numberOfDays: Int = 365
+    ) -> (start: Date, end: Date) {
+        let end = calendar.startOfDay(for: endDate)
+        let initialStart = calendar.date(byAdding: .day, value: -(numberOfDays - 1), to: end)!
+        
+        // Find the week start for the initial start date
+        let weekStartDate = weekStart(for: initialStart)
+        
+        // If the week start is before our initial start date, we have a partial first week
+        // In that case, move to the next complete week
+        let adjustedStart: Date
+        if weekStartDate < initialStart {
+            adjustedStart = calendar.date(byAdding: .weekOfYear, value: 1, to: weekStartDate)!
+        } else {
+            adjustedStart = weekStartDate
+        }
+        
+        return (start: adjustedStart, end: end)
+    }
+    
     /// Finds the Sunday of the week containing the given date
     /// - Parameter date: The date to find the week start for
     /// - Returns: The Sunday of that week
@@ -198,14 +225,22 @@ public final class HeatmapDateCalculator {
         // Close the final month
         if weekIndex > monthStartWeek {
             let monthName = calendar.monthSymbols[currentMonth - 1]
-            months.append(MonthInfo(
-                name: String(monthName.prefix(3)),
-                fullName: monthName,
-                monthNumber: currentMonth,
-                year: currentYear,
-                firstWeek: monthStartWeek,
-                lastWeek: weekIndex - 1
-            ))
+            let monthAbbrev = String(monthName.prefix(3))
+            
+            // Check if this month would duplicate the first month (common in rolling year views)
+            // For rolling year views, we only check month name to avoid confusion with duplicate labels
+            let isDuplicate = months.first?.name == monthAbbrev
+            
+            if !isDuplicate {
+                months.append(MonthInfo(
+                    name: monthAbbrev,
+                    fullName: monthName,
+                    monthNumber: currentMonth,
+                    year: currentYear,
+                    firstWeek: monthStartWeek,
+                    lastWeek: weekIndex - 1
+                ))
+            }
         }
         
         return months
@@ -231,7 +266,7 @@ public final class HeatmapDateCalculator {
         return dates
     }
     
-    /// Generates weeks of dates for heatmap layout
+    /// Generates weeks of dates for heatmap layout, starting with the first complete week
     /// - Parameters:
     ///   - startDate: The start date of the range
     ///   - endDate: The end date of the range
@@ -240,6 +275,19 @@ public final class HeatmapDateCalculator {
         let weekStartDate = weekStart(for: startDate)
         var weeks: [[Date?]] = []
         var currentWeekStart = weekStartDate
+        
+        // Check if the first week is partial (doesn't contain the full 7 days within our range)
+        var isFirstWeekPartial = false
+        if weekStartDate < startDate {
+            // Count how many days of the first week are before our start date
+            let daysBefore = calendar.dateComponents([.day], from: weekStartDate, to: startDate).day ?? 0
+            isFirstWeekPartial = daysBefore > 0
+        }
+        
+        // Skip the first week if it's partial
+        if isFirstWeekPartial {
+            currentWeekStart = calendar.date(byAdding: .weekOfYear, value: 1, to: currentWeekStart)!
+        }
         
         while currentWeekStart <= endDate {
             var weekDays: [Date?] = Array(repeating: nil, count: 7)
