@@ -115,6 +115,13 @@ public struct DailyUsage: Codable {
     public let totalTokens: Int
     public let modelsUsed: [String]
     
+    public init(date: String, totalCost: Double, totalTokens: Int, modelsUsed: [String]) {
+        self.date = date
+        self.totalCost = totalCost
+        self.totalTokens = totalTokens
+        self.modelsUsed = modelsUsed
+    }
+    
     private enum CodingKeys: String, CodingKey {
         case date
         case totalCost = "total_cost"
@@ -176,6 +183,22 @@ public struct UsageStats: Codable {
     public let byModel: [ModelUsage]
     public let byDate: [DailyUsage]
     public let byProject: [ProjectUsage]
+    
+    public init(totalCost: Double, totalTokens: Int, totalInputTokens: Int, 
+                totalOutputTokens: Int, totalCacheCreationTokens: Int, 
+                totalCacheReadTokens: Int, totalSessions: Int, 
+                byModel: [ModelUsage], byDate: [DailyUsage], byProject: [ProjectUsage]) {
+        self.totalCost = totalCost
+        self.totalTokens = totalTokens
+        self.totalInputTokens = totalInputTokens
+        self.totalOutputTokens = totalOutputTokens
+        self.totalCacheCreationTokens = totalCacheCreationTokens
+        self.totalCacheReadTokens = totalCacheReadTokens
+        self.totalSessions = totalSessions
+        self.byModel = byModel
+        self.byDate = byDate
+        self.byProject = byProject
+    }
     
     private enum CodingKeys: String, CodingKey {
         case totalCost = "total_cost"

@@ -44,6 +44,7 @@ struct CostMetricsSection: View {
                             .foregroundColor(MenuBarTheme.Colors.Status.critical)
                     }
                 }
+                .frame(maxWidth: .infinity)
             }
             .frame(minWidth: 80)
             

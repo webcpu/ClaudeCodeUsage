@@ -16,6 +16,7 @@ struct AnalyticsScreen: View {
                 
                 if let stats = dataModel.stats {
                     VStack(spacing: 16) {
+                        YearlyCostHeatmapCard(stats: stats)
                         TokenDistributionCard(stats: stats)
                         PredictionsCard(stats: stats)
                         EfficiencyCard(stats: stats)
@@ -355,6 +356,68 @@ private struct InfoRow: View {
                 Text(detail)
                     .font(.caption)
                     .foregroundColor(.secondary)
+            }
+        }
+    }
+}
+
+// MARK: - Yearly Cost Heatmap Card
+private struct YearlyCostHeatmapCard: View {
+    let stats: UsageStats
+    @State private var selectedYear: Int = Calendar.current.component(.year, from: Date())
+    
+    private var availableYears: [Int] {
+        let years = Set<Int>(stats.byDate.compactMap { dailyUsage in
+            guard let year = Int(dailyUsage.date.prefix(4)) else { return nil }
+            return year
+        })
+        return Array(years).sorted(by: >)
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                HStack {
+                    Image(systemName: "calendar.badge.plus")
+                        .foregroundColor(.green)
+                    Text("Daily Cost Activity")
+                        .font(.headline)
+                }
+                
+                Spacer()
+                
+                // Year selector
+                if availableYears.count > 1 {
+                    Menu {
+                        ForEach(availableYears, id: \.self) { year in
+                            Button(String(year)) {
+                                selectedYear = year
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(String(selectedYear))
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                            Image(systemName: "chevron.down")
+                                .font(.caption)
+                        }
+                        .foregroundColor(.primary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.gray.opacity(0.1))
+                        .cornerRadius(6)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            
+            YearlyCostHeatmap(stats: stats, year: selectedYear)
+        }
+        .onAppear {
+            // Set initial year to the most recent year with data
+            if let mostRecentYear = availableYears.first {
+                selectedYear = mostRecentYear
             }
         }
     }
