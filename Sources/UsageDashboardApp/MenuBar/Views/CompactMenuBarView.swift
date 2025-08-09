@@ -193,7 +193,7 @@ struct CompactMenuBarView: View {
             quickStatItem(
                 title: "Tokens",
                 value: FormatterService.formatLargeNumber(dataModel.stats?.totalTokens ?? 0),
-                icon: "textformat"
+                icon: "text.alignleft"
             )
             
             Divider()
