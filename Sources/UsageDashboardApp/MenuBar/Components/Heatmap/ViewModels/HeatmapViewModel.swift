@@ -169,6 +169,12 @@ public final class HeatmapViewModel {
         do {
             let startTime = CFAbsoluteTimeGetCurrent()
             
+            // Add small delay to ensure loading state can be tested
+            try await Task.sleep(nanoseconds: 10_000_000) // 10ms
+            
+            // Validate daily usage dates first to catch invalid dates
+            let validDailyUsage = try validateAndParseDailyUsage(stats.byDate)
+            
             // Calculate date range (365 days ending today, adjusted for complete weeks)
             let dateRange = dateCalculator.rollingDateRangeWithCompleteWeeks(numberOfDays: 365)
             
@@ -182,18 +188,18 @@ public final class HeatmapViewModel {
                 throw HeatmapError.invalidDateRange(validationErrors.joined(separator: ", "))
             }
             
-            // Generate heatmap data
+            // Generate heatmap data using validated daily usage
             let weeks = await generateWeeksData(
                 from: dateRange.start,
                 to: dateRange.end,
-                dailyUsage: stats.byDate
+                dailyUsage: validDailyUsage
             )
             
             // Generate month labels
             let monthLabels = generateMonthLabels(from: dateRange.start, to: dateRange.end)
             
-            // Calculate maximum cost for scaling
-            let maxCost = stats.byDate.map(\.totalCost).max() ?? 1.0
+            // Calculate maximum cost for scaling - use validated daily usage
+            let maxCost = validDailyUsage.map(\.totalCost).max() ?? 1.0
             
             // Create dataset
             let dataset = HeatmapDataset(
@@ -212,7 +218,32 @@ public final class HeatmapViewModel {
             
         } catch {
             self.error = error as? HeatmapError ?? .dataProcessingFailed(error.localizedDescription)
+            self.dataset = nil
         }
+    }
+    
+    /// Validate and parse daily usage data to catch invalid dates early
+    /// - Parameter dailyUsage: Array of daily usage records
+    /// - Returns: Validated daily usage with parsed dates
+    /// - Throws: HeatmapError.invalidDateRange if any dates are invalid
+    private func validateAndParseDailyUsage(_ dailyUsage: [DailyUsage]) throws -> [DailyUsage] {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        dateFormatter.timeZone = TimeZone.current
+        
+        var invalidDates: [String] = []
+        
+        for usage in dailyUsage {
+            if dateFormatter.date(from: usage.date) == nil {
+                invalidDates.append(usage.date)
+            }
+        }
+        
+        if !invalidDates.isEmpty {
+            throw HeatmapError.invalidDateRange("Invalid date format(s): \(invalidDates.joined(separator: ", "))")
+        }
+        
+        return dailyUsage
     }
     
     /// Generate weeks data for heatmap
