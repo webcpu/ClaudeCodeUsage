@@ -34,6 +34,13 @@ struct UsageDashboardApp: App {
             AppCommands()
         }
         
+        // Preferences Window
+        #if os(macOS)
+        Settings {
+            PreferencesView()
+        }
+        #endif
+        
         MenuBarScene(appState: appState)
     }
 }
@@ -44,7 +51,7 @@ struct MenuBarScene: Scene {
     
     var body: some Scene {
         MenuBarExtra {
-            MenuBarContentView()
+            AdaptiveMenuBarView()
                 .environment(appState.dataModel)
         } label: {
             MenuBarLabel(appState: appState)
@@ -59,14 +66,31 @@ struct MenuBarLabel: View {
     @Environment(UsageDataModel.self) private var dataModel
     let appState: AppState
     
+    private var menuBarIcon: String {
+        // Dynamic icon based on state
+        if let session = dataModel.activeSession, session.isActive {
+            return "dollarsign.circle.fill" // Active session
+        } else if dataModel.todaysCostValue > dataModel.dailyCostThreshold {
+            return "exclamationmark.triangle.fill" // Cost warning
+        } else {
+            return "dollarsign.circle" // Normal state
+        }
+    }
+    
+    private var iconColor: Color {
+        if let session = dataModel.activeSession, session.isActive {
+            return .green
+        } else if dataModel.todaysCostValue > dataModel.dailyCostThreshold {
+            return .orange
+        } else {
+            return .primary
+        }
+    }
+    
     var body: some View {
         HStack(spacing: 4) {
-            if let session = dataModel.activeSession, session.isActive {
-                Circle()
-                    .fill(Color.green)
-                    .frame(width: 6, height: 6)
-            }
-            Image(systemName: "dollarsign.circle.fill")
+            Image(systemName: menuBarIcon)
+                .foregroundColor(iconColor)
             Text(dataModel.todaysCost)
                 .font(.system(.body, design: .monospaced))
         }

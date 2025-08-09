@@ -85,6 +85,19 @@ final class UsageDataModel {
         return viewModel.estimatedDailySessions
     }
     
+    // Formatted values for display
+    var formattedTodaysCost: String? {
+        return FormatterService.formatCurrency(todaysCostValue)
+    }
+    
+    var formattedTotalCost: String? {
+        return stats?.totalCost != nil ? FormatterService.formatCurrency(stats!.totalCost) : nil
+    }
+    
+    var lastUpdateTime: Date? {
+        return lastRefreshTime
+    }
+    
     // Chart data
     var chartDataService = ChartDataService()
     

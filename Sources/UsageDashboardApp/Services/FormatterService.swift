@@ -58,4 +58,30 @@ struct FormatterService {
     static func formatDailyAverage(_ average: Double) -> String {
         return formatCurrency(average)
     }
+    
+    // MARK: - Large Number Formatting
+    static func formatLargeNumber(_ number: Int) -> String {
+        return formatTokenCount(number)
+    }
+    
+    // MARK: - Relative Time Formatting
+    static func formatRelativeTime(_ date: Date?) -> String {
+        guard let date = date else { return "Never" }
+        
+        let now = Date()
+        let interval = now.timeIntervalSince(date)
+        
+        if interval < 60 {
+            return "Just now"
+        } else if interval < 3600 {
+            let minutes = Int(interval / 60)
+            return "\(minutes)m ago"
+        } else if interval < 86400 {
+            let hours = Int(interval / 3600)
+            return "\(hours)h ago"
+        } else {
+            let days = Int(interval / 86400)
+            return "\(days)d ago"
+        }
+    }
 }
