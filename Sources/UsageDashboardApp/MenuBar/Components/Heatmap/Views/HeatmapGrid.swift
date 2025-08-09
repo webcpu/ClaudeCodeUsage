@@ -78,8 +78,6 @@ public struct HeatmapGrid: View {
                 
                 // Calendar grid
                 scrollableGrid
-                
-                Spacer()
             }
         }
     }
@@ -88,24 +86,47 @@ public struct HeatmapGrid: View {
     
     @ViewBuilder
     private var monthLabelsHeader: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: 0) {
             // Spacer for day labels column
             if configuration.showDayLabels {
                 Spacer()
                     .frame(width: 30)
             }
             
-            // Month labels
-            ForEach(dataset.monthLabels) { month in
-                Text(month.name)
-                    .font(configuration.monthLabelFont)
-                    .foregroundColor(.secondary)
-                    .frame(width: CGFloat(month.weekSpan.count * Int(configuration.cellSize)), alignment: .leading)
-                    .accessibilityLabel(accessibility.enableAccessibilityLabels ? month.fullName : "")
+            // Month labels positioned based on their week spans
+            ZStack(alignment: .topLeading) {
+                // Create a full-width container to match the scrollable grid
+                Rectangle()
+                    .fill(Color.clear)
+                    .frame(width: totalGridWidth, height: 20)
+                
+                // Position each month label at the correct offset
+                ForEach(dataset.monthLabels) { month in
+                    Text(month.name)
+                        .font(configuration.monthLabelFont)
+                        .foregroundColor(.secondary)
+                        .accessibilityLabel(accessibility.enableAccessibilityLabels ? month.fullName : "")
+                        .offset(x: monthLabelOffset(for: month), y: 0)
+                }
             }
-            
-            Spacer()
         }
+    }
+    
+    // MARK: - Month Label Positioning
+    
+    /// Calculate the horizontal offset for a month label based on its week span
+    private func monthLabelOffset(for month: HeatmapMonth) -> CGFloat {
+        let weekStartOffset = CGFloat(month.weekSpan.lowerBound) * configuration.cellSize
+        let paddingOffset: CGFloat = 4 // Match the padding from gridContent
+        return weekStartOffset + paddingOffset
+    }
+    
+    /// Calculate the total width of the grid to match the scrollable content
+    private var totalGridWidth: CGFloat {
+        let weekCount = CGFloat(dataset.weeks.count)
+        let totalSpacing = (weekCount - 1) * configuration.spacing
+        let totalSquares = weekCount * configuration.squareSize
+        return totalSquares + totalSpacing + 8 // 8 for horizontal padding (4 on each side)
     }
     
     // MARK: - Day Labels Column
