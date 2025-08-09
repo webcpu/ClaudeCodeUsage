@@ -103,7 +103,7 @@ struct NavigationDetailView: View {
             AnalyticsScreen()
                 .environment(dataModel)
         case .liveMetrics:
-            MenuBarContentView()
+            MenuBarContentView(viewMode: .liveMetrics)
                 .environment(dataModel)
         }
     }

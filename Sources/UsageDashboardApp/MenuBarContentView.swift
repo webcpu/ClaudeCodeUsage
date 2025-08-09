@@ -9,6 +9,12 @@ import ClaudeCodeUsage
 // MARK: - Main Menu Bar Content View
 struct MenuBarContentView: View {
     @Environment(UsageDataModel.self) private var dataModel
+    let viewMode: MenuBarViewMode
+    
+    // MARK: - Initializers
+    init(viewMode: MenuBarViewMode = .menuBar) {
+        self.viewMode = viewMode
+    }
     
     var body: some View {
         VStack(spacing: 2) {
@@ -51,9 +57,7 @@ struct MenuBarContentView: View {
             largeDivider
             
             // Actions
-            ActionButtons {
-                handleRefresh()
-            }
+            ActionButtons(onRefresh: handleRefresh, viewMode: viewMode)
         }
         .frame(width: MenuBarTheme.Layout.menuBarWidth)
         .background(MenuBarTheme.Colors.UI.background)

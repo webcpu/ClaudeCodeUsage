@@ -100,7 +100,7 @@ struct HourlyCostChartSimple: View {
             }
             .chartYScale(domain: 0...yAxisMax)
             .frame(height: 60)
-            .padding(.trailing, 30) // Space for y-axis labels
+            .padding(.trailing, 15) // Reduced space for y-axis labels
             .overlay(alignment: .top) {
                 // Tooltip overlay - positioned above chart, doesn't affect layout
                 if let selectedHour = selectedHour,

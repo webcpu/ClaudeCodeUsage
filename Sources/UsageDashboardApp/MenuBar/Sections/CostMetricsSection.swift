@@ -24,7 +24,7 @@ struct CostMetricsSection: View {
     
     // MARK: - Today's Cost View
     private var todaysCostView: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Today")
                     .font(MenuBarTheme.Typography.metricTitle)
@@ -44,9 +44,10 @@ struct CostMetricsSection: View {
                             .foregroundColor(MenuBarTheme.Colors.Status.critical)
                     }
                 }
-                .frame(maxWidth: .infinity)
             }
-            .frame(minWidth: 80)
+            .layoutPriority(1)
+            
+            Spacer()
             
             // Swift Charts-based hourly cost chart
             if !dataModel.chartDataService.todayHourlyCosts.isEmpty {
