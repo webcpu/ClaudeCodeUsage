@@ -7,7 +7,6 @@ import SwiftUI
 
 // MARK: - Preferences Window
 struct PreferencesView: View {
-    @AppStorage("menuBarDisplayMode") private var displayMode: MenuBarDisplayMode = .compact
     @AppStorage("openAtLogin") private var openAtLogin = false
     @AppStorage("refreshInterval") private var refreshInterval: Double = 30.0
     @AppStorage("dailyCostThreshold") private var dailyCostThreshold: Double = 10.0
@@ -19,7 +18,6 @@ struct PreferencesView: View {
         TabView(selection: $selectedTab) {
             // General Tab
             GeneralPreferencesView(
-                displayMode: $displayMode,
                 openAtLogin: $openAtLogin,
                 showCostInMenuBar: $showCostInMenuBar
             )
@@ -53,7 +51,6 @@ struct PreferencesView: View {
 
 // MARK: - General Preferences
 struct GeneralPreferencesView: View {
-    @Binding var displayMode: MenuBarDisplayMode
     @Binding var openAtLogin: Bool
     @Binding var showCostInMenuBar: Bool
     
@@ -61,24 +58,6 @@ struct GeneralPreferencesView: View {
         Form {
             Section {
                 VStack(alignment: .leading, spacing: 16) {
-                    // Display Mode
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Menu Bar Display")
-                            .font(.headline)
-                        
-                        Picker("Display Mode", selection: $displayMode) {
-                            Text("Compact (Recommended)").tag(MenuBarDisplayMode.compact)
-                            Text("Detailed").tag(MenuBarDisplayMode.detailed)
-                        }
-                        .pickerStyle(RadioGroupPickerStyle())
-                        
-                        Text(displayModeDescription)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    Divider()
-                    
                     // Startup Options
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Startup")
@@ -95,15 +74,6 @@ struct GeneralPreferencesView: View {
             }
         }
         .formStyle(.grouped)
-    }
-    
-    private var displayModeDescription: String {
-        switch displayMode {
-        case .compact:
-            return "Shows only today's cost and active session indicator. Click 'Show Details' for more information."
-        case .detailed:
-            return "Shows full analytics dashboard with charts and detailed metrics. Takes more menu bar space."
-        }
     }
 }
 

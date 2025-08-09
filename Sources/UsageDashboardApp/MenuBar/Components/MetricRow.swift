@@ -45,7 +45,6 @@ struct MetricRow: View {
                 showOverflow: percentage > 100
             )
         }
-        .padding(.horizontal, MenuBarTheme.Layout.horizontalPadding)
         .padding(.vertical, MenuBarTheme.Layout.verticalPadding)
     }
     

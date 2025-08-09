@@ -51,7 +51,7 @@ struct MenuBarScene: Scene {
     
     var body: some Scene {
         MenuBarExtra {
-            AdaptiveMenuBarView()
+            MenuBarContentView()
                 .environment(appState.dataModel)
         } label: {
             MenuBarLabel(appState: appState)

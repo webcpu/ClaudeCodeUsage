@@ -53,7 +53,6 @@ struct UsageMetricsSection: View {
                 .foregroundColor(MenuBarTheme.Colors.Status.warning)
                 .monospacedDigit()
         }
-        .padding(.horizontal, MenuBarTheme.Layout.horizontalPadding)
         .padding(.bottom, MenuBarTheme.Layout.verticalPadding)
     }
 }

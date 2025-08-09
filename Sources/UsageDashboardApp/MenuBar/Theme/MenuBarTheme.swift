@@ -10,21 +10,17 @@ struct MenuBarTheme {
     
     // MARK: - Layout Constants
     struct Layout {
-        // Menu Bar Widths
-        static let menuBarWidth: CGFloat = 360 // Legacy detailed view
-        static let compactMenuBarWidth: CGFloat = 280 // New compact view
+        // Menu Bar Width
+        static let menuBarWidth: CGFloat = 360
         
         // Padding
         static let horizontalPadding: CGFloat = 20
-        static let compactHorizontalPadding: CGFloat = 16
+        static let contentHorizontalPadding: CGFloat = 12  // Reduced padding for content sections
         static let verticalPadding: CGFloat = 10
-        static let compactVerticalPadding: CGFloat = 8
         
         // Spacing
         static let sectionSpacing: CGFloat = 14
-        static let compactSectionSpacing: CGFloat = 12
         static let itemSpacing: CGFloat = 8
-        static let compactItemSpacing: CGFloat = 6
         static let dividerVerticalPadding: CGFloat = 6
         static let actionButtonsBottomPadding: CGFloat = 14
         
@@ -55,12 +51,6 @@ struct MenuBarTheme {
         static let metricSubvalue = Font.system(size: 9)
         static let summaryValue = Font.system(size: 12, weight: .medium)
         static let summaryLabel = Font.system(size: 10)
-        
-        // Compact Typography
-        static let compactPrimaryValue = Font.system(size: 16, weight: .semibold, design: .rounded)
-        static let compactPrimaryLabel = Font.system(size: 11, weight: .medium)
-        static let compactStatusBadge = Font.system(size: 9, weight: .semibold)
-        static let compactActionButton = Font.system(size: 10, weight: .medium)
         
         static let burnRateLabel = Font.system(size: 11)
         static let burnRateValue = Font.system(size: 11, weight: .medium)

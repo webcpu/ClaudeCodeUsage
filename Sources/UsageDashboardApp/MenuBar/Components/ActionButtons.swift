@@ -52,7 +52,6 @@ struct ActionButtons: View {
                 .buttonStyle(MenuButtonStyle(style: .secondary))
             }
         }
-        .padding(.horizontal, MenuBarTheme.Layout.horizontalPadding)
         .padding(.bottom, MenuBarTheme.Layout.actionButtonsBottomPadding)
     }
 }

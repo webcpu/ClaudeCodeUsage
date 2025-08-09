@@ -29,7 +29,7 @@ struct SectionHeader: View {
             
             Spacer()
         }
-        .padding(.horizontal, MenuBarTheme.Layout.horizontalPadding)
+        .padding(.horizontal, MenuBarTheme.Layout.contentHorizontalPadding)
         .padding(.vertical, MenuBarTheme.Layout.verticalPadding)
         .background(MenuBarTheme.Colors.UI.sectionBackground)
     }

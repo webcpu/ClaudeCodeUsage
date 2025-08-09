@@ -28,11 +28,11 @@ struct MenuBarContentView: View {
                 )
                 
                 SessionMetricsSection()
-                    .padding(.horizontal, MenuBarTheme.Layout.horizontalPadding)
+                    .padding(.horizontal, 12)
                     .padding(.vertical, 4)
                 
                 sectionDivider
-                    .padding(.horizontal, MenuBarTheme.Layout.horizontalPadding)
+                    .padding(.horizontal, 12)
             }
             
             // Usage Section
@@ -44,11 +44,11 @@ struct MenuBarContentView: View {
             )
             
             UsageMetricsSection()
-                .padding(.horizontal, MenuBarTheme.Layout.horizontalPadding)
+                .padding(.horizontal, 12)
                 .padding(.vertical, 4)
             
             sectionDivider
-                .padding(.horizontal, MenuBarTheme.Layout.horizontalPadding)
+                .padding(.horizontal, 12)
             
             // Cost Section
             SectionHeader(
@@ -59,15 +59,15 @@ struct MenuBarContentView: View {
             )
             
             CostMetricsSection()
-                .padding(.horizontal, MenuBarTheme.Layout.horizontalPadding)
+                .padding(.horizontal, 12)
                 .padding(.vertical, 4)
             
             largeDivider
-                .padding(.horizontal, MenuBarTheme.Layout.horizontalPadding)
+                .padding(.horizontal, 12)
             
             // Actions
             ActionButtons(onRefresh: handleRefresh, viewMode: viewMode)
-                .padding(.horizontal, MenuBarTheme.Layout.horizontalPadding)
+                .padding(.horizontal, 12)
                 .padding(.bottom, 8)
         }
         .frame(width: MenuBarTheme.Layout.menuBarWidth)

@@ -56,7 +56,6 @@ struct CostMetricsSection: View {
                 HourlyCostChartSimple(from: dataModel.chartDataService.detailedHourlyData)
             }
         }
-        .padding(.horizontal, MenuBarTheme.Layout.horizontalPadding)
         .padding(.vertical, MenuBarTheme.Layout.verticalPadding)
     }
     
@@ -83,7 +82,6 @@ struct CostMetricsSection: View {
                     .monospacedDigit()
             }
         }
-        .padding(.horizontal, MenuBarTheme.Layout.horizontalPadding)
         .padding(.bottom, MenuBarTheme.Layout.verticalPadding)
     }
     
