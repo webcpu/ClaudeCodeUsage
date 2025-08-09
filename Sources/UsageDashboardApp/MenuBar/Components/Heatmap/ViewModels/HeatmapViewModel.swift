@@ -110,10 +110,20 @@ public final class HeatmapViewModel: ObservableObject {
         if hoveredDay?.id != day?.id {
             hoveredDay = day
             
-            if day != nil {
+            if let day = day {
+                // Calculate the exact position of the day square
+                let cellSize = configuration.cellSize
+                let weekIndex = day.weekOfYear
+                let dayIndex = day.dayOfWeek
+                
+                // Calculate center of the day square
+                let squareCenterX = CGFloat(weekIndex) * cellSize + (cellSize / 2) + configuration.padding.leading
+                let squareCenterY = CGFloat(dayIndex) * cellSize + (cellSize / 2)
+                
+                // Position tooltip above the day square
                 tooltipPosition = CGPoint(
-                    x: location.x + 10, // Offset from cursor
-                    y: location.y - 30
+                    x: squareCenterX,
+                    y: squareCenterY - configuration.squareSize - 20 // Above the square with 8px gap
                 )
             }
         }

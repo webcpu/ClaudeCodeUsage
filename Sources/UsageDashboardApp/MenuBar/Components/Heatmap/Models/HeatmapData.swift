@@ -223,19 +223,19 @@ public enum HeatmapColorScheme {
     // MARK: - Color Constants
     
     /// Color for days with no usage
-    public static let emptyColor = Color.gray.opacity(0.3)
+    public static let emptyColor = Color(red: 240/255, green: 242/255, blue: 245/255)
     
     /// Color for low usage days
-    public static let lowColor = Color.green.opacity(0.25)
+    public static let lowColor = Color(red: 186/255, green: 236/255, blue: 191/255)
     
     /// Color for medium-low usage days
-    public static let mediumLowColor = Color.green.opacity(0.45)
+    public static let mediumLowColor = Color(red: 109/255, green: 191/255, blue: 116/255)
     
     /// Color for medium-high usage days
-    public static let mediumHighColor = Color.green.opacity(0.65)
+    public static let mediumHighColor = Color(red: 83/255, green: 162/255, blue: 88/255)
     
     /// Color for high usage days
-    public static let highColor = Color.green
+    public static let highColor = Color(red: 45/255, green: 97/255, blue: 48/255)
     
     /// Array of all legend colors (5 levels from no activity to high activity)
     public static let legendColors: [Color] = [

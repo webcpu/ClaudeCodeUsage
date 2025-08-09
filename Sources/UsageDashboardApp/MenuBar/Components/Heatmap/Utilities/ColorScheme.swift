@@ -256,11 +256,11 @@ public extension HeatmapColorTheme {
     /// - Returns: Generated color theme
     static func generate(from baseColor: Color) -> [Color] {
         return [
-            Color.gray.opacity(0.3),          // Empty
-            baseColor.opacity(0.25),          // Low
-            baseColor.opacity(0.45),          // Medium-low
-            baseColor.opacity(0.65),          // Medium-high
-            baseColor                         // High
+            Color(red: 240/255, green: 242/255, blue: 245/255),  // Empty
+            baseColor.opacity(0.35),          // Low
+            baseColor.opacity(0.55),          // Medium-low
+            baseColor.opacity(0.75),          // Medium-high
+            baseColor.opacity(0.95)           // High
         ]
     }
     

@@ -267,7 +267,9 @@ public struct YearlyCostHeatmap: View {
                 style: .standard,
                 screenBounds: screenBounds
             )
+            .position(viewModel.tooltipPosition) // Position at calculated coordinates
             .allowsHitTesting(false)
+            .animation(.easeInOut(duration: 0.1), value: viewModel.tooltipPosition)
         }
     }
 }

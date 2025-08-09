@@ -199,11 +199,11 @@ public enum HeatmapColorTheme: String, CaseIterable, Equatable {
         switch self {
         case .github:
             return [
-                Color.gray.opacity(0.3),      // Empty
-                Color.green.opacity(0.25),    // Low
-                Color.green.opacity(0.45),    // Medium-low
-                Color.green.opacity(0.65),    // Medium-high
-                Color.green                   // High
+                Color(red: 240/255, green: 242/255, blue: 245/255),  // Level 0: Light gray (no activity)
+                Color(red: 186/255, green: 236/255, blue: 191/255),  // Level 1: Very light green
+                Color(red: 109/255, green: 191/255, blue: 116/255),  // Level 2: Light green
+                Color(red: 83/255, green: 162/255, blue: 88/255),    // Level 3: Medium green
+                Color(red: 45/255, green: 97/255, blue: 48/255)      // Level 4: Dark green
             ]
         case .ocean:
             return [
