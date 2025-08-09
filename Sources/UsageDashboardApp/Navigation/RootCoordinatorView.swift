@@ -19,11 +19,13 @@ enum NavigationDestination: Hashable {
 struct RootCoordinatorView: View {
     @Environment(UsageDataModel.self) private var dataModel
     @State private var selectedDestination: NavigationDestination? = .overview
+    let settingsService: AppSettingsService
     
     var body: some View {
         ModernNavigationView(
             selectedDestination: $selectedDestination,
-            dataModel: dataModel
+            dataModel: dataModel,
+            settingsService: settingsService
         )
     }
 }
@@ -32,6 +34,7 @@ struct RootCoordinatorView: View {
 struct ModernNavigationView: View {
     @Binding var selectedDestination: NavigationDestination?
     let dataModel: UsageDataModel
+    let settingsService: AppSettingsService
     
     var body: some View {
         NavigationSplitView {
@@ -39,7 +42,8 @@ struct ModernNavigationView: View {
         } detail: {
             NavigationDetailView(
                 destination: selectedDestination ?? .overview,
-                dataModel: dataModel
+                dataModel: dataModel,
+                settingsService: settingsService
             )
         }
         .onReceive(NotificationCenter.default.publisher(for: .refreshData)) { _ in
@@ -87,6 +91,7 @@ struct NavigationSidebar: View {
 struct NavigationDetailView: View {
     let destination: NavigationDestination
     let dataModel: UsageDataModel
+    let settingsService: AppSettingsService
     
     var body: some View {
         switch destination {
@@ -103,7 +108,7 @@ struct NavigationDetailView: View {
             AnalyticsScreen()
                 .environment(dataModel)
         case .liveMetrics:
-            MenuBarContentView(viewMode: .liveMetrics)
+            MenuBarContentView(settingsService: settingsService, viewMode: .liveMetrics)
                 .environment(dataModel)
         }
     }

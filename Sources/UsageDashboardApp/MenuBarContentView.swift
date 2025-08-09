@@ -9,10 +9,19 @@ import ClaudeCodeUsage
 // MARK: - Main Menu Bar Content View
 struct MenuBarContentView: View {
     @Environment(UsageDataModel.self) private var dataModel
+    @ObservedObject var settingsService: AppSettingsService
+    @FocusState private var focusedField: FocusField?
     let viewMode: MenuBarViewMode
     
+    enum FocusField: Hashable {
+        case refresh
+        case settings
+        case quit
+    }
+    
     // MARK: - Initializers
-    init(viewMode: MenuBarViewMode = .menuBar) {
+    init(settingsService: AppSettingsService, viewMode: MenuBarViewMode = .menuBar) {
+        self.settingsService = settingsService
         self.viewMode = viewMode
     }
     
@@ -66,12 +75,64 @@ struct MenuBarContentView: View {
                 .padding(.horizontal, 12)
             
             // Actions
-            ActionButtons(onRefresh: handleRefresh, viewMode: viewMode)
+            ActionButtons(settingsService: settingsService, onRefresh: handleRefresh, viewMode: viewMode)
                 .padding(.horizontal, 12)
                 .padding(.bottom, 8)
         }
         .frame(width: MenuBarTheme.Layout.menuBarWidth)
         .background(MenuBarTheme.Colors.UI.background)
+        .focusable()
+        .onKeyPress { press in
+            // Handle keyboard shortcuts
+            switch press.key {
+            case .tab:
+                // Tab navigation
+                if press.modifiers.contains(.shift) {
+                    switchFocusPrevious()
+                } else {
+                    switchFocusNext()
+                }
+                return .handled
+            case .escape:
+                // Escape to close menu bar window
+                if viewMode == .menuBar {
+                    NSApp.hide(nil)
+                }
+                return .handled
+            case KeyEquivalent("r"):
+                // Cmd+R to refresh
+                if press.modifiers.contains(.command) {
+                    handleRefresh()
+                    return .handled
+                }
+                return .ignored
+            default:
+                return .ignored
+            }
+        }
+    }
+    
+    // MARK: - Focus Navigation
+    private func switchFocusNext() {
+        switch focusedField {
+        case .refresh:
+            focusedField = .settings
+        case .settings:
+            focusedField = .quit
+        case .quit, nil:
+            focusedField = .refresh
+        }
+    }
+    
+    private func switchFocusPrevious() {
+        switch focusedField {
+        case .refresh:
+            focusedField = .quit
+        case .settings:
+            focusedField = .refresh
+        case .quit, nil:
+            focusedField = .settings
+        }
     }
     
     // MARK: - UI Elements

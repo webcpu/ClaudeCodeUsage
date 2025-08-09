@@ -14,6 +14,7 @@ enum MenuBarViewMode {
 
 struct ActionButtons: View {
     @Environment(\.openWindow) private var openWindow
+    @ObservedObject var settingsService: AppSettingsService
     let onRefresh: () -> Void
     let viewMode: MenuBarViewMode
     
@@ -37,19 +38,34 @@ struct ActionButtons: View {
                     }
                 }
                 .buttonStyle(MenuButtonStyle(style: .primary))
+                .keyboardShortcut("1", modifiers: .command)
+                .help("Open the main dashboard window (⌘1)")
             }
             
             Button("Refresh") {
                 onRefresh()
             }
             .buttonStyle(MenuButtonStyle(style: .primary))
+            .keyboardShortcut("r", modifiers: .command)
+            .help("Refresh usage data (⌘R)")
             
-            // Quit button - only show in menu bar mode
+            // Menu bar only buttons
             if viewMode == .menuBar {
+                // Settings menu using the new component
+                SettingsMenu(settingsService: settingsService)
+                    .menuStyle(BorderlessButtonMenuStyle())
+                    .fixedSize()
+                    .buttonStyle(MenuButtonStyle(style: .secondary))
+                    .help("Settings")
+                
+                Spacer()
+                
                 Button("Quit") {
                     NSApplication.shared.terminate(nil)
                 }
                 .buttonStyle(MenuButtonStyle(style: .secondary))
+                .keyboardShortcut("q", modifiers: .command)
+                .help("Quit the application (⌘Q)")
             }
         }
         .padding(.bottom, MenuBarTheme.Layout.actionButtonsBottomPadding)

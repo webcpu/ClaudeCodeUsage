@@ -12,10 +12,11 @@ struct UsageDashboardApp: App {
     @State private var appState = AppState()
     @State private var lifecycleManager = AppLifecycleManager()
     @State private var hasAppeared = false
+    @StateObject private var settingsService = AppSettingsService()
     
     var body: some Scene {
         Window("Usage Dashboard", id: "main") {
-            RootCoordinatorView()
+            RootCoordinatorView(settingsService: settingsService)
                 .environment(appState.dataModel)
                 .onAppear {
                     if !hasAppeared {
@@ -31,31 +32,29 @@ struct UsageDashboardApp: App {
         .windowToolbarStyle(.unified)
         .defaultSize(width: 840, height: 600)
         .commands {
-            AppCommands()
+            AppCommands(settingsService: settingsService)
         }
         
-        // Preferences Window
-        #if os(macOS)
-        Settings {
-            PreferencesView()
-        }
-        #endif
-        
-        MenuBarScene(appState: appState)
+        MenuBarScene(appState: appState, settingsService: settingsService)
     }
 }
 
 // MARK: - Menu Bar Scene
 struct MenuBarScene: Scene {
     let appState: AppState
+    @ObservedObject var settingsService: AppSettingsService
     
     var body: some Scene {
         MenuBarExtra {
-            MenuBarContentView()
+            MenuBarContentView(settingsService: settingsService)
                 .environment(appState.dataModel)
         } label: {
             MenuBarLabel(appState: appState)
                 .environment(appState.dataModel)
+                .contextMenu {
+                    MenuBarContextMenu(settingsService: settingsService)
+                        .environment(appState.dataModel)
+                }
         }
         .menuBarExtraStyle(.window)
     }
@@ -99,20 +98,24 @@ struct MenuBarLabel: View {
 
 // MARK: - App Commands
 struct AppCommands: Commands {
+    @ObservedObject var settingsService: AppSettingsService
+    
     var body: some Commands {
         CommandGroup(replacing: .appInfo) {
             Button("About Usage Dashboard") {
-                NSApp.orderFrontStandardAboutPanel(
-                    options: [
-                        .applicationName: "Usage Dashboard",
-                        .applicationVersion: "1.0.0",
-                        .credits: NSAttributedString(
-                            string: "Claude Code Usage Tracking",
-                            attributes: [.font: NSFont.systemFont(ofSize: 11)]
-                        )
-                    ]
-                )
+                settingsService.showAboutPanel()
             }
+        }
+        
+        CommandGroup(after: .appSettings) {
+            Toggle("Open at Login", isOn: Binding(
+                get: { settingsService.isOpenAtLoginEnabled },
+                set: { newValue in
+                    Task {
+                        _ = await settingsService.setOpenAtLogin(newValue)
+                    }
+                }
+            ))
         }
         
         CommandMenu("View") {
@@ -120,6 +123,16 @@ struct AppCommands: Commands {
                 NotificationCenter.default.post(name: .refreshData, object: nil)
             }
             .keyboardShortcut("R", modifiers: .command)
+            
+            Divider()
+            
+            Button("Show Main Window") {
+                NSApp.activate(ignoringOtherApps: true)
+                if let window = NSApp.windows.first(where: { $0.identifier?.rawValue == "main" }) {
+                    window.makeKeyAndOrderFront(nil)
+                }
+            }
+            .keyboardShortcut("1", modifiers: .command)
         }
     }
 }
@@ -141,6 +154,55 @@ final class AppState {
         
         await dataModel.loadData()
         dataModel.startRefreshTimer()
+    }
+}
+
+// MARK: - Menu Bar Context Menu
+struct MenuBarContextMenu: View {
+    @Environment(UsageDataModel.self) private var dataModel
+    @ObservedObject var settingsService: AppSettingsService
+    
+    var body: some View {
+        Group {
+            Button("Refresh") {
+                Task {
+                    await dataModel.loadData()
+                }
+            }
+            
+            Divider()
+            
+            if let session = dataModel.activeSession, session.isActive {
+                Label("Session Active", systemImage: "dot.radiowaves.left.and.right")
+                    .foregroundColor(.green)
+            }
+            
+            Text("Today: \(dataModel.formattedTodaysCost ?? "$0.00")")
+            
+            Divider()
+            
+            Button("Open Dashboard") {
+                NSApp.activate(ignoringOtherApps: true)
+                if let window = NSApp.windows.first(where: { $0.identifier?.rawValue == "main" }) {
+                    window.makeKeyAndOrderFront(nil)
+                }
+            }
+            
+            Toggle("Open at Login", isOn: Binding(
+                get: { settingsService.isOpenAtLoginEnabled },
+                set: { newValue in
+                    Task {
+                        _ = await settingsService.setOpenAtLogin(newValue)
+                    }
+                }
+            ))
+            
+            Divider()
+            
+            Button("Quit") {
+                NSApplication.shared.terminate(nil)
+            }
+        }
     }
 }
 
