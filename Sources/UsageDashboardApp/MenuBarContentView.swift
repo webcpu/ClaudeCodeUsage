@@ -17,7 +17,7 @@ struct MenuBarContentView: View {
     }
     
     var body: some View {
-        VStack(spacing: 2) {
+        VStack(spacing: 0) {
             // Live Session Section
             if let session = dataModel.activeSession, session.isActive {
                 SectionHeader(
@@ -28,8 +28,11 @@ struct MenuBarContentView: View {
                 )
                 
                 SessionMetricsSection()
+                    .padding(.horizontal, MenuBarTheme.Layout.horizontalPadding)
+                    .padding(.vertical, 4)
                 
                 sectionDivider
+                    .padding(.horizontal, MenuBarTheme.Layout.horizontalPadding)
             }
             
             // Usage Section
@@ -41,8 +44,11 @@ struct MenuBarContentView: View {
             )
             
             UsageMetricsSection()
+                .padding(.horizontal, MenuBarTheme.Layout.horizontalPadding)
+                .padding(.vertical, 4)
             
             sectionDivider
+                .padding(.horizontal, MenuBarTheme.Layout.horizontalPadding)
             
             // Cost Section
             SectionHeader(
@@ -53,11 +59,16 @@ struct MenuBarContentView: View {
             )
             
             CostMetricsSection()
+                .padding(.horizontal, MenuBarTheme.Layout.horizontalPadding)
+                .padding(.vertical, 4)
             
             largeDivider
+                .padding(.horizontal, MenuBarTheme.Layout.horizontalPadding)
             
             // Actions
             ActionButtons(onRefresh: handleRefresh, viewMode: viewMode)
+                .padding(.horizontal, MenuBarTheme.Layout.horizontalPadding)
+                .padding(.bottom, 8)
         }
         .frame(width: MenuBarTheme.Layout.menuBarWidth)
         .background(MenuBarTheme.Colors.UI.background)

@@ -76,7 +76,7 @@ struct DetailedMenuBarView: View {
             Divider()
             
             // Original detailed content
-            VStack(spacing: 2) {
+            VStack(spacing: 0) {
                 // Live Session Section
                 if let session = dataModel.activeSession, session.isActive {
                     SectionHeader(
@@ -87,8 +87,11 @@ struct DetailedMenuBarView: View {
                     )
                     
                     SessionMetricsSection()
+                        .padding(.horizontal, MenuBarTheme.Layout.horizontalPadding)
+                        .padding(.vertical, 8)
                     
                     sectionDivider
+                        .padding(.horizontal, MenuBarTheme.Layout.horizontalPadding)
                 }
                 
                 // Usage Section
@@ -100,8 +103,11 @@ struct DetailedMenuBarView: View {
                 )
                 
                 UsageMetricsSection()
+                    .padding(.horizontal, MenuBarTheme.Layout.horizontalPadding)
+                    .padding(.vertical, 8)
                 
                 sectionDivider
+                    .padding(.horizontal, MenuBarTheme.Layout.horizontalPadding)
                 
                 // Cost Section
                 SectionHeader(
@@ -112,14 +118,17 @@ struct DetailedMenuBarView: View {
                 )
                 
                 CostMetricsSection()
+                    .padding(.horizontal, MenuBarTheme.Layout.horizontalPadding)
+                    .padding(.vertical, 8)
                 
                 largeDivider
+                    .padding(.horizontal, MenuBarTheme.Layout.horizontalPadding)
                 
                 // Actions
                 ActionButtons(onRefresh: handleRefresh, viewMode: viewMode)
+                    .padding(.horizontal, MenuBarTheme.Layout.horizontalPadding)
+                    .padding(.bottom, MenuBarTheme.Layout.verticalPadding)
             }
-            .padding(.horizontal, MenuBarTheme.Layout.horizontalPadding)
-            .padding(.vertical, MenuBarTheme.Layout.verticalPadding)
         }
         .frame(width: MenuBarTheme.Layout.menuBarWidth)
         .background(MenuBarTheme.Colors.UI.background)
@@ -146,7 +155,7 @@ struct DetailedMenuBarView: View {
             .buttonStyle(PlainButtonStyle())
         }
         .padding(.horizontal, MenuBarTheme.Layout.horizontalPadding)
-        .padding(.vertical, 8)
+        .padding(.vertical, 10)
     }
     
     // MARK: - UI Elements
