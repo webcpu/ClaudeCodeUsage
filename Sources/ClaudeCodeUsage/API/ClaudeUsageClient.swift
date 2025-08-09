@@ -107,9 +107,10 @@ struct FilterService {
             return stats
         }
         
-        // Recalculate totals based on filtered data
-        let totalCost = filteredByDate.reduce(0) { $0 + $1.totalCost }
-        let totalTokens = filteredByDate.reduce(0) { $0 + $1.totalTokens }
+        // Recalculate totals based on filtered data (single-pass reduction)
+        let (totalCost, totalTokens) = filteredByDate.reduce((0.0, 0)) { acc, daily in
+            (acc.0 + daily.totalCost, acc.1 + daily.totalTokens)
+        }
         
         return UsageStats(
             totalCost: totalCost,

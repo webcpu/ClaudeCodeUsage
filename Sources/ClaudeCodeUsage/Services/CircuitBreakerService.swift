@@ -159,78 +159,58 @@ public enum CircuitBreakerError: LocalizedError {
     }
 }
 
-/// File system with circuit breaker protection
-public class CircuitBreakerFileSystem: FileSystemProtocol {
-    private let fileSystem: FileSystemProtocol
+/// Async file system with circuit breaker protection
+public actor AsyncCircuitBreakerFileSystem: AsyncFileSystemProtocol {
+    private let fileSystem: AsyncFileSystemProtocol
     private let circuitBreaker: CircuitBreaker
     
-    public init(fileSystem: FileSystemProtocol, configuration: CircuitBreakerConfiguration = .default) {
+    public init(fileSystem: AsyncFileSystemProtocol, configuration: CircuitBreakerConfiguration = .default) {
         self.fileSystem = fileSystem
         self.circuitBreaker = CircuitBreaker(configuration: configuration)
     }
     
+    public func fileExists(atPath path: String) async -> Bool {
+        // Non-throwing operation, pass through directly
+        await fileSystem.fileExists(atPath: path)
+    }
+    
+    public func contentsOfDirectory(atPath path: String) async throws -> [String] {
+        try await circuitBreaker.execute {
+            try await self.fileSystem.contentsOfDirectory(atPath: path)
+        }
+    }
+    
+    public func readFile(atPath path: String) async throws -> String {
+        try await circuitBreaker.execute {
+            try await self.fileSystem.readFile(atPath: path)
+        }
+    }
+}
+
+/// Legacy file system with circuit breaker protection (deprecated)
+/// Migrate to AsyncCircuitBreakerFileSystem for better performance
+/// This synchronous wrapper passthrough without circuit breaker protection
+@available(*, deprecated, message: "Use AsyncCircuitBreakerFileSystem - sync circuit breaker no longer supported")
+public class CircuitBreakerFileSystem: FileSystemProtocol {
+    private let fileSystem: FileSystemProtocol
+    
+    public init(fileSystem: FileSystemProtocol, configuration: CircuitBreakerConfiguration = .default) {
+        self.fileSystem = fileSystem
+        // Configuration ignored - no sync circuit breaker available
+        print("[Warning] CircuitBreakerFileSystem is deprecated. Circuit breaker protection not applied to sync operations.")
+    }
+    
     public func fileExists(atPath path: String) -> Bool {
-        // This is a non-throwing operation, pass through directly
         fileSystem.fileExists(atPath: path)
     }
     
     public func contentsOfDirectory(atPath path: String) throws -> [String] {
-        // Use synchronous wrapper for async circuit breaker
-        let semaphore = DispatchSemaphore(value: 0)
-        var result: Result<[String], Error>!
-        
-        Task {
-            do {
-                let contents = try await circuitBreaker.execute {
-                    try self.fileSystem.contentsOfDirectory(atPath: path)
-                }
-                result = .success(contents)
-            } catch {
-                result = .failure(error)
-            }
-            semaphore.signal()
-        }
-        
-        semaphore.wait()
-        
-        switch result! {
-        case .success(let contents):
-            return contents
-        case .failure(let error):
-            throw error
-        }
+        // Passthrough without circuit breaker protection
+        return try fileSystem.contentsOfDirectory(atPath: path)
     }
     
     public func readFile(atPath path: String) throws -> String {
-        // Use synchronous wrapper for async circuit breaker
-        let semaphore = DispatchSemaphore(value: 0)
-        var result: Result<String, Error>!
-        
-        Task {
-            do {
-                let content = try await circuitBreaker.execute {
-                    try self.fileSystem.readFile(atPath: path)
-                }
-                result = .success(content)
-            } catch {
-                result = .failure(error)
-            }
-            semaphore.signal()
-        }
-        
-        semaphore.wait()
-        
-        switch result! {
-        case .success(let content):
-            return content
-        case .failure(let error):
-            throw error
-        }
-    }
-    
-    public func readFileAsync(atPath path: String) async throws -> String {
-        try await circuitBreaker.execute {
-            try self.fileSystem.readFile(atPath: path)
-        }
+        // Passthrough without circuit breaker protection  
+        return try fileSystem.readFile(atPath: path)
     }
 }

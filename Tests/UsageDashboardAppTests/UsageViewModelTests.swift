@@ -58,13 +58,16 @@ final class UsageViewModelTests: XCTestCase {
         var usageDataService: UsageDataService
         var sessionMonitorService: SessionMonitorService
         var configurationService: ConfigurationService
+        var performanceMetrics: PerformanceMetricsProtocol
         
         init(usageDataService: UsageDataService,
              sessionMonitorService: SessionMonitorService,
-             configurationService: ConfigurationService) {
+             configurationService: ConfigurationService,
+             performanceMetrics: PerformanceMetricsProtocol? = nil) {
             self.usageDataService = usageDataService
             self.sessionMonitorService = sessionMonitorService
             self.configurationService = configurationService
+            self.performanceMetrics = performanceMetrics ?? NullPerformanceMetrics()
         }
     }
     

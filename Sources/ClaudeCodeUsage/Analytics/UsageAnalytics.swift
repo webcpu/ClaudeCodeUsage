@@ -54,10 +54,13 @@ public enum UsageAnalytics {
         let total = Double(stats.totalTokens)
         guard total > 0 else { return (0, 0, 0, 0) }
         
-        let input = stats.byModel.reduce(0) { $0 + $1.inputTokens }
-        let output = stats.byModel.reduce(0) { $0 + $1.outputTokens }
-        let cacheWrite = stats.byModel.reduce(0) { $0 + $1.cacheCreationTokens }
-        let cacheRead = stats.byModel.reduce(0) { $0 + $1.cacheReadTokens }
+        // Single-pass reduction for better performance
+        let (input, output, cacheWrite, cacheRead) = stats.byModel.reduce((0, 0, 0, 0)) { acc, model in
+            (acc.0 + model.inputTokens,
+             acc.1 + model.outputTokens,
+             acc.2 + model.cacheCreationTokens,
+             acc.3 + model.cacheReadTokens)
+        }
         
         return (
             inputPercentage: (Double(input) / total) * 100,
@@ -135,8 +138,10 @@ public enum UsageAnalytics {
     
     /// Calculate cache savings
     public static func cacheSavings(from stats: UsageStats) -> CacheSavings {
-        let cacheReadTokens = stats.byModel.reduce(0) { $0 + $1.cacheReadTokens }
-        let inputTokens = stats.byModel.reduce(0) { $0 + $1.inputTokens }
+        // Single-pass reduction for cache and input tokens
+        let (cacheReadTokens, inputTokens) = stats.byModel.reduce((0, 0)) { acc, model in
+            (acc.0 + model.cacheReadTokens, acc.1 + model.inputTokens)
+        }
         
         // Estimate savings (cache reads are typically 10% of input cost)
         let estimatedInputCost = Double(inputTokens) * 0.00001 // Rough estimate

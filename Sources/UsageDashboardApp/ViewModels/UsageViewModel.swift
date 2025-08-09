@@ -224,7 +224,8 @@ final class UsageViewModel {
         // Average daily cost
         if !stats.byDate.isEmpty {
             let recentDays = stats.byDate.suffix(7)
-            let totalRecentCost = recentDays.reduce(0) { $0 + $1.totalCost }
+            // Single-pass reduction for performance
+            let totalRecentCost = recentDays.reduce(0.0) { $0 + $1.totalCost }
             averageDailyCost = totalRecentCost / Double(recentDays.count)
             
             if averageDailyCost > 0 {

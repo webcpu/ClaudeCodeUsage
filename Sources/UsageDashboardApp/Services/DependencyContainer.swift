@@ -115,6 +115,7 @@ protocol DependencyContainer {
     var usageDataService: UsageDataService { get }
     var sessionMonitorService: SessionMonitorService { get }
     var configurationService: ConfigurationService { get }
+    var performanceMetrics: PerformanceMetricsProtocol { get }
 }
 
 final class ProductionContainer: DependencyContainer {
@@ -130,6 +131,10 @@ final class ProductionContainer: DependencyContainer {
         DefaultConfigurationService()
     }()
     
+    lazy var performanceMetrics: PerformanceMetricsProtocol = {
+        PerformanceMetrics.default
+    }()
+    
     static let shared = ProductionContainer()
 }
 
@@ -139,15 +144,18 @@ final class TestContainer: DependencyContainer {
     var usageDataService: UsageDataService
     var sessionMonitorService: SessionMonitorService
     var configurationService: ConfigurationService
+    var performanceMetrics: PerformanceMetricsProtocol
     
     init(
         usageDataService: UsageDataService? = nil,
         sessionMonitorService: SessionMonitorService? = nil,
-        configurationService: ConfigurationService? = nil
+        configurationService: ConfigurationService? = nil,
+        performanceMetrics: PerformanceMetricsProtocol? = nil
     ) {
         self.usageDataService = usageDataService ?? MockUsageDataService()
         self.sessionMonitorService = sessionMonitorService ?? MockSessionMonitorService()
         self.configurationService = configurationService ?? DefaultConfigurationService()
+        self.performanceMetrics = performanceMetrics ?? NullPerformanceMetrics()
     }
 }
 
