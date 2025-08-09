@@ -116,14 +116,17 @@ public final class HeatmapViewModel: ObservableObject {
                 let weekIndex = day.weekOfYear
                 let dayIndex = day.dayOfWeek
                 
+                // Account for the horizontal padding applied to grid content (4 points from HeatmapGrid)
+                let gridContentPadding: CGFloat = 4
+                
                 // Calculate center of the day square
-                let squareCenterX = CGFloat(weekIndex) * cellSize + (cellSize / 2) + configuration.padding.leading
+                let squareCenterX = CGFloat(weekIndex) * cellSize + (cellSize / 2) + gridContentPadding
                 let squareCenterY = CGFloat(dayIndex) * cellSize + (cellSize / 2)
                 
                 // Position tooltip above the day square
                 tooltipPosition = CGPoint(
                     x: squareCenterX,
-                    y: squareCenterY - configuration.squareSize - 20 // Above the square with 8px gap
+                    y: squareCenterY - configuration.squareSize - 20 // Above the square with gap
                 )
             }
         }
@@ -294,8 +297,11 @@ public final class HeatmapViewModel: ObservableObject {
     ) -> HeatmapDay? {
         let cellSize = configuration.cellSize
         
+        // Account for the horizontal padding applied to grid content (4 points from HeatmapGrid)
+        let gridContentPadding: CGFloat = 4
+        
         // Convert location to grid coordinates
-        let weekIndex = Int((location.x - configuration.padding.leading) / cellSize)
+        let weekIndex = Int((location.x - gridContentPadding) / cellSize)
         let dayIndex = Int(location.y / cellSize)
         
         // Validate coordinates

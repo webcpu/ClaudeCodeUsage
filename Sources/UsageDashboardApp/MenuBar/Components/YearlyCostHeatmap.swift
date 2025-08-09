@@ -226,17 +226,22 @@ public struct YearlyCostHeatmap: View {
     
     @ViewBuilder
     private func heatmapContent(_ dataset: HeatmapDataset) -> some View {
-        HeatmapGrid(
-            dataset: dataset,
-            configuration: configuration,
-            hoveredDay: viewModel.hoveredDay,
-            onHover: { location in
-                viewModel.handleHover(at: location, in: .zero)
-            },
-            onEndHover: {
-                viewModel.endHover()
-            }
-        )
+        let gridLayout = HeatmapGridLayout(configuration: configuration, dataset: dataset)
+        
+        GeometryReader { geometry in
+            HeatmapGrid(
+                dataset: dataset,
+                configuration: configuration,
+                hoveredDay: viewModel.hoveredDay,
+                onHover: { location in
+                    viewModel.handleHover(at: location, in: geometry.frame(in: .local))
+                },
+                onEndHover: {
+                    viewModel.endHover()
+                }
+            )
+        }
+        .frame(height: gridLayout.totalSize.height)
         .accessibilityLabel("Heatmap showing daily cost activity over the last 365 days")
         .accessibilityAddTraits(.allowsDirectInteraction)
     }
