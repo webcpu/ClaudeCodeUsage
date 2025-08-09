@@ -12,7 +12,7 @@ struct UsageMetricsSection: View {
     
     var body: some View {
         VStack(spacing: MenuBarTheme.Layout.sectionSpacing) {
-            if let stats = dataModel.stats {
+            if dataModel.stats != nil {
                 // Token usage (moved from Session section)
                 if let session = dataModel.activeSession,
                    let tokenLimit = dataModel.autoTokenLimit {

@@ -8,34 +8,35 @@
 
 import SwiftUI
 import Foundation
-import Combine
+import Observation
 import ClaudeCodeUsage
 
 // MARK: - Heatmap View Model
 
 /// View model managing heatmap data, state, and business logic
+@Observable
 @MainActor
-public final class HeatmapViewModel: ObservableObject {
+public final class HeatmapViewModel {
     
-    // MARK: - Published Properties
+    // MARK: - Observable Properties
     
     /// Current heatmap dataset
-    @Published public private(set) var dataset: HeatmapDataset?
+    public private(set) var dataset: HeatmapDataset?
     
     /// Currently hovered day
-    @Published public var hoveredDay: HeatmapDay?
+    public var hoveredDay: HeatmapDay?
     
     /// Tooltip position for hovered day
-    @Published public var tooltipPosition: CGPoint = .zero
+    public var tooltipPosition: CGPoint = .zero
     
     /// Loading state
-    @Published public private(set) var isLoading: Bool = false
+    public private(set) var isLoading: Bool = false
     
     /// Error state
-    @Published public private(set) var error: HeatmapError?
+    public private(set) var error: HeatmapError?
     
     /// Configuration settings
-    @Published public var configuration: HeatmapConfiguration {
+    public var configuration: HeatmapConfiguration {
         didSet {
             // Regenerate dataset when configuration changes
             if let stats = currentStats, configuration != oldValue {
@@ -57,8 +58,7 @@ public final class HeatmapViewModel: ObservableObject {
     /// Color manager for optimized color calculations
     private let colorManager = HeatmapColorManager.shared
     
-    /// Cancellables for Combine subscriptions
-    private var cancellables = Set<AnyCancellable>()
+    // Note: Removed Combine cancellables as @Observable doesn't need them
     
     /// Performance metrics
     private var performanceMetrics = PerformanceMetrics()
@@ -69,7 +69,6 @@ public final class HeatmapViewModel: ObservableObject {
     /// - Parameter configuration: Heatmap configuration (defaults to standard)
     public init(configuration: HeatmapConfiguration = .default) {
         self.configuration = configuration
-        setupBindings()
     }
     
     // MARK: - Public Interface
@@ -162,16 +161,7 @@ public final class HeatmapViewModel: ObservableObject {
     
     // MARK: - Private Methods
     
-    /// Setup reactive bindings
-    private func setupBindings() {
-        // Clear error when starting new operations
-        $isLoading
-            .filter { $0 }
-            .sink { [weak self] _ in
-                self?.error = nil
-            }
-            .store(in: &cancellables)
-    }
+    // Note: @Observable automatically tracks property changes, no manual setup needed
     
     /// Generate heatmap dataset from usage statistics
     /// - Parameter stats: Usage statistics to process

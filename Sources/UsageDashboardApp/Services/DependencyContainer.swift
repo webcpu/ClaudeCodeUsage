@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import Observation
 import ClaudeCodeUsage
 import ClaudeLiveMonitorLib
 
@@ -96,8 +97,9 @@ final class DefaultSessionMonitorService: SessionMonitorService {
     }
 }
 
+@Observable
 final class DefaultConfigurationService: ConfigurationService {
-    @Published private(set) var configuration: AppConfiguration
+    private(set) var configuration: AppConfiguration
     
     init() {
         self.configuration = AppConfiguration.load()

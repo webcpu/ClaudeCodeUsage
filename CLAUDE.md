@@ -38,6 +38,60 @@ swift test --filter ClaudeCodeUsageTests
 swift test --filter "TestClassName/testMethodName"
 ```
 
+## Critical: ViewModel Architecture Standards ⚠️
+
+### ALWAYS Use @Observable + @MainActor for ViewModels
+
+**This project uses Swift's modern `@Observable` macro. DO NOT use `ObservableObject` or `@Published` patterns.**
+
+#### ✅ Correct ViewModel Pattern
+```swift
+import SwiftUI
+import Observation
+
+@Observable
+@MainActor
+final class ExampleViewModel {
+    var data: DataType?
+    var isLoading = false
+    
+    func loadData() async {
+        // Implementation
+    }
+}
+```
+
+#### ❌ NEVER Use This Pattern
+```swift
+import Combine
+
+class ExampleViewModel: ObservableObject {  // ❌ DON'T use ObservableObject
+    @Published var data: DataType?          // ❌ DON'T use @Published
+    @Published var isLoading = false        // ❌ DON'T use @Published
+}
+```
+
+#### View Integration
+```swift
+// ✅ CORRECT: Use @State with @Observable ViewModels
+struct ExampleView: View {
+    @State private var viewModel = ExampleViewModel()
+}
+
+// ❌ WRONG: Don't use @StateObject or @ObservedObject
+struct BadView: View {
+    @StateObject private var viewModel = ExampleViewModel()  // ❌
+}
+```
+
+### Enforcement Rules
+1. **ALWAYS** use `@Observable` macro for ViewModels
+2. **ALWAYS** use `@MainActor` with ViewModels
+3. **NEVER** use `ObservableObject` protocol
+4. **NEVER** use `@Published` properties
+5. **NEVER** use `@StateObject` or `@ObservedObject`
+6. Import `Observation` not `Combine` for ViewModels
+
 ## Architecture Overview
 
 ### Package Structure
@@ -51,7 +105,7 @@ The project uses Swift Package Manager with multiple targets:
 1. **Repository Pattern**: `UsageRepository` abstracts data access with protocol-based design
 2. **Dependency Injection**: `DependencyContainer` protocol enables testing with mock implementations
 3. **Actor-Based Concurrency**: Thread-safe state management using Swift actors
-4. **MVVM for SwiftUI**: `UsageViewModel` manages state for SwiftUI views
+4. **MVVM with @Observable**: Modern ViewModels using `@Observable` macro for fine-grained updates
 5. **Protocol-Oriented**: Extensive protocol usage for testability and flexibility
 
 ### Key Components

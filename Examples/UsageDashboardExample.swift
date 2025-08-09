@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Observation
 import ClaudeCodeUsage
 
 // MARK: - Main App
@@ -22,7 +23,7 @@ struct UsageDashboardApp: App {
 // MARK: - Content View
 
 struct ContentView: View {
-    @StateObject private var viewModel = UsageDashboardViewModel()
+    @State private var viewModel = UsageDashboardViewModel()
     @State private var selectedTab = 0
     
     var body: some View {
@@ -65,14 +66,15 @@ struct ContentView: View {
 
 // MARK: - View Model
 
+@Observable
 @MainActor
-class UsageDashboardViewModel: ObservableObject {
-    @Published var stats: UsageStats?
-    @Published var projects: [ProjectUsage] = []
-    @Published var entries: [UsageEntry] = []
-    @Published var isLoading = false
-    @Published var error: Error?
-    @Published var selectedTimeRange: TimeRange = .last7Days
+class UsageDashboardViewModel {
+    var stats: UsageStats?
+    var projects: [ProjectUsage] = []
+    var entries: [UsageEntry] = []
+    var isLoading = false
+    var error: Error?
+    var selectedTimeRange: TimeRange = .last7Days
     
     private let client = ClaudeUsageClient()
     
@@ -113,7 +115,7 @@ class UsageDashboardViewModel: ObservableObject {
 // MARK: - Overview Tab
 
 struct OverviewTab: View {
-    @ObservedObject var viewModel: UsageDashboardViewModel
+    let viewModel: UsageDashboardViewModel
     
     var body: some View {
         NavigationView {
@@ -156,7 +158,7 @@ struct OverviewTab: View {
 // MARK: - Models Tab
 
 struct ModelsTab: View {
-    @ObservedObject var viewModel: UsageDashboardViewModel
+    let viewModel: UsageDashboardViewModel
     
     var body: some View {
         NavigationView {
@@ -222,7 +224,7 @@ struct ModelRowView: View {
 // MARK: - Projects Tab
 
 struct ProjectsTab: View {
-    @ObservedObject var viewModel: UsageDashboardViewModel
+    let viewModel: UsageDashboardViewModel
     @State private var sortCriteria: [ProjectUsage].SortCriteria = .cost
     
     var body: some View {
@@ -277,7 +279,7 @@ struct ProjectRowView: View {
 // MARK: - Timeline Tab
 
 struct TimelineTab: View {
-    @ObservedObject var viewModel: UsageDashboardViewModel
+    let viewModel: UsageDashboardViewModel
     
     var body: some View {
         NavigationView {
@@ -344,7 +346,7 @@ struct DailyRowView: View {
 // MARK: - Analytics Tab
 
 struct AnalyticsTab: View {
-    @ObservedObject var viewModel: UsageDashboardViewModel
+    let viewModel: UsageDashboardViewModel
     @State private var weeklyTrend: WeeklyTrend?
     @State private var cacheSavings: CacheSavings?
     @State private var predictedMonthlyCost: Double = 0

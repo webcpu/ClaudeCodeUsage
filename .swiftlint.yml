@@ -1,0 +1,157 @@
+# SwiftLint Configuration for ClaudeCodeUsage
+# Enforces @Observable + @MainActor patterns for ViewModels
+
+# Disabled Rules
+disabled_rules:
+  - trailing_comma # Allow trailing commas in arrays/dictionaries
+  - line_length # Handled by opt_in_rules with more flexibility
+
+# Opt-in Rules
+opt_in_rules:
+  - attributes # Enforce attribute positioning
+  - closure_end_indentation
+  - closure_spacing
+  - contains_over_filter_count
+  - empty_collection_literal
+  - empty_count
+  - empty_string
+  - first_where
+  - last_where
+  - literal_expression_end_indentation
+  - modifier_order
+  - multiline_arguments
+  - multiline_function_chains
+  - multiline_literal_brackets
+  - multiline_parameters
+  - operator_usage_whitespace
+  - prefer_self_type_over_type_of_self
+  - sorted_first_last
+  - trailing_closure
+  - unneeded_parentheses_in_closure_argument
+  - vertical_parameter_alignment_on_call
+  - vertical_whitespace_closing_braces
+  - vertical_whitespace_opening_braces
+
+# Custom Rules for Observable Pattern Enforcement
+custom_rules:
+  
+  # Rule 1: Prohibit ObservableObject in ViewModels
+  no_observable_object:
+    name: "No ObservableObject"
+    regex: 'class\s+\w*ViewModel[^{]*:\s*ObservableObject'
+    message: "Use @Observable instead of ObservableObject for ViewModels"
+    severity: error
+    match_kinds:
+      - identifier
+      - keyword
+  
+  # Rule 2: Prohibit @Published in ViewModels
+  no_published_in_viewmodel:
+    name: "No @Published in ViewModels"
+    regex: '@Published\s+var'
+    message: "Use @Observable macro instead of @Published properties"
+    severity: error
+    included: ".*ViewModel.*\\.swift"
+  
+  # Rule 3: Require @MainActor for ViewModels
+  require_mainactor_viewmodel:
+    name: "ViewModels Must Use @MainActor"
+    regex: '@Observable\s*\n(?!@MainActor)[^@]*class\s+\w*ViewModel'
+    message: "ViewModels with @Observable must also use @MainActor for thread safety"
+    severity: error
+    match_kinds:
+      - attribute.builtin
+      - keyword
+  
+  # Rule 4: Prohibit @StateObject
+  no_state_object:
+    name: "No @StateObject"
+    regex: '@StateObject'
+    message: "Use @State with @Observable ViewModels instead of @StateObject"
+    severity: error
+  
+  # Rule 5: Prohibit @ObservedObject with ViewModels
+  no_observed_object:
+    name: "No @ObservedObject"
+    regex: '@ObservedObject\s+var\s+\w*[Vv]iew[Mm]odel'
+    message: "Pass @Observable objects directly without @ObservedObject"
+    severity: warning
+  
+  # Rule 6: Require import Observation for ViewModels
+  require_observation_import:
+    name: "Import Observation for ViewModels"
+    regex: '^(?!.*import\s+Observation).*@Observable'
+    message: "Files using @Observable must import Observation"
+    severity: error
+    match_kinds:
+      - attribute.builtin
+  
+  # Rule 7: Warn about Combine in ViewModels
+  avoid_combine_in_viewmodel:
+    name: "Avoid Combine in ViewModels"
+    regex: 'import\s+Combine'
+    message: "Consider if Combine is necessary with @Observable. Use only for system notifications."
+    severity: warning
+    included: ".*ViewModel.*\\.swift"
+
+# File Length
+file_length:
+  warning: 600
+  error: 1000
+  ignore_comment_only_lines: true
+
+# Type Body Length
+type_body_length:
+  warning: 400
+  error: 600
+
+# Function Body Length
+function_body_length:
+  warning: 50
+  error: 100
+
+# Line Length
+line_length:
+  warning: 120
+  error: 150
+  ignores_urls: true
+  ignores_function_declarations: false
+  ignores_comments: true
+
+# Naming Conventions
+identifier_name:
+  min_length:
+    warning: 2
+    error: 1
+  max_length:
+    warning: 40
+    error: 50
+  excluded:
+    - id
+    - vm
+    - vc
+    - i
+    - j
+    - k
+    - x
+    - y
+    - z
+
+type_name:
+  min_length: 3
+  max_length: 50
+
+# Included Paths
+included:
+  - Sources
+  - Tests
+
+# Excluded Paths
+excluded:
+  - Packages
+  - .build
+  - DerivedData
+  - "*.generated.swift"
+
+# Reporter
+reporter: "xcode" # Use "json" for CI/CD pipelines

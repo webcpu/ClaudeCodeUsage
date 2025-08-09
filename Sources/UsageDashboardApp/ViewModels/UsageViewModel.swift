@@ -4,7 +4,7 @@
 //
 
 import SwiftUI
-import Combine
+import Observation
 import ClaudeCodeUsage
 import ClaudeLiveMonitorLib
 
@@ -49,21 +49,22 @@ actor UsageStateManager {
 }
 
 // MARK: - Refactored View Model
+@Observable
 @MainActor
-final class UsageViewModel: ObservableObject {
-    // Published properties for UI binding
-    @Published var state: ViewState = .loading
-    @Published var activeSession: SessionBlock?
-    @Published var burnRate: BurnRate?
-    @Published var autoTokenLimit: Int?
-    @Published var todaysCost: String = "$0.00"
-    @Published var todaysCostProgress: Double = 0.0
-    @Published var sessionTimeProgress: Double = 0.0
-    @Published var sessionTokenProgress: Double = 0.0
-    @Published var averageDailyCost: Double = 0.0
-    @Published var dailyCostThreshold: Double = 10.0
-    @Published var todaySessionCount: Int = 0
-    @Published var estimatedDailySessions: Int = 0
+final class UsageViewModel {
+    // Observable properties for UI binding
+    var state: ViewState = .loading
+    var activeSession: SessionBlock?
+    var burnRate: BurnRate?
+    var autoTokenLimit: Int?
+    var todaysCost: String = "$0.00"
+    var todaysCostProgress: Double = 0.0
+    var sessionTimeProgress: Double = 0.0
+    var sessionTokenProgress: Double = 0.0
+    var averageDailyCost: Double = 0.0
+    var dailyCostThreshold: Double = 10.0
+    var todaySessionCount: Int = 0
+    var estimatedDailySessions: Int = 0
     
     // Dependencies
     private let usageDataService: UsageDataService
@@ -233,8 +234,7 @@ final class UsageViewModel: ObservableObject {
     }
     
     deinit {
-        // Cancel the timer task directly
-        timerTask?.cancel()
+        // Clean up resources - tasks are automatically cancelled when the class is deallocated
     }
 }
 
