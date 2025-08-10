@@ -55,7 +55,11 @@ let package = Package(
         .testTarget(
             name: "ClaudeCodeUsageTests",
             dependencies: ["ClaudeCodeUsage"],
-            path: "Tests/ClaudeCodeUsageTests"),
+            path: "Tests/ClaudeCodeUsageTests",
+            swiftSettings: [
+                .unsafeFlags(["-enable-testing"]),
+                .define("ENABLE_CODE_COVERAGE", .when(configuration: .debug))
+            ]),
         .testTarget(
             name: "UsageDashboardAppTests",
             dependencies: [
@@ -63,6 +67,10 @@ let package = Package(
                 "ClaudeCodeUsage",
                 .product(name: "ClaudeLiveMonitorLib", package: "ClaudeLiveMonitor")
             ],
-            path: "Tests/UsageDashboardAppTests"),
+            path: "Tests/UsageDashboardAppTests",
+            swiftSettings: [
+                .unsafeFlags(["-enable-testing"]),
+                .define("ENABLE_CODE_COVERAGE", .when(configuration: .debug))
+            ]),
     ]
 )
