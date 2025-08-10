@@ -6,7 +6,7 @@
 import SwiftUI
 
 struct SettingsMenu<Label: View>: View {
-    @ObservedObject var settingsService: AppSettingsService
+    let settingsService: AppSettingsService
     @State private var showingError = false
     @State private var lastError: AppSettingsError?
     

@@ -9,7 +9,7 @@ import ClaudeCodeUsage
 // MARK: - Main Menu Bar Content View
 struct MenuBarContentView: View {
     @Environment(UsageDataModel.self) private var dataModel
-    @ObservedObject var settingsService: AppSettingsService
+    let settingsService: AppSettingsService
     @FocusState private var focusedField: FocusField?
     let viewMode: MenuBarViewMode
     

@@ -6,7 +6,7 @@
 import SwiftUI
 
 struct OpenAtLoginToggle: View {
-    @ObservedObject var settingsService: AppSettingsService
+    let settingsService: AppSettingsService
     @State private var isHovered = false
     
     var body: some View {

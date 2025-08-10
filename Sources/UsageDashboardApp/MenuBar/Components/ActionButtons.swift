@@ -14,7 +14,7 @@ enum MenuBarViewMode {
 
 struct ActionButtons: View {
     @Environment(\.openWindow) private var openWindow
-    @ObservedObject var settingsService: AppSettingsService
+    let settingsService: AppSettingsService
     let onRefresh: () -> Void
     let viewMode: MenuBarViewMode
     

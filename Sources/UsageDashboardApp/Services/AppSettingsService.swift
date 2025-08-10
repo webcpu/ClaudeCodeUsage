@@ -6,10 +6,11 @@
 import Foundation
 import ServiceManagement
 import SwiftUI
+import Observation
 
 // MARK: - Protocol for Dependency Injection
 @MainActor
-protocol AppSettingsServiceProtocol: ObservableObject {
+protocol AppSettingsServiceProtocol: AnyObject {
     var isOpenAtLoginEnabled: Bool { get }
     func setOpenAtLogin(_ enabled: Bool) async -> Result<Void, AppSettingsError>
     func showAboutPanel()
@@ -45,9 +46,10 @@ enum AppSettingsError: LocalizedError {
 }
 
 // MARK: - Main Implementation
+@Observable
 @MainActor
 final class AppSettingsService: AppSettingsServiceProtocol {
-    @Published private(set) var isOpenAtLoginEnabled: Bool = false
+    private(set) var isOpenAtLoginEnabled: Bool = false
     
     // App metadata
     let appName = "Usage Dashboard"
@@ -116,9 +118,10 @@ final class AppSettingsService: AppSettingsServiceProtocol {
 
 // MARK: - Mock for Testing
 #if DEBUG
+@Observable
 @MainActor
 final class MockAppSettingsService: AppSettingsServiceProtocol {
-    @Published private(set) var isOpenAtLoginEnabled: Bool = false
+    private(set) var isOpenAtLoginEnabled: Bool = false
     
     func setOpenAtLogin(_ enabled: Bool) async -> Result<Void, AppSettingsError> {
         isOpenAtLoginEnabled = enabled

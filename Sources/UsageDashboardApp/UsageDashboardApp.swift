@@ -12,7 +12,7 @@ struct UsageDashboardApp: App {
     @State private var appState = AppState()
     @State private var lifecycleManager = AppLifecycleManager()
     @State private var hasAppeared = false
-    @StateObject private var settingsService = AppSettingsService()
+    @State private var settingsService = AppSettingsService()
     
     var body: some Scene {
         Window("Usage Dashboard", id: "main") {
@@ -42,7 +42,7 @@ struct UsageDashboardApp: App {
 // MARK: - Menu Bar Scene
 struct MenuBarScene: Scene {
     let appState: AppState
-    @ObservedObject var settingsService: AppSettingsService
+    let settingsService: AppSettingsService
     
     var body: some Scene {
         MenuBarExtra {
@@ -98,7 +98,7 @@ struct MenuBarLabel: View {
 
 // MARK: - App Commands
 struct AppCommands: Commands {
-    @ObservedObject var settingsService: AppSettingsService
+    let settingsService: AppSettingsService
     
     var body: some Commands {
         CommandGroup(replacing: .appInfo) {
@@ -160,7 +160,7 @@ final class AppState {
 // MARK: - Menu Bar Context Menu
 struct MenuBarContextMenu: View {
     @Environment(UsageDataModel.self) private var dataModel
-    @ObservedObject var settingsService: AppSettingsService
+    let settingsService: AppSettingsService
     
     var body: some View {
         Group {
