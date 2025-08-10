@@ -76,6 +76,8 @@ final class UsageViewModel {
     private var refreshTask: Task<Void, Never>?
     private var refreshTimer: AsyncStream<Date>?
     private var timerTask: Task<Void, Never>?
+    private var dayChangeTask: Task<Void, Never>?
+    private var lastKnownDay: String = ""
     
     // Computed properties
     var stats: UsageStats? {
@@ -106,6 +108,11 @@ final class UsageViewModel {
         self.configurationService = container.configurationService
         
         self.dailyCostThreshold = container.configurationService.configuration.dailyCostThreshold
+        
+        // Initialize last known day
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        self.lastKnownDay = formatter.string(from: Date())
     }
     
     // MARK: - Public Methods
@@ -155,6 +162,7 @@ final class UsageViewModel {
     func startAutoRefresh() {
         stopAutoRefresh()
         
+        // Start regular refresh timer
         let interval = configurationService.configuration.refreshInterval
         let stream = AsyncStream<Date> { continuation in
             let timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { _ in
@@ -172,15 +180,72 @@ final class UsageViewModel {
                 await loadData()
             }
         }
+        
+        // Start day change monitoring
+        startDayChangeMonitoring()
     }
     
     func stopAutoRefresh() {
         timerTask?.cancel()
         timerTask = nil
+        dayChangeTask?.cancel()
+        dayChangeTask = nil
     }
     
     func refresh() async {
         await loadData()
+    }
+    
+    // MARK: - Day Change Detection
+    private func startDayChangeMonitoring() {
+        dayChangeTask?.cancel()
+        
+        dayChangeTask = Task {
+            while !Task.isCancelled {
+                // Calculate seconds until midnight
+                let secondsUntilMidnight = calculateSecondsUntilMidnight()
+                
+                #if DEBUG
+                print("[UsageViewModel] Day change monitoring: Next refresh in \(secondsUntilMidnight) seconds")
+                #endif
+                
+                // Wait until just after midnight (add 1 second buffer)
+                try? await Task.sleep(nanoseconds: UInt64((secondsUntilMidnight + 1) * 1_000_000_000))
+                
+                guard !Task.isCancelled else { break }
+                
+                #if DEBUG
+                print("[UsageViewModel] Day changed! Refreshing data at \(Date())")
+                #endif
+                
+                // Refresh data for the new day
+                await loadData()
+                
+                // Update last known day
+                let formatter = DateFormatter()
+                formatter.dateFormat = "yyyy-MM-dd"
+                lastKnownDay = formatter.string(from: Date())
+            }
+        }
+    }
+    
+    private func calculateSecondsUntilMidnight() -> TimeInterval {
+        let calendar = Calendar.current
+        let now = Date()
+        
+        // Get tomorrow's date at midnight
+        var components = calendar.dateComponents([.year, .month, .day], from: now)
+        components.day! += 1
+        components.hour = 0
+        components.minute = 0
+        components.second = 0
+        
+        guard let midnight = calendar.date(from: components) else {
+            // Fallback to 1 hour if calculation fails
+            return 3600
+        }
+        
+        return midnight.timeIntervalSince(now)
     }
     
     // MARK: - Private Methods
@@ -236,6 +301,7 @@ final class UsageViewModel {
     
     deinit {
         // Clean up resources - tasks are automatically cancelled when the class is deallocated
+        // No need to manually cancel tasks in deinit since they're automatically cancelled
     }
 }
 
