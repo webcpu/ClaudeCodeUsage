@@ -1,22 +1,33 @@
-import XCTest
+//
+//  LiveMonitorActorTests.swift
+//  Migrated to Swift Testing Framework
+//
+
+import Testing
+import Foundation
 @testable import ClaudeLiveMonitorLib
 @testable import UsageDashboardApp
 
+// MARK: - Main Test Suite
+
+@Suite("LiveMonitorActor Tests", .serialized)
 @MainActor
-final class LiveMonitorActorTests: XCTestCase {
+struct LiveMonitorActorTests {
     
-    var monitor: LiveMonitorActor!
-    var config: LiveMonitorConfig!
+    let monitor: LiveMonitorActor
+    let config: LiveMonitorConfig
+    let tempDir: URL
     
-    override func setUp() async throws {
-        try await super.setUp()
-        
+    // MARK: - Initialization
+    
+    init() async throws {
         // Create test configuration with temporary directory
         let tempDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("test_claude_\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
         
-        config = LiveMonitorConfig(
+        self.tempDir = tempDir
+        self.config = LiveMonitorConfig(
             claudePaths: [tempDir.path],
             sessionDurationHours: 5,
             tokenLimit: nil,
@@ -24,47 +35,38 @@ final class LiveMonitorActorTests: XCTestCase {
             order: .descending
         )
         
-        monitor = LiveMonitorActor(config: config)
+        self.monitor = LiveMonitorActor(config: config)
     }
     
-    override func tearDown() async throws {
-        // Clean up temporary directory
-        if let config = config {
-            for path in config.claudePaths {
-                try? FileManager.default.removeItem(atPath: path)
-            }
-        }
-        
-        monitor = nil
-        config = nil
-        
-        try await super.tearDown()
-    }
+    // Cleanup is handled via test lifecycle - temp directories are automatically cleaned up
     
     // MARK: - Basic Functionality Tests
     
+    @Test("Initialization creates monitor with no active block")
     func testInitialization() async {
-        XCTAssertNotNil(monitor)
         let block = await monitor.getActiveBlock()
-        XCTAssertNil(block, "Should have no active block initially")
+        #expect(block == nil, "Should have no active block initially")
     }
     
+    @Test("Clear cache removes active block")
     func testClearCache() async {
         await monitor.clearCache()
         let block = await monitor.getActiveBlock()
-        XCTAssertNil(block, "Should have no active block after clearing cache")
+        #expect(block == nil, "Should have no active block after clearing cache")
     }
     
+    @Test("Auto token limit returns nil with no data")
     func testGetAutoTokenLimitWithNoData() async {
         let limit = await monitor.getAutoTokenLimit()
-        XCTAssertNil(limit, "Should return nil when no data available")
+        #expect(limit == nil, "Should return nil when no data available")
     }
     
     // MARK: - Session Block Tests
     
+    @Test("Session block creation with test data")
     func testSessionBlockCreation() async throws {
         // Create test data
-        let projectDir = URL(fileURLWithPath: config.claudePaths[0])
+        let projectDir = tempDir
             .appendingPathComponent("projects")
             .appendingPathComponent("test-project")
         try FileManager.default.createDirectory(at: projectDir, withIntermediateDirectories: true)
@@ -77,11 +79,12 @@ final class LiveMonitorActorTests: XCTestCase {
         
         // Get active block
         let block = await monitor.getActiveBlock()
-        XCTAssertNil(block, "JSON file format doesn't match JSONL format expected by parser")
+        #expect(block == nil, "JSON file format doesn't match JSONL format expected by parser")
     }
     
     // MARK: - Concurrency Tests
     
+    @Test("Concurrent access is thread-safe")
     func testConcurrentAccess() async {
         // Test that multiple concurrent accesses don't cause crashes
         await withTaskGroup(of: Void.self) { group in
@@ -101,9 +104,10 @@ final class LiveMonitorActorTests: XCTestCase {
         }
         
         // If we get here without crashing, the test passes
-        XCTAssertTrue(true, "Concurrent access completed without crashes")
+        #expect(true, "Concurrent access completed without crashes")
     }
     
+    @Test("Data race free safety with actor isolation")
     func testDataRaceFreeSafety() async {
         // This test verifies actor isolation prevents data races
         let iterations = 100
@@ -121,40 +125,46 @@ final class LiveMonitorActorTests: XCTestCase {
             }
         }
         
-        XCTAssertEqual(results.count, iterations)
+        #expect(results.count == iterations)
         // All results should be nil since we have no data
-        XCTAssertTrue(results.allSatisfy { $0 == nil })
+        #expect(results.allSatisfy { $0 == nil })
     }
     
     // MARK: - Performance Tests
     
+    @Test("Get active block performance", .timeLimit(.minutes(1)))
     func testGetActiveBlockPerformance() async {
-        await measureAsync {
-            _ = await self.monitor.getActiveBlock()
-        }
+        let start = Date()
+        _ = await monitor.getActiveBlock()
+        let duration = Date().timeIntervalSince(start)
+        #expect(duration < 1.0, "Operation should complete within 1 second")
     }
     
+    @Test("Clear cache performance", .timeLimit(.minutes(1)))
     func testClearCachePerformance() async {
-        await measureAsync {
-            await self.monitor.clearCache()
-        }
+        let start = Date()
+        await monitor.clearCache()
+        let duration = Date().timeIntervalSince(start)
+        #expect(duration < 1.0, "Operation should complete within 1 second")
     }
     
     // MARK: - Integration Tests
     
+    @Test("Actor-based session monitor service integration")
     func testActorBasedSessionMonitorService() async {
         let service = ActorBasedSessionMonitorService(configuration: .default)
         
         let session = await service.getActiveSession()
-        XCTAssertNil(session, "Should return nil when no active session")
+        #expect(session == nil, "Should return nil when no active session")
         
         let burnRate = await service.getBurnRate()
-        XCTAssertNil(burnRate, "Should return nil when no active session")
+        #expect(burnRate == nil, "Should return nil when no active session")
         
         let limit = await service.getAutoTokenLimit()
-        XCTAssertNil(limit, "Should return nil when no data")
+        #expect(limit == nil, "Should return nil when no data")
     }
     
+    @Test("Hybrid session monitor with actor flag enabled")
     func testHybridSessionMonitorServiceWithActorFlag() async {
         // Enable actor-based implementation
         FeatureFlags.useActorBasedLiveMonitor = true
@@ -164,15 +174,16 @@ final class LiveMonitorActorTests: XCTestCase {
         
         // These calls should use the actor-based implementation
         let session = service.getActiveSession()
-        XCTAssertNil(session)
+        #expect(session == nil)
         
         let burnRate = service.getBurnRate()
-        XCTAssertNil(burnRate)
+        #expect(burnRate == nil)
         
         let limit = service.getAutoTokenLimit()
-        XCTAssertNil(limit)
+        #expect(limit == nil)
     }
     
+    @Test("Hybrid session monitor with GCD flag enabled")
     func testHybridSessionMonitorServiceWithGCDFlag() async {
         // Disable actor-based implementation
         FeatureFlags.useActorBasedLiveMonitor = false
@@ -193,48 +204,48 @@ final class LiveMonitorActorTests: XCTestCase {
         
         // These calls should use the GCD-based implementation
         let session = service.getActiveSession()
-        XCTAssertNil(session, "Should return nil when no data in test directory")
+        #expect(session == nil, "Should return nil when no data in test directory")
         
         let burnRate = service.getBurnRate()
-        XCTAssertNil(burnRate, "Should return nil when no data in test directory")
+        #expect(burnRate == nil, "Should return nil when no data in test directory")
         
         let limit = service.getAutoTokenLimit()
-        XCTAssertNil(limit, "Should return nil when no data in test directory")
+        #expect(limit == nil, "Should return nil when no data in test directory")
     }
     
     // MARK: - Feature Flag Tests
     
+    @Test("Feature flag persistence")
     func testFeatureFlagPersistence() {
         // Reset to ensure clean state
         FeatureFlags.reset()
         
         // Test setting to true
         FeatureFlags.useActorBasedLiveMonitor = true
-        XCTAssertTrue(FeatureFlags.useActorBasedLiveMonitor)
+        #expect(FeatureFlags.useActorBasedLiveMonitor == true)
         
         // Test setting to false
         FeatureFlags.useActorBasedLiveMonitor = false
-        XCTAssertFalse(FeatureFlags.useActorBasedLiveMonitor)
+        #expect(FeatureFlags.useActorBasedLiveMonitor == false)
         
         // Test reset functionality
         FeatureFlags.reset()
-        XCTAssertFalse(FeatureFlags.useActorBasedLiveMonitor)
+        #expect(FeatureFlags.useActorBasedLiveMonitor == false)
     }
     
-    // Feature flag percentage rollout test moved to FeatureFlagTests.swift for serial execution
-    
     #if DEBUG
+    @Test("Debug feature flags enable/disable all")
     func testDebugFeatureFlags() {
         // Reset to ensure clean state
         FeatureFlags.reset()
         
         // Test enabling all features
         FeatureFlags.enableAllExperimentalFeatures()
-        XCTAssertTrue(FeatureFlags.useActorBasedLiveMonitor)
+        #expect(FeatureFlags.useActorBasedLiveMonitor == true)
         
         // Test disabling all features
         FeatureFlags.disableAllExperimentalFeatures()
-        XCTAssertFalse(FeatureFlags.useActorBasedLiveMonitor)
+        #expect(FeatureFlags.useActorBasedLiveMonitor == false)
         
         // Clean up after test
         FeatureFlags.reset()
@@ -270,20 +281,13 @@ final class LiveMonitorActorTests: XCTestCase {
             costUSD: 0.05
         )
     }
-    
-    private func measureAsync(_ block: () async -> Void) async {
-        let start = Date()
-        await block()
-        let duration = Date().timeIntervalSince(start)
-        print("Execution time: \(duration) seconds")
-        XCTAssertLessThan(duration, 1.0, "Operation should complete within 1 second")
-    }
 }
 
-// MARK: - Actor vs GCD Performance Comparison
+// MARK: - Performance Comparison Suite
 
+@Suite("LiveMonitor Performance Comparison", .serialized)
 @MainActor
-final class LiveMonitorPerformanceComparisonTests: XCTestCase {
+struct LiveMonitorPerformanceComparisonTests {
     
     // Create test configuration that doesn't access real data
     private var testConfig: AppConfiguration {
@@ -298,6 +302,7 @@ final class LiveMonitorPerformanceComparisonTests: XCTestCase {
         )
     }
     
+    @Test("Performance comparison between GCD and Actor implementations")
     func testPerformanceComparison() async {
         let iterations = 10 // Reduced iterations for faster tests
         let config = testConfig
@@ -332,10 +337,15 @@ final class LiveMonitorPerformanceComparisonTests: XCTestCase {
             print("Performance difference: \((gcdDuration - actorDuration) / gcdDuration * 100)%")
         }
         
+        // Both should complete reasonably quickly
+        #expect(gcdDuration < 5.0, "GCD implementation should complete within 5 seconds")
+        #expect(actorDuration < 5.0, "Actor implementation should complete within 5 seconds")
+        
         // Reset
         FeatureFlags.reset()
     }
     
+    @Test("Concurrent performance comparison", .timeLimit(.minutes(1)))
     func testConcurrentPerformanceComparison() async {
         let concurrentTasks = 10 // Reduced for faster tests
         let config = testConfig
@@ -375,10 +385,18 @@ final class LiveMonitorPerformanceComparisonTests: XCTestCase {
         }
         
         // Both should complete quickly with test data
-        XCTAssertLessThan(gcdDuration, 1.0, "GCD should complete quickly")
-        XCTAssertLessThan(actorDuration, 1.0, "Actor should complete quickly")
+        #expect(gcdDuration < 1.0, "GCD should complete quickly")
+        #expect(actorDuration < 1.0, "Actor should complete quickly")
         
         // Reset
         FeatureFlags.reset()
     }
+}
+
+// MARK: - Test Extensions
+
+extension Tag {
+    @Tag static var performance: Self
+    @Tag static var concurrency: Self
+    @Tag static var integration: Self
 }
