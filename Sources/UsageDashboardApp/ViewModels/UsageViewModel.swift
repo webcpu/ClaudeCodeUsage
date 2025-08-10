@@ -6,7 +6,9 @@
 import SwiftUI
 import Observation
 import ClaudeCodeUsage
-import ClaudeLiveMonitorLib
+// Import specific types from ClaudeLiveMonitorLib to avoid UsageEntry conflict
+import struct ClaudeLiveMonitorLib.SessionBlock
+import struct ClaudeLiveMonitorLib.BurnRate
 import OSLog
 
 private let performanceLogger = Logger(subsystem: "com.claudecodeusage", category: "ViewModelPerformance")
@@ -68,6 +70,7 @@ final class UsageViewModel {
     var dailyCostThreshold: Double = 10.0
     var todaySessionCount: Int = 0
     var estimatedDailySessions: Int = 0
+    var todayEntries: [UsageEntry] = []  // Store today's raw entries for chart sync
     
     // Additional properties for ModernDashboardView
     var isLoading: Bool {
@@ -100,6 +103,9 @@ final class UsageViewModel {
     let sessionMonitorService: SessionMonitorService  // Made internal for access
     private let configurationService: ConfigurationService
     
+    // Callback for when data is loaded (for syncing chart data)
+    var onDataLoaded: (() async -> Void)?
+    
     // State management
     private let stateManager = UsageStateManager()
     private var refreshTask: Task<Void, Never>?
@@ -117,17 +123,8 @@ final class UsageViewModel {
     }
     
     var todaysCostValue: Double {
-        guard let stats = stats else { return 0.0 }
-        
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        let todayString = formatter.string(from: Date())
-        
-        if let todayUsage = stats.byDate.first(where: { $0.date == todayString }) {
-            return todayUsage.totalCost
-        }
-        
-        return 0.0
+        // Calculate from today's entries for consistency with chart
+        return todayEntries.reduce(0.0) { $0 + $1.cost }
     }
     
     // MARK: - Initialization
@@ -157,17 +154,27 @@ final class UsageViewModel {
             do {
                 // Use structured concurrency to load data in parallel
                 async let statsLoading = usageDataService.loadStats()
+                async let entriesLoading = usageDataService.loadEntries()  // Also load raw entries
                 async let sessionLoading = sessionMonitorService.getActiveSession()
                 async let burnRateLoading = sessionMonitorService.getBurnRate()
                 async let tokenLimitLoading = sessionMonitorService.getAutoTokenLimit()
                 
                 // Await all results concurrently
-                let (stats, session, burnRate, autoTokenLimit) = try await (
+                let (stats, entries, session, burnRate, autoTokenLimit) = try await (
                     statsLoading,
+                    entriesLoading,
                     sessionLoading,
                     burnRateLoading,
                     tokenLimitLoading
                 )
+                
+                // Filter for today's entries using same logic as chart
+                let calendar = Calendar.current
+                let today = calendar.startOfDay(for: Date())
+                let todaysEntries = entries.filter { entry in
+                    guard let date = entry.date else { return false }
+                    return calendar.isDate(date, inSameDayAs: today)
+                }
                 
                 // Log performance metrics
                 let loadDuration = Date().timeIntervalSince(loadStartTime)
@@ -179,6 +186,17 @@ final class UsageViewModel {
                 
                 #if DEBUG
                 print("[UsageViewModel] Stats loaded: totalCost=\(stats.totalCost), entries=\(stats.byDate.count)")
+                print("[UsageViewModel] Today's entries: \(todaysEntries.count) entries")
+                let todaysCostFromEntries = todaysEntries.reduce(0.0) { $0 + $1.cost }
+                print("[UsageViewModel] Today's cost from entries: $\(String(format: "%.2f", todaysCostFromEntries))")
+                
+                // Also log what stats.byDate says for today
+                let formatter = DateFormatter()
+                formatter.dateFormat = "yyyy-MM-dd"
+                let todayString = formatter.string(from: Date())
+                if let todayFromStats = stats.byDate.first(where: { $0.date == todayString }) {
+                    print("[UsageViewModel] Today's cost from stats: $\(String(format: "%.2f", todayFromStats.totalCost))")
+                }
                 #endif
                 
                 // Update state manager
@@ -191,8 +209,14 @@ final class UsageViewModel {
                     self.activeSession = session
                     self.burnRate = burnRate
                     self.autoTokenLimit = autoTokenLimit
+                    self.todayEntries = todaysEntries  // Store today's entries
                     
                     updateCalculatedProperties(stats: stats)
+                }
+                
+                // Notify that data has been loaded (for chart sync)
+                if let onDataLoaded = self.onDataLoaded {
+                    await onDataLoaded()
                 }
                 
             } catch {

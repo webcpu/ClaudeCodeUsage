@@ -6,7 +6,9 @@
 import XCTest
 @testable import UsageDashboardApp
 @testable import ClaudeCodeUsage
-@testable import ClaudeLiveMonitorLib
+// Import specific types to avoid UsageEntry conflict
+import struct ClaudeLiveMonitorLib.SessionBlock
+import struct ClaudeLiveMonitorLib.BurnRate
 
 @MainActor
 final class ImprovedDayChangeTests: XCTestCase {
@@ -298,6 +300,10 @@ final class EnhancedMockUsageDataService: UsageDataService {
             byDate: [],
             byProject: []
         )
+    }
+    
+    func loadEntries() async throws -> [UsageEntry] {
+        return []
     }
     
     nonisolated func getDateRange() -> (start: Date, end: Date) {

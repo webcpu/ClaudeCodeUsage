@@ -6,7 +6,11 @@
 import Foundation
 import Observation
 import ClaudeCodeUsage
-import ClaudeLiveMonitorLib
+// Import specific types from ClaudeLiveMonitorLib to avoid UsageEntry conflict
+import struct ClaudeLiveMonitorLib.SessionBlock
+import struct ClaudeLiveMonitorLib.BurnRate
+import class ClaudeLiveMonitorLib.LiveMonitor
+import struct ClaudeLiveMonitorLib.LiveMonitorConfig
 
 // MARK: - Configuration
 public struct AppConfiguration {
@@ -33,6 +37,7 @@ public struct AppConfiguration {
 // MARK: - Service Protocols
 protocol UsageDataService {
     func loadStats() async throws -> UsageStats
+    func loadEntries() async throws -> [UsageEntry]
     func getDateRange() -> (start: Date, end: Date)
 }
 
@@ -63,6 +68,10 @@ final class DefaultUsageDataService: UsageDataService {
             startDate: range.start,
             endDate: range.end
         )
+    }
+    
+    func loadEntries() async throws -> [UsageEntry] {
+        return try await client.getUsageDetails()
     }
     
     func getDateRange() -> (start: Date, end: Date) {
@@ -163,11 +172,14 @@ final class TestContainer: DependencyContainer {
 }
 
 // Mock implementations for testing
-final class MockUsageDataService: UsageDataService {
-    var mockStats: UsageStats?
-    var shouldThrow = false
+public final class MockUsageDataService: UsageDataService {
+    public var mockStats: UsageStats?
+    public var mockEntries: [UsageEntry] = []
+    public var shouldThrow = false
     
-    func loadStats() async throws -> UsageStats {
+    public init() {}
+    
+    public func loadStats() async throws -> UsageStats {
         if shouldThrow {
             throw NSError(domain: "MockError", code: 1)
         }
@@ -178,7 +190,14 @@ final class MockUsageDataService: UsageDataService {
         return stats
     }
     
-    func getDateRange() -> (start: Date, end: Date) {
+    public func loadEntries() async throws -> [UsageEntry] {
+        if shouldThrow {
+            throw NSError(domain: "MockError", code: 1)
+        }
+        return mockEntries
+    }
+    
+    public func getDateRange() -> (start: Date, end: Date) {
         TimeRange.allTime.dateRange
     }
 }

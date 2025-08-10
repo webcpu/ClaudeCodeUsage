@@ -6,13 +6,16 @@
 import SwiftUI
 import Observation
 import ClaudeCodeUsage
-import ClaudeLiveMonitorLib
+// Import specific types from ClaudeLiveMonitorLib to avoid UsageEntry conflict
+import struct ClaudeLiveMonitorLib.SessionBlock
+import struct ClaudeLiveMonitorLib.BurnRate
 
 // MARK: - Modern Observable Data Model
 @Observable
 @MainActor
 final class UsageDataModel {
     private let viewModel: UsageViewModel
+    private var previousStatsUpdateTime: Date?
     
     // Observable state properties
     var lastRefreshTime = Date()
@@ -85,6 +88,10 @@ final class UsageDataModel {
         return viewModel.estimatedDailySessions
     }
     
+    var todayEntries: [UsageEntry] {
+        return viewModel.todayEntries
+    }
+    
     // Formatted values for display
     var formattedTodaysCost: String? {
         return FormatterService.formatCurrency(todaysCostValue)
@@ -103,6 +110,12 @@ final class UsageDataModel {
     
     init(container: DependencyContainer = ProductionContainer.shared) {
         self.viewModel = UsageViewModel(container: container)
+        
+        // Set up callback to sync chart data whenever main data loads
+        self.viewModel.onDataLoaded = { [weak self] in
+            guard let self = self else { return }
+            await self.updateChartData()
+        }
     }
     
     // With @Observable, we can directly access viewModel properties without manual binding
@@ -110,7 +123,8 @@ final class UsageDataModel {
     func loadData() async {
         lastRefreshTime = Date()
         await viewModel.loadData()
-        await chartDataService.loadTodayHourlyCosts()
+        // Load chart data from the same stats that were just loaded
+        await updateChartData()
     }
     
     func startRefreshTimer() {
@@ -124,6 +138,8 @@ final class UsageDataModel {
     func handleAppBecameActive() {
         Task {
             await viewModel.refresh()
+            // Sync chart data after refresh
+            await updateChartData()
         }
         viewModel.startAutoRefresh()
     }
@@ -135,7 +151,26 @@ final class UsageDataModel {
     func handleWindowFocus() {
         Task {
             await viewModel.refresh()
+            // Sync chart data after refresh
+            await updateChartData()
         }
+    }
+    
+    // Update chart data from current entries
+    func updateChartData() async {
+        // Pass entries directly to chart service - no disk fetch needed!
+        await chartDataService.loadHourlyCostsFromEntries(viewModel.todayEntries)
+        
+        #if DEBUG
+        if viewModel.stats != nil {
+            let todaysCost = viewModel.todaysCostValue
+            let chartTotal = chartDataService.todayHourlyCosts.reduce(0, +)
+            print("[UsageDataModel] Chart sync - Today's cost: $\(String(format: "%.2f", todaysCost)), Chart total: $\(String(format: "%.2f", chartTotal))")
+            if abs(todaysCost - chartTotal) > 0.01 {
+                print("[UsageDataModel] WARNING: Chart total doesn't match today's cost!")
+            }
+        }
+        #endif
     }
 }
 

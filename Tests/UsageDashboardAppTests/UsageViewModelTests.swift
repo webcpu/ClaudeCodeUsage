@@ -6,7 +6,9 @@
 import XCTest
 @testable import UsageDashboardApp
 @testable import ClaudeCodeUsage
-import ClaudeLiveMonitorLib
+// Import specific types to avoid UsageEntry conflict
+import struct ClaudeLiveMonitorLib.SessionBlock
+import struct ClaudeLiveMonitorLib.BurnRate
 
 @MainActor
 final class UsageViewModelTests: XCTestCase {
@@ -34,6 +36,10 @@ final class UsageViewModelTests: XCTestCase {
             
             loadStatsTime = CFAbsoluteTimeGetCurrent() - startTime
             return stats
+        }
+        
+        func loadEntries() async throws -> [UsageEntry] {
+            return []
         }
         
         func getDateRange() -> (start: Date, end: Date) {

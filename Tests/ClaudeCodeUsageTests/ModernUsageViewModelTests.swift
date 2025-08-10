@@ -8,7 +8,11 @@ import Foundation
 import SwiftUI
 @testable import UsageDashboardApp
 @testable import ClaudeCodeUsage
-@testable import ClaudeLiveMonitorLib
+// Import specific types from ClaudeLiveMonitorLib to avoid UsageEntry conflict
+import struct ClaudeLiveMonitorLib.SessionBlock
+import struct ClaudeLiveMonitorLib.BurnRate
+import struct ClaudeLiveMonitorLib.TokenCounts
+import struct ClaudeLiveMonitorLib.ProjectedUsage
 
 // MARK: - Test Suite
 
@@ -397,6 +401,10 @@ fileprivate final class MockUsageDataService: UsageDataService {
             byDate: [],
             byProject: []
         )
+    }
+    
+    func loadEntries() async throws -> [UsageEntry] {
+        return []
     }
     
     func getDateRange() -> (start: Date, end: Date) {
