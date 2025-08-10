@@ -71,6 +71,21 @@ struct MenuBarContentView: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 4)
             
+            sectionDivider
+                .padding(.horizontal, 12)
+            
+            // Memory Monitor Section
+            SectionHeader(
+                title: "System",
+                icon: "memorychip",
+                color: MenuBarTheme.Colors.Sections.system,
+                badge: nil
+            )
+            
+            MemoryMonitorView()
+                .padding(.horizontal, 12)
+                .padding(.vertical, 4)
+            
             largeDivider
                 .padding(.horizontal, 12)
             

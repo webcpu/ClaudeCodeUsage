@@ -107,6 +107,7 @@ struct MenuBarTheme {
         struct Sections {
             static let liveSession = Color.green
             static let usage = Color.blue
+            static let system = Color.purple
             static let cost = Color.purple
         }
     }

@@ -57,6 +57,8 @@ actor UsageStateManager {
 @Observable
 @MainActor
 final class UsageViewModel {
+    // Memory cleanup support
+    private var memoryCleanupObserver: NSObjectProtocol?
     // Observable properties for UI binding
     var state: ViewState = .loading
     var activeSession: SessionBlock?
@@ -137,6 +139,17 @@ final class UsageViewModel {
         self.dateProvider = dateProvider
         
         self.dailyCostThreshold = container.configurationService.configuration.dailyCostThreshold
+        
+        // Setup memory cleanup observer
+        memoryCleanupObserver = NotificationCenter.default.addObserver(
+            forName: .performMemoryCleanup,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.performMemoryCleanup()
+            }
+        }
         
         // Initialize last known day
         let formatter = DateFormatter()
@@ -408,6 +421,36 @@ final class UsageViewModel {
         NotificationCenter.default.removeObserver(self)
         // Note: dayChangeObserver will be cleaned up automatically
         // Tasks are automatically cancelled when the class is deallocated
+    }
+    
+    // MARK: - Memory Management
+    
+    /// Perform memory cleanup when system memory pressure is high
+    private func performMemoryCleanup() {
+        performanceLogger.info("Performing memory cleanup")
+        
+        // Clear cached entries older than today
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: dateProvider.now)
+        
+        todayEntries = todayEntries.filter { entry in
+            guard let date = entry.date else { return false }
+            return calendar.startOfDay(for: date) == today
+        }
+        
+        // Clear chart data cache if needed
+        // Chart services will reload when data refreshes
+        
+        // Force refresh state with minimal data
+        Task {
+            await stateManager.cancelCurrentLoad()
+            // Only reload if we have an active session
+            if activeSession != nil {
+                await loadData()
+            }
+        }
+        
+        performanceLogger.info("Memory cleanup completed")
     }
 }
 
