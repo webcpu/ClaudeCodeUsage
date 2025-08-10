@@ -8,7 +8,7 @@
 import Foundation
 
 /// Client using the repository pattern and SOLID principles
-public class ClaudeUsageClient: UsageDataSource {
+public actor ClaudeUsageClient: UsageDataSource {
     
     /// Shared instance
     public static let shared = ClaudeUsageClient()
@@ -29,7 +29,7 @@ public class ClaudeUsageClient: UsageDataSource {
     }
     
     /// Initialize with custom dependencies (for testing)
-    public init(repository: UsageRepository) {
+    internal init(repository: UsageRepository) {
         self.repository = repository
     }
     
@@ -145,4 +145,18 @@ struct SortingService {
             order == .ascending ? a.totalCost < b.totalCost : a.totalCost > b.totalCost
         }
     }
+}
+
+/// Protocol for usage data source
+public protocol UsageDataSource {
+    func getUsageStats() async throws -> UsageStats
+    func getUsageByDateRange(startDate: Date, endDate: Date) async throws -> UsageStats
+    func getSessionStats(since: Date?, until: Date?, order: SortOrder?) async throws -> [ProjectUsage]
+    func getUsageDetails(limit: Int?) async throws -> [UsageEntry]
+}
+
+/// Sort order for queries
+public enum SortOrder: String {
+    case ascending = "asc"
+    case descending = "desc"
 }

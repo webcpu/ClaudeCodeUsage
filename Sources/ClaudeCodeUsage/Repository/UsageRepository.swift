@@ -11,7 +11,8 @@ import OSLog
 private let logger = Logger(subsystem: "com.claudecodeusage", category: "Repository")
 
 /// Repository for accessing and processing usage data
-public class UsageRepository {
+/// Uses actor isolation for thread safety and proper async/await patterns
+public actor UsageRepository {
     private let fileSystem: FileSystemProtocol
     private let parser: UsageDataParserProtocol
     private let pathDecoder: ProjectPathDecoderProtocol
@@ -34,7 +35,7 @@ public class UsageRepository {
     }
     
     /// Convenience initializer with default implementations
-    public convenience init(basePath: String = NSHomeDirectory() + "/.claude") {
+    public init(basePath: String = NSHomeDirectory() + "/.claude") {
         self.init(
             fileSystem: FileSystemService(),
             parser: JSONLUsageParser(),
@@ -65,7 +66,7 @@ public class UsageRepository {
         if sortedFiles.count > 100 {
             entries = try await processFilesInBatches(sortedFiles, batchSize: 20, deduplication: deduplication)
         } else {
-            entries = try processFiles(sortedFiles, deduplication: deduplication)
+            entries = try await processFiles(sortedFiles, deduplication: deduplication)
         }
         
         #if DEBUG
@@ -98,7 +99,7 @@ public class UsageRepository {
         
         let filesToProcess = try collectJSONLFiles(from: projectsPath)
         let sortedFiles = sortFilesByTimestamp(filesToProcess)
-        var entries = try processFiles(sortedFiles, deduplication: deduplication)
+        var entries = try await processFiles(sortedFiles, deduplication: deduplication)
         
         // Sort by timestamp (newest first)
         entries.sort { $0.timestamp > $1.timestamp }
@@ -149,10 +150,10 @@ public class UsageRepository {
         return files.sorted { $0.earliestTimestamp < $1.earliestTimestamp }
     }
     
-    private func processFiles(_ files: [(path: String, projectDir: String, earliestTimestamp: String)], deduplication: DeduplicationStrategy) throws -> [UsageEntry] {
+    private func processFiles(_ files: [(path: String, projectDir: String, earliestTimestamp: String)], deduplication: DeduplicationStrategy) async throws -> [UsageEntry] {
         // Use parallel processing for better performance with large datasets
         if files.count > 5 {
-            return try processFilesInParallel(files, deduplication: deduplication)
+            return try await processFilesInParallel(files, deduplication: deduplication)
         } else {
             return try processFilesSequentially(files, deduplication: deduplication)
         }
@@ -169,54 +170,27 @@ public class UsageRepository {
         return allEntries
     }
     
-    private func processFilesInParallel(_ files: [(path: String, projectDir: String, earliestTimestamp: String)], deduplication: DeduplicationStrategy) throws -> [UsageEntry] {
+    private func processFilesInParallel(_ files: [(path: String, projectDir: String, earliestTimestamp: String)], deduplication: DeduplicationStrategy) async throws -> [UsageEntry] {
         // Use structured concurrency for thread-safe parallel processing
-        let result = try runBlocking {
-            try await withThrowingTaskGroup(of: [UsageEntry].self) { group in
-                for (filePath, projectDir, _) in files {
-                    group.addTask {
-                        try self.processJSONLFile(
-                            at: filePath,
-                            projectDir: projectDir,
-                            deduplication: deduplication
-                        )
-                    }
+        return try await withThrowingTaskGroup(of: [UsageEntry].self) { group in
+            for (filePath, projectDir, _) in files {
+                group.addTask {
+                    try await self.processJSONLFile(
+                        at: filePath,
+                        projectDir: projectDir,
+                        deduplication: deduplication
+                    )
                 }
-                
-                var allEntries: [UsageEntry] = []
-                for try await entries in group {
-                    allEntries.append(contentsOf: entries)
-                }
-                return allEntries
             }
+            
+            var allEntries: [UsageEntry] = []
+            for try await entries in group {
+                allEntries.append(contentsOf: entries)
+            }
+            return allEntries
         }
-        return result
     }
     
-    /// Helper to run async code synchronously (temporary bridge)
-    private func runBlocking<T>(_ operation: @escaping () async throws -> T) throws -> T {
-        let semaphore = DispatchSemaphore(value: 0)
-        var result: Result<T, Error>!
-        
-        Task {
-            do {
-                let value = try await operation()
-                result = .success(value)
-            } catch {
-                result = .failure(error)
-            }
-            semaphore.signal()
-        }
-        
-        semaphore.wait()
-        
-        switch result! {
-        case .success(let value):
-            return value
-        case .failure(let error):
-            throw error
-        }
-    }
     
     /// Process files in batches to manage memory for very large datasets
     private func processFilesInBatches(_ files: [(path: String, projectDir: String, earliestTimestamp: String)], batchSize: Int, deduplication: DeduplicationStrategy) async throws -> [UsageEntry] {
@@ -237,7 +211,7 @@ public class UsageRepository {
             #endif
             
             // Process batch in parallel
-            let batchEntries = try processFilesInParallel(batch, deduplication: deduplication)
+            let batchEntries = try await processFilesInParallel(batch, deduplication: deduplication)
             allEntries.append(contentsOf: batchEntries)
             
             // Allow other operations to proceed between batches
