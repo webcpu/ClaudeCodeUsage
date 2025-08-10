@@ -5,6 +5,7 @@
 //  Tests for file processing benchmarks
 //
 
+import Foundation
 import Testing
 @testable import ClaudeCodeUsage
 
