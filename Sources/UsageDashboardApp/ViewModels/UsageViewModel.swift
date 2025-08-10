@@ -66,9 +66,35 @@ final class UsageViewModel {
     var todaySessionCount: Int = 0
     var estimatedDailySessions: Int = 0
     
+    // Additional properties for ModernDashboardView
+    var isLoading: Bool {
+        if case .loading = state { return true }
+        return false
+    }
+    
+    var lastError: Error? {
+        if case .error(let error) = state { return error }
+        return nil
+    }
+    
+    var errorMessage: String? {
+        if case .error(let error) = state { return error.localizedDescription }
+        return nil
+    }
+    
+    var totalCost: String {
+        guard let stats = stats else { return "$0.00" }
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencySymbol = "$"
+        formatter.maximumFractionDigits = 2
+        formatter.minimumFractionDigits = 2
+        return formatter.string(from: NSNumber(value: stats.totalCost)) ?? "$0.00"
+    }
+    
     // Dependencies
     private let usageDataService: UsageDataService
-    private let sessionMonitorService: SessionMonitorService
+    let sessionMonitorService: SessionMonitorService  // Made internal for access
     private let configurationService: ConfigurationService
     
     // State management
