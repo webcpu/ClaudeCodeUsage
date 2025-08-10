@@ -1,37 +1,34 @@
 //
 //  HeatmapViewModelTests.swift
 //  Behavioral tests for HeatmapViewModel following TDD principles
+//  Migrated to Swift Testing Framework
 //
 
-import XCTest
 import Testing
+import Foundation
 @testable import ClaudeCodeUsage
 @testable import UsageDashboardApp
 
 // MARK: - User Story: Yearly Cost Heatmap Visualization
 
 @Suite("As a user, I want to see my yearly usage pattern as a heatmap")
-final class HeatmapViewModelBehaviorTests {
+@MainActor
+struct HeatmapViewModelBehaviorTests {
     
     // MARK: - System Under Test
     
-    private var sut: HeatmapViewModel!
-    private var mockStats: UsageStats!
+    private let sut: HeatmapViewModel
     private let testConfiguration = HeatmapConfiguration.default
     
-    // MARK: - Setup
+    // MARK: - Initialization
     
-    init() async {
-        await MainActor.run {
-            self.sut = HeatmapViewModel(configuration: testConfiguration)
-            self.mockStats = createMockStats()
-        }
+    init() async throws {
+        self.sut = HeatmapViewModel(configuration: testConfiguration)
     }
     
     // MARK: - Dataset Generation
     
     @Test("Should generate 52-53 weeks of data for rolling year")
-    @MainActor
     func generatesFullYearDataset() async {
         // Given
         let stats = createMockStats(daysWithUsage: 365)
@@ -48,7 +45,6 @@ final class HeatmapViewModelBehaviorTests {
     }
     
     @Test("Should show loading state during data generation")
-    @MainActor
     func showsLoadingState() async {
         // Given
         let stats = createMockStats(daysWithUsage: 365)
@@ -71,8 +67,7 @@ final class HeatmapViewModelBehaviorTests {
     // MARK: - Color Intensity Mapping
     
     @Test("Should map costs to correct color intensities")
-    @MainActor
-    func mapsColorIntensitiesCorrectly() async {
+    func mapsColorIntensitiesCorrectly() async throws {
         // Given - Use recent dates that fall within the rolling year range
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
@@ -104,10 +99,7 @@ final class HeatmapViewModelBehaviorTests {
         await sut.updateStats(stats)
         
         // Then
-        guard let dataset = sut.dataset else {
-            Issue.record("Dataset should not be nil")
-            return
-        }
+        let dataset = try #require(sut.dataset, "Dataset should not be nil")
         
         // Find the specific days we added data for
         let targetDays = [day1, day2, day3, day4].map { Calendar.current.startOfDay(for: $0) }
@@ -117,20 +109,19 @@ final class HeatmapViewModelBehaviorTests {
         
         #expect(matchingDays.count == 4, "Should find all 4 days we added data for")
         
-        if matchingDays.count >= 4 {
-            #expect(matchingDays[0].intensity == 0.0)  // No usage (cost = 0)
-            #expect(matchingDays[1].intensity > 0 && matchingDays[1].intensity <= 0.25)  // Low (cost = 10, max = 100)
-            #expect(matchingDays[2].intensity > 0.25 && matchingDays[2].intensity <= 0.75)  // Medium (cost = 50, max = 100)
-            #expect(matchingDays[3].intensity > 0.75)  // High (cost = 100, max = 100)
-        } else {
-            Issue.record("Could not find all test days in heatmap. Found \\(matchingDays.count) days with costs: \\(matchingDays.map { $0.cost })")
+        guard matchingDays.count >= 4 else {
+            throw TestError("Could not find all test days in heatmap. Found \(matchingDays.count) days with costs: \(matchingDays.map { $0.cost })")
         }
+        
+        #expect(matchingDays[0].intensity == 0.0)  // No usage (cost = 0)
+        #expect(matchingDays[1].intensity > 0 && matchingDays[1].intensity <= 0.25)  // Low (cost = 10, max = 100)
+        #expect(matchingDays[2].intensity > 0.25 && matchingDays[2].intensity <= 0.75)  // Medium (cost = 50, max = 100)
+        #expect(matchingDays[3].intensity > 0.75)  // High (cost = 100, max = 100)
     }
     
     // MARK: - Hover Interaction
     
     @Test("Should update hovered day on mouse position")
-    @MainActor
     func updatesHoveredDay() async {
         // Given
         let stats = createMockStats(daysWithUsage: 30)
@@ -147,7 +138,6 @@ final class HeatmapViewModelBehaviorTests {
     }
     
     @Test("Should calculate tooltip position above hovered day")
-    @MainActor
     func calculatesTooltipPosition() async {
         // Given
         let stats = createMockStats(daysWithUsage: 30)
@@ -163,7 +153,6 @@ final class HeatmapViewModelBehaviorTests {
     }
     
     @Test("Should clear hover state when ending hover")
-    @MainActor
     func clearsHoverState() async {
         // Given
         let stats = createMockStats(daysWithUsage: 30)
@@ -180,8 +169,7 @@ final class HeatmapViewModelBehaviorTests {
     // MARK: - Month Labels
     
     @Test("Should generate correct month labels for rolling year")
-    @MainActor
-    func generatesMonthLabels() async {
+    func generatesMonthLabels() async throws {
         // Given
         let stats = createMockStats(daysWithUsage: 365)
         
@@ -189,10 +177,7 @@ final class HeatmapViewModelBehaviorTests {
         await sut.updateStats(stats)
         
         // Then
-        guard let dataset = sut.dataset else {
-            Issue.record("Dataset should not be nil")
-            return
-        }
+        let dataset = try #require(sut.dataset, "Dataset should not be nil")
         
         #expect(dataset.monthLabels.count >= 12)
         #expect(dataset.monthLabels.contains { $0.name == "Jan" })
@@ -202,7 +187,6 @@ final class HeatmapViewModelBehaviorTests {
     // MARK: - Summary Statistics
     
     @Test("Should calculate summary statistics correctly")
-    @MainActor
     func calculatesSummaryStats() async {
         // Given
         let stats = UsageStats(
@@ -238,7 +222,6 @@ final class HeatmapViewModelBehaviorTests {
     // MARK: - Error Handling
     
     @Test("Should handle invalid date ranges")
-    @MainActor
     func handlesInvalidDateRange() async {
         // Given - Stats with invalid dates
         let stats = UsageStats(
@@ -265,7 +248,6 @@ final class HeatmapViewModelBehaviorTests {
     }
     
     @Test("Should handle empty statistics gracefully")
-    @MainActor
     func handlesEmptyStats() async {
         // Given
         let emptyStats = UsageStats(
@@ -293,7 +275,6 @@ final class HeatmapViewModelBehaviorTests {
     // MARK: - Configuration Changes
     
     @Test("Should regenerate dataset when configuration changes")
-    @MainActor
     func regeneratesOnConfigChange() async {
         // Given
         let stats = createMockStats(daysWithUsage: 30)
@@ -314,7 +295,6 @@ final class HeatmapViewModelBehaviorTests {
     // MARK: - Today Highlighting
     
     @Test("Should mark today's date correctly")
-    @MainActor
     func marksTodayCorrectly() async {
         // Given - Stats including today
         let formatter = DateFormatter()
@@ -348,15 +328,11 @@ final class HeatmapViewModelBehaviorTests {
     // MARK: - Accessibility
     
     @Test("Should provide accessibility labels for days")
-    @MainActor
-    func providesAccessibilityLabels() async {
+    func providesAccessibilityLabels() async throws {
         // Given
         let stats = createMockStats(daysWithUsage: 1)
         await sut.updateStats(stats)
-        guard let firstDay = sut.dataset?.allDays.first else {
-            Issue.record("Should have at least one day")
-            return
-        }
+        let firstDay = try #require(sut.dataset?.allDays.first, "Should have at least one day")
         
         // When
         let label = sut.accessibilityLabel(for: firstDay)
@@ -409,10 +385,10 @@ final class HeatmapViewModelBehaviorTests {
 // MARK: - Performance Tests
 
 @Suite("Heatmap performance requirements")
-final class HeatmapPerformanceTests {
+@MainActor
+struct HeatmapPerformanceTests {
     
-    @Test("Should handle 365 days efficiently")
-    @MainActor
+    @Test("Should handle 365 days efficiently", .timeLimit(.minutes(1)))
     func handlesFullYearEfficiently() async {
         // Given
         let viewModel = HeatmapViewModel()
@@ -424,12 +400,11 @@ final class HeatmapPerformanceTests {
         let duration = Date().timeIntervalSince(startTime)
         
         // Then
-        #expect(duration < 0.5) // Should complete in under 500ms
+        #expect(duration < 0.5, "Should complete in under 500ms")
         #expect(viewModel.dataset != nil)
     }
     
-    @Test("Should handle hover interactions smoothly")
-    @MainActor
+    @Test("Should handle hover interactions smoothly", .timeLimit(.minutes(1)))
     func handlesHoverSmoothly() async {
         // Given
         let viewModel = HeatmapViewModel()
@@ -449,7 +424,7 @@ final class HeatmapPerformanceTests {
         let duration = Date().timeIntervalSince(startTime)
         
         // Then
-        #expect(duration < 1.0) // 500 hover events should complete in under 1 second
+        #expect(duration < 1.0, "500 hover events should complete in under 1 second")
     }
     
     private func createLargeDataset(days: Int) -> UsageStats {
@@ -487,5 +462,14 @@ final class HeatmapPerformanceTests {
             byDate: dailyUsage,
             byProject: []
         )
+    }
+}
+// MARK: - Test Error
+
+struct TestError: Error {
+    let message: String
+    
+    init(_ message: String) {
+        self.message = message
     }
 }
