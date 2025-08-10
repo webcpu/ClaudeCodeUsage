@@ -16,7 +16,6 @@ public class UsageRepository {
     private let parser: UsageDataParserProtocol
     private let pathDecoder: ProjectPathDecoderProtocol
     private let aggregator: StatisticsAggregatorProtocol
-    private let deduplication: DeduplicationStrategy // Shared deduplication instance
     public let basePath: String
     
     /// Initialize with all dependencies injected
@@ -25,14 +24,12 @@ public class UsageRepository {
         parser: UsageDataParserProtocol,
         pathDecoder: ProjectPathDecoderProtocol,
         aggregator: StatisticsAggregatorProtocol,
-        deduplication: DeduplicationStrategy? = nil,
         basePath: String
     ) {
         self.fileSystem = fileSystem
         self.parser = parser
         self.pathDecoder = pathDecoder
         self.aggregator = aggregator
-        self.deduplication = deduplication ?? HashBasedDeduplication()
         self.basePath = basePath
     }
     
@@ -43,7 +40,6 @@ public class UsageRepository {
             parser: JSONLUsageParser(),
             pathDecoder: ProjectPathDecoder(),
             aggregator: StatisticsAggregator(),
-            deduplication: HashBasedDeduplication(),
             basePath: basePath
         )
     }
@@ -57,8 +53,8 @@ public class UsageRepository {
             return createEmptyStats()
         }
         
-        // Reset deduplication state for fresh operation
-        deduplication.reset()
+        // Create a fresh deduplication instance for this operation
+        let deduplication = HashBasedDeduplication()
         
         // Collect and process all JSONL files
         let filesToProcess = try collectJSONLFiles(from: projectsPath)
@@ -97,8 +93,8 @@ public class UsageRepository {
             return []
         }
         
-        // Reset deduplication state for fresh operation
-        deduplication.reset()
+        // Create a fresh deduplication instance for this operation
+        let deduplication = HashBasedDeduplication()
         
         let filesToProcess = try collectJSONLFiles(from: projectsPath)
         let sortedFiles = sortFilesByTimestamp(filesToProcess)

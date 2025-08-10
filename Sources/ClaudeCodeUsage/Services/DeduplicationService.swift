@@ -46,8 +46,8 @@ public class HashBasedDeduplication: DeduplicationStrategy {
     }
     
     public func reset() {
-        // Use barrier for thread-safe write operation
-        queue.async(flags: .barrier) {
+        // Use barrier for thread-safe write operation - MUST be synchronous to ensure reset completes
+        queue.sync(flags: .barrier) {
             self.processedHashes.removeAll()
         }
     }
