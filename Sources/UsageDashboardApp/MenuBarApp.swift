@@ -15,10 +15,11 @@ import struct ClaudeLiveMonitorLib.BurnRate
 @MainActor
 final class UsageDataModel {
     private let viewModel: UsageViewModel
+    private let dateProvider: DateProviding
     private var previousStatsUpdateTime: Date?
     
     // Observable state properties
-    var lastRefreshTime = Date()
+    var lastRefreshTime: Date
     
     // Computed properties that directly access viewModel
     var isLoading: Bool {
@@ -106,10 +107,14 @@ final class UsageDataModel {
     }
     
     // Chart data
-    var chartDataService = ChartDataService()
+    var chartDataService: ChartDataService
     
-    init(container: DependencyContainer = ProductionContainer.shared) {
-        self.viewModel = UsageViewModel(container: container)
+    init(container: DependencyContainer = ProductionContainer.shared,
+         dateProvider: DateProviding = SystemDateProvider()) {
+        self.dateProvider = dateProvider
+        self.lastRefreshTime = dateProvider.now
+        self.chartDataService = ChartDataService(dateProvider: dateProvider)
+        self.viewModel = UsageViewModel(container: container, dateProvider: dateProvider)
         
         // Set up callback to sync chart data whenever main data loads
         self.viewModel.onDataLoaded = { [weak self] in
@@ -121,7 +126,7 @@ final class UsageDataModel {
     // With @Observable, we can directly access viewModel properties without manual binding
     
     func loadData() async {
-        lastRefreshTime = Date()
+        lastRefreshTime = dateProvider.now
         await viewModel.loadData()
         // Load chart data from the same stats that were just loaded
         await updateChartData()

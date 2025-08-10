@@ -11,6 +11,11 @@ import XCTest
 final class ChartSyncMockUsageDataService: UsageDataService {
     var mockStats: UsageStats?
     var mockEntries: [UsageEntry] = []
+    let testDate: Date
+    
+    init(testDate: Date) {
+        self.testDate = testDate
+    }
     
     func loadStats() async throws -> UsageStats {
         guard let stats = mockStats else {
@@ -24,7 +29,7 @@ final class ChartSyncMockUsageDataService: UsageDataService {
     }
     
     func getDateRange() -> (start: Date, end: Date) {
-        (Date().addingTimeInterval(-30 * 24 * 60 * 60), Date())
+        (testDate.addingTimeInterval(-30 * 24 * 60 * 60), testDate)
     }
 }
 
@@ -32,15 +37,21 @@ final class ChartDataSyncTests: XCTestCase {
     
     @MainActor
     func testChartDataSyncsWithTodaysCost() async throws {
-        // Given: Create test data model with mock service
-        let mockService = ChartSyncMockUsageDataService()
+        // Given: Use fixed date for deterministic testing
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        let testDate = formatter.date(from: "2024-01-15 12:00:00")!
+        let testDateProvider = TestDateProvider(fixedDate: testDate)
+        
+        // Create test data model with mock service
+        let mockService = ChartSyncMockUsageDataService(testDate: testDate)
         let container = TestContainer(usageDataService: mockService)
-        let dataModel = UsageDataModel(container: container)
+        let dataModel = UsageDataModel(container: container, dateProvider: testDateProvider)
         
         // Create mock stats with today's data
-        let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
-        let todayString = formatter.string(from: Date())
+        let todayString = formatter.string(from: testDate)
         
         let mockStats = UsageStats(
             totalCost: 200.0,
@@ -65,11 +76,10 @@ final class ChartDataSyncTests: XCTestCase {
         mockService.mockStats = mockStats
         
         // Create mock entries for today with matching cost
-        let now = Date()
         mockService.mockEntries = [
             UsageEntry(
                 id: "1",
-                timestamp: now,
+                timestamp: testDate,
                 cost: 128.49,
                 model: "claude-3.5-sonnet",
                 inputTokens: 30000,
@@ -102,14 +112,19 @@ final class ChartDataSyncTests: XCTestCase {
     
     @MainActor
     func testChartUpdatesOnRefresh() async throws {
-        // Given: Initial data with mock service
-        let mockService = ChartSyncMockUsageDataService()
-        let container = TestContainer(usageDataService: mockService)
-        let dataModel = UsageDataModel(container: container)
-        
+        // Given: Use fixed date for deterministic testing
         let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        let testDate = formatter.date(from: "2024-01-15 12:00:00")!
+        
+        // Initial data with mock service
+        let mockService = ChartSyncMockUsageDataService(testDate: testDate)
+        let container = TestContainer(usageDataService: mockService)
+        let dataModel = UsageDataModel(container: container, dateProvider: TestDateProvider(fixedDate: testDate))
+        
         formatter.dateFormat = "yyyy-MM-dd"
-        let todayString = formatter.string(from: Date())
+        let todayString = formatter.string(from: testDate)
         
         // Initial stats
         let initialStats = UsageStats(
@@ -135,11 +150,10 @@ final class ChartDataSyncTests: XCTestCase {
         mockService.mockStats = initialStats
         
         // Create initial mock entries
-        let now = Date()
         mockService.mockEntries = [
             UsageEntry(
                 id: "1",
-                timestamp: now,
+                timestamp: testDate,
                 cost: 50.0,
                 model: "claude-3.5-sonnet",
                 inputTokens: 12500,
@@ -181,7 +195,7 @@ final class ChartDataSyncTests: XCTestCase {
         mockService.mockEntries = [
             UsageEntry(
                 id: "1",
-                timestamp: now,
+                timestamp: testDate,
                 cost: 128.49,
                 model: "claude-3.5-sonnet",
                 inputTokens: 30000,
@@ -202,10 +216,16 @@ final class ChartDataSyncTests: XCTestCase {
     
     @MainActor  
     func testChartDataCallbackTriggersOnDataLoad() async throws {
-        // Given: Setup with callback tracking
-        let mockService = ChartSyncMockUsageDataService()
+        // Given: Use fixed date and setup with callback tracking
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        let testDate = formatter.date(from: "2024-01-15 12:00:00")!
+        let testDateProvider = TestDateProvider(fixedDate: testDate)
+        
+        let mockService = ChartSyncMockUsageDataService(testDate: testDate)
         let container = TestContainer(usageDataService: mockService)
-        let viewModel = UsageViewModel(container: container)
+        let viewModel = UsageViewModel(container: container, dateProvider: testDateProvider)
         
         var callbackTriggered = false
         viewModel.onDataLoaded = {
@@ -236,23 +256,27 @@ final class ChartDataSyncTests: XCTestCase {
     
     @MainActor
     func testTodaysCostAlwaysMatchesChartTotal() async throws {
-        // Given: Create test data with various entries
-        let mockService = ChartSyncMockUsageDataService()
-        let container = TestContainer(usageDataService: mockService)
-        let dataModel = UsageDataModel(container: container)
-        
+        // Given: Use fixed date for deterministic testing
         let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        let testDate = formatter.date(from: "2024-01-15 12:00:00")!
+        
+        // Create test data with various entries
+        let mockService = ChartSyncMockUsageDataService(testDate: testDate)
+        let container = TestContainer(usageDataService: mockService)
+        let dataModel = UsageDataModel(container: container, dateProvider: TestDateProvider(fixedDate: testDate))
+        
         formatter.dateFormat = "yyyy-MM-dd"
-        let todayString = formatter.string(from: Date())
+        let todayString = formatter.string(from: testDate)
         
         // Create entries at different hours with different costs
-        let now = Date()
         let calendar = Calendar.current
         var testEntries: [UsageEntry] = []
         
         // Add entries at different hours
         for hour in [2, 8, 14, 20] {
-            var components = calendar.dateComponents([.year, .month, .day], from: now)
+            var components = calendar.dateComponents([.year, .month, .day], from: testDate)
             components.hour = hour
             components.minute = 30
             if let entryDate = calendar.date(from: components) {

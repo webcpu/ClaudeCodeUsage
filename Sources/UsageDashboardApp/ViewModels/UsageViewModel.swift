@@ -102,6 +102,7 @@ final class UsageViewModel {
     private let usageDataService: UsageDataService
     let sessionMonitorService: SessionMonitorService  // Made internal for access
     private let configurationService: ConfigurationService
+    private let dateProvider: DateProviding
     
     // Callback for when data is loaded (for syncing chart data)
     var onDataLoaded: (() async -> Void)?
@@ -128,24 +129,26 @@ final class UsageViewModel {
     }
     
     // MARK: - Initialization
-    init(container: DependencyContainer = ProductionContainer.shared) {
+    init(container: DependencyContainer = ProductionContainer.shared, 
+         dateProvider: DateProviding = SystemDateProvider()) {
         self.usageDataService = container.usageDataService
         self.sessionMonitorService = container.sessionMonitorService
         self.configurationService = container.configurationService
+        self.dateProvider = dateProvider
         
         self.dailyCostThreshold = container.configurationService.configuration.dailyCostThreshold
         
         // Initialize last known day
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
-        self.lastKnownDay = formatter.string(from: Date())
+        self.lastKnownDay = formatter.string(from: dateProvider.now)
     }
     
     // MARK: - Public Methods
     func loadData() async {
-        let loadStartTime = Date()
+        let loadStartTime = dateProvider.now
         #if DEBUG
-        print("[UsageViewModel] loadData() called at \(Date())")
+        print("[UsageViewModel] loadData() called at \(dateProvider.now)")
         #endif
         
         await stateManager.cancelCurrentLoad()
@@ -170,14 +173,14 @@ final class UsageViewModel {
                 
                 // Filter for today's entries using same logic as chart
                 let calendar = Calendar.current
-                let today = calendar.startOfDay(for: Date())
+                let today = dateProvider.startOfDay(for: dateProvider.now)
                 let todaysEntries = entries.filter { entry in
                     guard let date = entry.date else { return false }
                     return calendar.isDate(date, inSameDayAs: today)
                 }
                 
                 // Log performance metrics
-                let loadDuration = Date().timeIntervalSince(loadStartTime)
+                let loadDuration = dateProvider.now.timeIntervalSince(loadStartTime)
                 if loadDuration > 1.0 {
                     performanceLogger.warning("Slow data load: \(String(format: "%.2f", loadDuration))s | entries=\(stats.byDate.count)")
                 } else {
@@ -193,7 +196,7 @@ final class UsageViewModel {
                 // Also log what stats.byDate says for today
                 let formatter = DateFormatter()
                 formatter.dateFormat = "yyyy-MM-dd"
-                let todayString = formatter.string(from: Date())
+                let todayString = formatter.string(from: dateProvider.now)
                 if let todayFromStats = stats.byDate.first(where: { $0.date == todayString }) {
                     print("[UsageViewModel] Today's cost from stats: $\(String(format: "%.2f", todayFromStats.totalCost))")
                 }
@@ -296,13 +299,13 @@ final class UsageViewModel {
                 guard let self = self else { return }
                 
                 #if DEBUG
-                print("[UsageViewModel] Day changed detected via notification at \(Date())")
+                print("[UsageViewModel] Day changed detected via notification at \(self.dateProvider.now)")
                 #endif
                 
                 // Update last known day
                 let formatter = DateFormatter()
                 formatter.dateFormat = "yyyy-MM-dd"
-                self.lastKnownDay = formatter.string(from: Date())
+                self.lastKnownDay = formatter.string(from: dateProvider.now)
                 
                 // Refresh data for the new day
                 await self.loadData()
@@ -334,13 +337,13 @@ final class UsageViewModel {
     @objc private func handleSignificantTimeChange() {
         Task { @MainActor in
             #if DEBUG
-            print("[UsageViewModel] Significant time change detected at \(Date())")
+            print("[UsageViewModel] Significant time change detected at \(dateProvider.now)")
             #endif
             
             // Check if the day actually changed
             let formatter = DateFormatter()
             formatter.dateFormat = "yyyy-MM-dd"
-            let currentDay = formatter.string(from: Date())
+            let currentDay = formatter.string(from: dateProvider.now)
             
             if currentDay != lastKnownDay {
                 lastKnownDay = currentDay
@@ -363,7 +366,7 @@ final class UsageViewModel {
         if let todayEntry = stats.byDate.first(where: { 
             let formatter = DateFormatter()
             formatter.dateFormat = "yyyy-MM-dd"
-            return $0.date == formatter.string(from: Date())
+            return $0.date == formatter.string(from: dateProvider.now)
         }) {
             print("[UsageViewModel] Today's entry found: \(todayEntry.date) = $\(todayEntry.totalCost)")
         }
@@ -375,7 +378,7 @@ final class UsageViewModel {
         
         // Session progress
         if let session = activeSession {
-            let elapsed = Date().timeIntervalSince(session.startTime)
+            let elapsed = dateProvider.now.timeIntervalSince(session.startTime)
             let total = session.endTime.timeIntervalSince(session.startTime)
             sessionTimeProgress = min(elapsed / total, 1.5)
             

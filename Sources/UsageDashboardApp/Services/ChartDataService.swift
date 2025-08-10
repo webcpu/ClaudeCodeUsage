@@ -15,6 +15,11 @@ final class ChartDataService {
     private(set) var detailedHourlyData: [HourlyChartData] = []
     private(set) var isLoading: Bool = false
     private(set) var error: Error?
+    private let dateProvider: DateProviding
+    
+    init(dateProvider: DateProviding = SystemDateProvider()) {
+        self.dateProvider = dateProvider
+    }
     
     // MARK: - Data Loading
     /// Load hourly costs directly from provided entries (preferred method)
@@ -22,8 +27,8 @@ final class ChartDataService {
         isLoading = true
         error = nil
         
-        let hourlyData = UsageAnalytics.todayHourlyCosts(from: entries)
-        let detailedData = UsageAnalytics.detailedHourlyCosts(from: entries)
+        let hourlyData = UsageAnalytics.todayHourlyCosts(from: entries, referenceDate: dateProvider.now)
+        let detailedData = UsageAnalytics.detailedHourlyCosts(from: entries, referenceDate: dateProvider.now)
         
         self.todayHourlyCosts = hourlyData
         self.detailedHourlyData = detailedData
@@ -54,14 +59,14 @@ final class ChartDataService {
             
             // Filter for today's entries
             let calendar = Calendar.current
-            let today = Date()
+            let today = dateProvider.now
             let todayEntries = allEntries.filter { entry in
                 guard let date = entry.date else { return false }
                 return calendar.isDate(date, inSameDayAs: today)
             }
             
-            let hourlyData = UsageAnalytics.todayHourlyCosts(from: todayEntries)
-            let detailedData = UsageAnalytics.detailedHourlyCosts(from: todayEntries)
+            let hourlyData = UsageAnalytics.todayHourlyCosts(from: todayEntries, referenceDate: dateProvider.now)
+            let detailedData = UsageAnalytics.detailedHourlyCosts(from: todayEntries, referenceDate: dateProvider.now)
             
             self.todayHourlyCosts = hourlyData
             self.detailedHourlyData = detailedData
@@ -100,7 +105,7 @@ final class ChartDataService {
     }
     
     func currentHourCost() -> Double {
-        let currentHour = Calendar.current.component(.hour, from: Date())
+        let currentHour = Calendar.current.component(.hour, from: dateProvider.now)
         guard currentHour < todayHourlyCosts.count else { return 0 }
         return todayHourlyCosts[currentHour]
     }

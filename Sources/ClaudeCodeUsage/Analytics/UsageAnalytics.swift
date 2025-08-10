@@ -198,10 +198,10 @@ public struct CacheSavings {
 // MARK: - Hourly Accumulation
 public extension UsageAnalytics {
     /// Get hourly cost accumulation for today from usage entries (cumulative)
-    static func todayHourlyAccumulation(from entries: [UsageEntry]) -> [Double] {
+    static func todayHourlyAccumulation(from entries: [UsageEntry], referenceDate: Date = Date()) -> [Double] {
         let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        let currentHour = calendar.component(.hour, from: Date())
+        let today = calendar.startOfDay(for: referenceDate)
+        let currentHour = calendar.component(.hour, from: referenceDate)
         
         // Filter entries for today
         let todayEntries = entries.filter { entry in
@@ -235,9 +235,9 @@ public extension UsageAnalytics {
     }
     
     /// Get individual hourly costs for today from usage entries (non-cumulative) with proper timezone handling
-    static func todayHourlyCosts(from entries: [UsageEntry]) -> [Double] {
+    static func todayHourlyCosts(from entries: [UsageEntry], referenceDate: Date = Date()) -> [Double] {
         let calendar = Calendar.current
-        let now = Date()
+        let now = referenceDate
         let today = calendar.startOfDay(for: now)
         
         // Debug: Print timezone info

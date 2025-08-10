@@ -24,12 +24,21 @@ struct ModernUsageViewModelTests {
     
     fileprivate let mockContainer: TestDependencyContainer
     let viewModel: UsageViewModel
+    let testDate: Date
+    let testDateProvider: TestDateProvider
     
     // MARK: - Initialization
     
     init() async throws {
+        // Use a fixed date for deterministic testing
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        self.testDate = formatter.date(from: "2024-01-15 12:00:00")!
+        self.testDateProvider = TestDateProvider(fixedDate: testDate)
+        
         self.mockContainer = TestDependencyContainer()
-        self.viewModel = UsageViewModel(container: mockContainer)
+        self.viewModel = UsageViewModel(container: mockContainer, dateProvider: testDateProvider)
     }
     
     // MARK: - Basic Functionality Tests
@@ -109,7 +118,7 @@ struct ModernUsageViewModelTests {
         // Given
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
-        let todayString = formatter.string(from: Date())
+        let todayString = formatter.string(from: testDate)
         
         let stats = UsageStats(
             totalCost: 1000.0,
@@ -133,6 +142,18 @@ struct ModernUsageViewModelTests {
         
         mockContainer.mockUsageDataService.statsToReturn = stats
         
+        // Also set up mock entries for today
+        mockContainer.mockUsageDataService.mockEntries = [
+            UsageEntry(
+                timestamp: testDate,
+                cost: todayCost,
+                model: "claude-3",
+                inputTokens: Int(todayCost * 50),
+                outputTokens: Int(todayCost * 50),
+                sessionId: "test-session"
+            )
+        ]
+        
         // When
         await viewModel.loadData()
         
@@ -150,10 +171,10 @@ struct ModernUsageViewModelTests {
         // Configure a shorter refresh interval for testing
         let config = AppConfiguration(
             basePath: NSHomeDirectory() + "/.claude",
-            refreshInterval: 0.2, // Shorter interval for faster testing
+            refreshInterval: 0.1, // Even shorter interval for faster testing
             sessionDurationHours: 5.0,
             dailyCostThreshold: 10.0,
-            minimumRefreshInterval: 0.1
+            minimumRefreshInterval: 0.05
         )
         mockContainer.mockConfigurationService.updateConfiguration(config)
         
@@ -265,8 +286,8 @@ struct ModernUsageViewModelTests {
         // Given
         let mockSession = SessionBlock(
             id: UUID().uuidString,
-            startTime: Date(),
-            endTime: Date().addingTimeInterval(3600),
+            startTime: testDate,
+            endTime: testDate.addingTimeInterval(3600),
             actualEndTime: nil,
             isActive: true,
             isGap: false,
@@ -328,7 +349,7 @@ struct ModernUsageViewModelTests {
     
     private func createLargeMockStats() -> UsageStats {
         let dates = (0..<365).map { daysAgo in
-            let date = Date().addingTimeInterval(TimeInterval(-daysAgo * 86400))
+            let date = testDate.addingTimeInterval(TimeInterval(-daysAgo * 86400))
             let formatter = DateFormatter()
             formatter.dateFormat = "yyyy-MM-dd"
             return DailyUsage(
@@ -379,6 +400,7 @@ fileprivate final class TestDependencyContainer: DependencyContainer {
 
 fileprivate final class MockUsageDataService: UsageDataService {
     var statsToReturn: UsageStats?
+    var mockEntries: [UsageEntry] = []
     var shouldThrow = false
     var onLoadStats: (() -> Void)?
     
@@ -404,11 +426,12 @@ fileprivate final class MockUsageDataService: UsageDataService {
     }
     
     func loadEntries() async throws -> [UsageEntry] {
-        return []
+        return mockEntries
     }
     
     func getDateRange() -> (start: Date, end: Date) {
-        (Date().addingTimeInterval(-30 * 86400), Date())
+        let baseDate = Date() // Use current date for range calculation
+        return (baseDate.addingTimeInterval(-30 * 86400), baseDate)
     }
 }
 

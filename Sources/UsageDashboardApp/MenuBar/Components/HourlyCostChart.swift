@@ -194,9 +194,9 @@ struct HourlyCostChart: View {
 // MARK: - Data Transformation Extension
 extension UsageAnalytics {
     /// Get detailed hourly cost data with model and project information
-    static func detailedHourlyCosts(from entries: [UsageEntry]) -> [HourlyChartData] {
+    static func detailedHourlyCosts(from entries: [UsageEntry], referenceDate: Date = Date()) -> [HourlyChartData] {
         let calendar = Calendar.current
-        let now = Date()
+        let now = referenceDate
         let today = calendar.startOfDay(for: now)
         
         // Filter entries for today
