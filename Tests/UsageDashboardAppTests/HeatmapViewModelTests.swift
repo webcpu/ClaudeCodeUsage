@@ -30,7 +30,7 @@ final class HeatmapViewModelBehaviorTests {
     
     // MARK: - Dataset Generation
     
-    @Test("Should generate 52 weeks of data for rolling year")
+    @Test("Should generate 52-53 weeks of data for rolling year")
     @MainActor
     func generatesFullYearDataset() async {
         // Given
@@ -41,7 +41,8 @@ final class HeatmapViewModelBehaviorTests {
         
         // Then
         #expect(sut.dataset != nil)
-        #expect(sut.dataset?.weeks.count == 52)
+        // A rolling year can have 52 or 53 weeks depending on week boundaries
+        #expect(sut.dataset?.weeks.count == 52 || sut.dataset?.weeks.count == 53)
         #expect(sut.error == nil)
         #expect(sut.isLoading == false)
     }
