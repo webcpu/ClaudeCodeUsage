@@ -5,18 +5,18 @@ Successfully implemented all essential Mac-native features to address UI/UX revi
 
 ## ✅ Implemented Features
 
-### 1. Preferences Window (Cmd+,)
-- **Status**: ✅ Fully Implemented
-- **Location**: `Sources/UsageDashboardApp/Views/PreferencesView.swift`
+### 1. Settings & Preferences (via Gear Menu)
+- **Status**: ✅ Redesigned as Streamlined Gear Menu
+- **Location**: `Sources/UsageDashboardApp/MenuBar/Components/SettingsMenu.swift`
 - **Features**:
-  - Proper Settings scene in SwiftUI
-  - Keyboard shortcut: Cmd+,
-  - Three organized tabs: General, Updates, Notifications
-  - Follows macOS preferences window conventions
+  - Gear icon menu in menu bar for quick access
+  - No separate preferences window (simplified UX)
+  - All settings accessible from main menu bar interface
+  - Follows macOS HIG for menu bar applications
 
 ### 2. Open at Login
 - **Status**: ✅ Fully Implemented
-- **Location**: `Sources/UsageDashboardApp/Services/LaunchAtLoginManager.swift`
+- **Location**: `Sources/UsageDashboardApp/Services/AppSettingsService.swift`
 - **Features**:
   - Uses native `ServiceManagement` framework
   - SMAppService for modern macOS implementation
