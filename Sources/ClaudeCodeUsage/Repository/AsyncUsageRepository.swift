@@ -8,7 +8,8 @@
 import Foundation
 
 /// Async stream-based usage repository
-public actor AsyncUsageRepository: UsageRepositoryProtocol {
+@MainActor
+public class AsyncUsageRepository: UsageRepositoryProtocol {
     private let basePath: String
     private let fileSystem: AsyncFileSystemProtocol
     private let pathDecoder: ProjectPathDecoderProtocol
