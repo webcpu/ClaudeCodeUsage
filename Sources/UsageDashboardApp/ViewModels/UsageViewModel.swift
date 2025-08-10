@@ -206,14 +206,20 @@ final class UsageViewModel {
         let interval = configurationService.configuration.refreshInterval
         
         timerTask = Task { @MainActor in
+            // Initial load
+            await loadData()
+            
             while !Task.isCancelled {
-                await loadData()
-                
                 // Use Task.sleep for better concurrency
                 do {
                     try await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
+                    
+                    // Check cancellation after sleep, before next load
+                    guard !Task.isCancelled else { break }
+                    
+                    await loadData()
                 } catch {
-                    // Task was cancelled
+                    // Task was cancelled during sleep
                     break
                 }
             }

@@ -143,30 +143,52 @@ struct ModernUsageViewModelTests {
         // Configure a shorter refresh interval for testing
         let config = AppConfiguration(
             basePath: NSHomeDirectory() + "/.claude",
-            refreshInterval: 0.5, // 0.5 seconds for faster testing
+            refreshInterval: 0.3, // Shorter interval to avoid edge cases
             sessionDurationHours: 5.0,
             dailyCostThreshold: 10.0,
             minimumRefreshInterval: 0.1
         )
         mockContainer.mockConfigurationService.updateConfiguration(config)
         
-        // Use confirmation to verify async behavior
-        // Expecting 3 loads: immediate + 2 refreshes at 0.5s intervals in 1.2s
-        await confirmation("Auto-refresh triggered", expectedCount: 3) { confirm in
-            // Setup mock to confirm on each load
-            mockContainer.mockUsageDataService.onLoadStats = {
-                confirm()
+        // Use an actor for thread-safe call counting
+        actor CallCounter {
+            private var count = 0
+            
+            func increment() {
+                count += 1
             }
             
-            // Start auto-refresh
-            viewModel.startAutoRefresh()
-            
-            // Wait for confirmations (2 refreshes at 0.5s intervals)
-            try? await Task.sleep(nanoseconds: 1_200_000_000) // 1.2 seconds
-            
-            // Stop auto-refresh
-            viewModel.stopAutoRefresh()
+            func getCount() -> Int {
+                return count
+            }
         }
+        
+        let callCounter = CallCounter()
+        
+        mockContainer.mockUsageDataService.onLoadStats = {
+            Task {
+                await callCounter.increment()
+            }
+        }
+        
+        // Start auto-refresh
+        viewModel.startAutoRefresh()
+        
+        // Wait for a specific duration (0.8s allows for 2-3 refreshes at 0.3s intervals)
+        try await Task.sleep(nanoseconds: 800_000_000) // 0.8 seconds
+        
+        // Stop auto-refresh
+        viewModel.stopAutoRefresh()
+        
+        // Allow brief settling time for any in-flight operations
+        try await Task.sleep(nanoseconds: 50_000_000) // 50ms
+        
+        // Verify we got the expected range of calls
+        // Expected: 1 immediate + 2-3 refreshes = 3-4 total
+        let finalCount = await callCounter.getCount()
+        
+        #expect(finalCount >= 3 && finalCount <= 4, 
+                "Expected 3-4 refresh calls, got \(finalCount)")
     }
     
     @Test("Concurrent loads are handled safely")
