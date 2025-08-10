@@ -8,6 +8,7 @@ import ServiceManagement
 import SwiftUI
 
 // MARK: - Protocol for Dependency Injection
+@MainActor
 protocol AppSettingsServiceProtocol: ObservableObject {
     var isOpenAtLoginEnabled: Bool { get }
     func setOpenAtLogin(_ enabled: Bool) async -> Result<Void, AppSettingsError>
@@ -115,6 +116,7 @@ final class AppSettingsService: AppSettingsServiceProtocol {
 
 // MARK: - Mock for Testing
 #if DEBUG
+@MainActor
 final class MockAppSettingsService: AppSettingsServiceProtocol {
     @Published private(set) var isOpenAtLoginEnabled: Bool = false
     

@@ -27,6 +27,14 @@ public struct LiveMonitorConfig {
 
 // MARK: - Live Monitor
 
+/// LiveMonitor manages the reading and processing of Claude usage files with thread-safe access.
+/// 
+/// Thread Safety Implementation:
+/// - Uses a concurrent queue with barriers for reader-writer lock pattern
+/// - Reads use queue.sync for concurrent access
+/// - Writes use queue.sync(flags: .barrier) for exclusive access
+/// 
+/// TODO: Consider migrating to Swift actors for better alignment with modern concurrency patterns
 public class LiveMonitor {
     private let config: LiveMonitorConfig
     private var lastFileTimestamps: [String: Date] = [:]
@@ -34,6 +42,9 @@ public class LiveMonitor {
     private var allEntries: [UsageEntry] = []
     private var maxTokensFromPreviousSessions: Int = 0
     private let parser = JSONLParser()
+    
+    /// Concurrent queue for thread-safe access to mutable state
+    private let queue = DispatchQueue(label: "com.claudecodemonitor.livemonitor", attributes: .concurrent)
     
     public init(config: LiveMonitorConfig) {
         self.config = config
@@ -50,10 +61,18 @@ public class LiveMonitor {
         var filesToRead: [String] = []
         for file in files {
             if let timestamp = getFileModificationTime(file) {
-                let lastTimestamp = lastFileTimestamps[file]
-                if lastTimestamp == nil || timestamp > lastTimestamp! {
+                // First, check if we should read (non-blocking read)
+                let shouldRead = queue.sync { () -> Bool in
+                    let lastTimestamp = self.lastFileTimestamps[file]
+                    return lastTimestamp == nil || timestamp > lastTimestamp!
+                }
+                
+                if shouldRead {
                     filesToRead.append(file)
-                    lastFileTimestamps[file] = timestamp
+                    // Update timestamp with barrier (write operation)
+                    queue.sync(flags: .barrier) {
+                        self.lastFileTimestamps[file] = timestamp
+                    }
                 }
             }
         }
@@ -64,15 +83,18 @@ public class LiveMonitor {
         }
         
         // Identify session blocks
-        let blocks = identifySessionBlocks(entries: allEntries)
+        let currentEntries = queue.sync { allEntries }
+        let blocks = identifySessionBlocks(entries: currentEntries)
         
         // Update max tokens from previous completed sessions
-        maxTokensFromPreviousSessions = 0
-        for block in blocks {
-            if !block.isActive && !block.isGap {
-                let blockTokens = block.tokenCounts.total
-                if blockTokens > maxTokensFromPreviousSessions {
-                    maxTokensFromPreviousSessions = blockTokens
+        queue.sync(flags: .barrier) {
+            self.maxTokensFromPreviousSessions = 0
+            for block in blocks {
+                if !block.isActive && !block.isGap {
+                    let blockTokens = block.tokenCounts.total
+                    if blockTokens > self.maxTokensFromPreviousSessions {
+                        self.maxTokensFromPreviousSessions = blockTokens
+                    }
                 }
             }
         }
@@ -97,13 +119,18 @@ public class LiveMonitor {
     
     public func getAutoTokenLimit() -> Int? {
         _ = getActiveBlock() // Ensure we've loaded data
-        return maxTokensFromPreviousSessions > 0 ? maxTokensFromPreviousSessions : nil
+        return queue.sync { 
+            maxTokensFromPreviousSessions > 0 ? maxTokensFromPreviousSessions : nil
+        }
     }
     
     public func clearCache() {
-        lastFileTimestamps.removeAll()
-        processedHashes.removeAll()
-        allEntries.removeAll()
+        queue.sync(flags: .barrier) {
+            self.lastFileTimestamps.removeAll()
+            self.processedHashes.removeAll()
+            self.allEntries.removeAll()
+            self.maxTokensFromPreviousSessions = 0
+        }
     }
     
     // MARK: - Private Methods
@@ -140,13 +167,15 @@ public class LiveMonitor {
     }
     
     private func loadEntriesFromFiles(_ files: [String]) {
-        for file in files {
-            let newEntries = parser.parseFile(at: file, processedHashes: &processedHashes)
-            allEntries.append(contentsOf: newEntries)
+        queue.sync(flags: .barrier) {
+            for file in files {
+                let newEntries = self.parser.parseFile(at: file, processedHashes: &self.processedHashes)
+                self.allEntries.append(contentsOf: newEntries)
+            }
+            
+            // Sort entries by timestamp
+            self.allEntries.sort { $0.timestamp < $1.timestamp }
         }
-        
-        // Sort entries by timestamp
-        allEntries.sort { $0.timestamp < $1.timestamp }
     }
     
     private func identifySessionBlocks(entries: [UsageEntry]) -> [SessionBlock] {

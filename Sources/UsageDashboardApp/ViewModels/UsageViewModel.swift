@@ -74,10 +74,10 @@ final class UsageViewModel {
     // State management
     private let stateManager = UsageStateManager()
     private var refreshTask: Task<Void, Never>?
-    private var refreshTimer: AsyncStream<Date>?
     private var timerTask: Task<Void, Never>?
     private var dayChangeTask: Task<Void, Never>?
     private var lastKnownDay: String = ""
+    private var dayChangeObserver: NSObjectProtocol?
     
     // Computed properties
     var stats: UsageStats? {
@@ -125,29 +125,43 @@ final class UsageViewModel {
         
         let task = Task {
             do {
-                // Load usage stats
-                let stats = try await usageDataService.loadStats()
+                // Use structured concurrency to load data in parallel
+                async let statsLoading = usageDataService.loadStats()
+                async let sessionLoading = sessionMonitorService.getActiveSession()
+                async let burnRateLoading = sessionMonitorService.getBurnRate()
+                async let tokenLimitLoading = sessionMonitorService.getAutoTokenLimit()
+                
+                // Await all results concurrently
+                let (stats, session, burnRate, autoTokenLimit) = try await (
+                    statsLoading,
+                    sessionLoading,
+                    burnRateLoading,
+                    tokenLimitLoading
+                )
                 
                 #if DEBUG
                 print("[UsageViewModel] Stats loaded: totalCost=\(stats.totalCost), entries=\(stats.byDate.count)")
                 #endif
-                await stateManager.updateStats(stats)
                 
-                // Load session data
-                let session = sessionMonitorService.getActiveSession()
+                // Update state manager
+                await stateManager.updateStats(stats)
                 await stateManager.updateSession(session)
                 
-                // Update published properties
+                // Update all published properties atomically on MainActor
                 await MainActor.run {
                     self.state = .loaded(stats)
                     self.activeSession = session
-                    self.burnRate = sessionMonitorService.getBurnRate()
-                    self.autoTokenLimit = sessionMonitorService.getAutoTokenLimit()
+                    self.burnRate = burnRate
+                    self.autoTokenLimit = autoTokenLimit
                     
                     updateCalculatedProperties(stats: stats)
                 }
                 
             } catch {
+                #if DEBUG
+                print("[UsageViewModel] Error loading data: \(error)")
+                #endif
+                
                 await MainActor.run {
                     self.state = .error(error)
                 }
@@ -162,22 +176,20 @@ final class UsageViewModel {
     func startAutoRefresh() {
         stopAutoRefresh()
         
-        // Start regular refresh timer
+        // Start regular refresh using async/await
         let interval = configurationService.configuration.refreshInterval
-        let stream = AsyncStream<Date> { continuation in
-            let timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { _ in
-                continuation.yield(Date())
-            }
-            
-            continuation.onTermination = { _ in
-                timer.invalidate()
-            }
-        }
         
-        timerTask = Task {
-            for await _ in stream {
-                guard !Task.isCancelled else { break }
+        timerTask = Task { @MainActor in
+            while !Task.isCancelled {
                 await loadData()
+                
+                // Use Task.sleep for better concurrency
+                do {
+                    try await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
+                } catch {
+                    // Task was cancelled
+                    break
+                }
             }
         }
         
@@ -188,8 +200,7 @@ final class UsageViewModel {
     func stopAutoRefresh() {
         timerTask?.cancel()
         timerTask = nil
-        dayChangeTask?.cancel()
-        dayChangeTask = nil
+        stopDayChangeMonitoring()
     }
     
     func refresh() async {
@@ -198,54 +209,70 @@ final class UsageViewModel {
     
     // MARK: - Day Change Detection
     private func startDayChangeMonitoring() {
-        dayChangeTask?.cancel()
+        // Remove any existing observer
+        stopDayChangeMonitoring()
         
-        dayChangeTask = Task {
-            while !Task.isCancelled {
-                // Calculate seconds until midnight
-                let secondsUntilMidnight = calculateSecondsUntilMidnight()
+        // Method 1: Use significant time change notification (more reliable)
+        dayChangeObserver = NotificationCenter.default.addObserver(
+            forName: .NSCalendarDayChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
                 
                 #if DEBUG
-                print("[UsageViewModel] Day change monitoring: Next refresh in \(secondsUntilMidnight) seconds")
+                print("[UsageViewModel] Day changed detected via notification at \(Date())")
                 #endif
-                
-                // Wait until just after midnight (add 1 second buffer)
-                try? await Task.sleep(nanoseconds: UInt64((secondsUntilMidnight + 1) * 1_000_000_000))
-                
-                guard !Task.isCancelled else { break }
-                
-                #if DEBUG
-                print("[UsageViewModel] Day changed! Refreshing data at \(Date())")
-                #endif
-                
-                // Refresh data for the new day
-                await loadData()
                 
                 // Update last known day
                 let formatter = DateFormatter()
                 formatter.dateFormat = "yyyy-MM-dd"
-                lastKnownDay = formatter.string(from: Date())
+                self.lastKnownDay = formatter.string(from: Date())
+                
+                // Refresh data for the new day
+                await self.loadData()
             }
         }
+        
+        // Method 2: Also monitor for significant time changes (handles manual time changes)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleSignificantTimeChange),
+            name: NSNotification.Name.NSSystemClockDidChange,
+            object: nil
+        )
+        
+        #if DEBUG
+        print("[UsageViewModel] Day change monitoring started")
+        #endif
     }
     
-    private func calculateSecondsUntilMidnight() -> TimeInterval {
-        let calendar = Calendar.current
-        let now = Date()
-        
-        // Get tomorrow's date at midnight
-        var components = calendar.dateComponents([.year, .month, .day], from: now)
-        components.day! += 1
-        components.hour = 0
-        components.minute = 0
-        components.second = 0
-        
-        guard let midnight = calendar.date(from: components) else {
-            // Fallback to 1 hour if calculation fails
-            return 3600
+    private func stopDayChangeMonitoring() {
+        if let observer = dayChangeObserver {
+            NotificationCenter.default.removeObserver(observer)
+            dayChangeObserver = nil
         }
-        
-        return midnight.timeIntervalSince(now)
+        dayChangeTask?.cancel()
+        dayChangeTask = nil
+    }
+    
+    @objc private func handleSignificantTimeChange() {
+        Task { @MainActor in
+            #if DEBUG
+            print("[UsageViewModel] Significant time change detected at \(Date())")
+            #endif
+            
+            // Check if the day actually changed
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            let currentDay = formatter.string(from: Date())
+            
+            if currentDay != lastKnownDay {
+                lastKnownDay = currentDay
+                await loadData()
+            }
+        }
     }
     
     // MARK: - Private Methods
@@ -300,8 +327,10 @@ final class UsageViewModel {
     }
     
     deinit {
-        // Clean up resources - tasks are automatically cancelled when the class is deallocated
-        // No need to manually cancel tasks in deinit since they're automatically cancelled
+        // Clean up notification observers
+        NotificationCenter.default.removeObserver(self)
+        // Note: dayChangeObserver will be cleaned up automatically
+        // Tasks are automatically cancelled when the class is deallocated
     }
 }
 

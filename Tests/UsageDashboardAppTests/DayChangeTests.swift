@@ -6,7 +6,9 @@
 import XCTest
 @testable import UsageDashboardApp
 @testable import ClaudeCodeUsage
+@testable import ClaudeLiveMonitorLib
 
+@MainActor
 final class DayChangeTests: XCTestCase {
     
     // MARK: - Test Calculate Seconds Until Midnight
@@ -16,8 +18,9 @@ final class DayChangeTests: XCTestCase {
         let container = TestDependencyContainer()
         let viewModel = UsageViewModel(container: container)
         
-        // When - Use reflection to access private method
-        let mirror = Mirror(reflecting: viewModel)
+        // When - Cannot directly test private methods
+        // Using reflection to verify object structure only
+        _ = Mirror(reflecting: viewModel)
         
         // We can't directly test private methods, but we can test the behavior
         // by observing when the refresh happens
@@ -188,18 +191,99 @@ final class MockUsageDataService: UsageDataService {
             byProject: []
         )
     }
+    
+    nonisolated func getDateRange() -> (start: Date, end: Date) {
+        let now = Date()
+        let thirtyDaysAgo = now.addingTimeInterval(-30 * 24 * 60 * 60)
+        return (start: thirtyDaysAgo, end: now)
+    }
 }
 
 // Test dependency container
 @MainActor
 final class TestDependencyContainer: DependencyContainer {
-    var mockUsageDataService: MockUsageDataService = MockUsageDataService()
+    let mockUsageDataService: MockUsageDataService = MockUsageDataService()
+    let mockSessionMonitorService = DayChangeMockSessionMonitorService()
+    let mockConfigurationService = MockConfigurationService()
+    let mockPerformanceMetrics = DayChangeMockPerformanceMetrics()
     
-    lazy var testUsageDataService: UsageDataService = {
+    nonisolated var usageDataService: UsageDataService {
         return mockUsageDataService
-    }()
+    }
     
-    override var usageDataService: UsageDataService {
-        return testUsageDataService
+    nonisolated var sessionMonitorService: SessionMonitorService {
+        return mockSessionMonitorService
+    }
+    
+    nonisolated var configurationService: ConfigurationService {
+        return mockConfigurationService
+    }
+    
+    nonisolated var performanceMetrics: PerformanceMetricsProtocol {
+        return mockPerformanceMetrics
+    }
+}
+
+// Mock SessionMonitorService for testing
+@MainActor
+final class DayChangeMockSessionMonitorService: SessionMonitorService {
+    nonisolated func getActiveSession() -> SessionBlock? {
+        return nil
+    }
+    
+    nonisolated func getBurnRate() -> BurnRate? {
+        return nil
+    }
+    
+    nonisolated func getAutoTokenLimit() -> Int? {
+        return nil
+    }
+}
+
+// Mock Configuration Service for testing
+@MainActor
+final class MockConfigurationService: ConfigurationService {
+    nonisolated var configuration: AppConfiguration {
+        return AppConfiguration(
+            basePath: NSHomeDirectory() + "/.claude",
+            refreshInterval: 30.0,
+            sessionDurationHours: 5.0,
+            dailyCostThreshold: 10.0,
+            minimumRefreshInterval: 10.0
+        )
+    }
+    
+    nonisolated func updateConfiguration(_ config: AppConfiguration) {
+        // Mock implementation - no-op
+    }
+}
+
+// Mock Performance Metrics for testing
+@MainActor
+final class DayChangeMockPerformanceMetrics: PerformanceMetricsProtocol {
+    func record<T>(
+        _ operation: String,
+        metadata: [String: Any] = [:],
+        block: () async throws -> T
+    ) async rethrows -> T {
+        return try await block()
+    }
+    
+    func getStats(for operation: String) async -> MetricStats? {
+        return nil
+    }
+    
+    func getAllStats() async -> [MetricStats] {
+        return []
+    }
+    
+    func clearMetrics(for operation: String?) async {}
+    
+    func exportMetrics() async -> Data? {
+        return nil
+    }
+    
+    func generateReport() async -> String {
+        return "Mock report"
     }
 }
