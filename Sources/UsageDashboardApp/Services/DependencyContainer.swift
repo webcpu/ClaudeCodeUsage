@@ -124,8 +124,8 @@ final class ProductionContainer: DependencyContainer {
     }()
     
     lazy var sessionMonitorService: SessionMonitorService = {
-        // Use HybridSessionMonitorService that switches based on feature flag
-        let hybrid = HybridSessionMonitorService(configuration: configurationService.configuration)
+        // Use ModernHybridSessionMonitor that switches based on feature flag without semaphores
+        let hybrid = ModernHybridSessionMonitor(configuration: configurationService.configuration)
         // Wrap with performance monitoring for A/B testing
         return MonitoredSessionService(wrapped: hybrid, metrics: performanceMetrics)
     }()

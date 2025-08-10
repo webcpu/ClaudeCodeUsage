@@ -76,7 +76,7 @@ final class HybridSessionMonitorService: SessionMonitorService {
     
     func getActiveSession() -> SessionBlock? {
         if let asyncService = asyncService {
-            // Use async service in sync context - requires blocking
+            // Use async service in sync context with timeout to prevent deadlock
             let semaphore = DispatchSemaphore(value: 0)
             var result: SessionBlock?
             
@@ -85,7 +85,12 @@ final class HybridSessionMonitorService: SessionMonitorService {
                 semaphore.signal()
             }
             
-            semaphore.wait()
+            // Wait with timeout (2 seconds)
+            let timeout = DispatchTime.now() + .seconds(2)
+            if semaphore.wait(timeout: timeout) == .timedOut {
+                print("[HybridSessionMonitorService] Warning: getActiveSession timed out")
+                return nil
+            }
             return result
         } else {
             return syncService?.getActiveSession()
@@ -94,7 +99,7 @@ final class HybridSessionMonitorService: SessionMonitorService {
     
     func getBurnRate() -> BurnRate? {
         if let asyncService = asyncService {
-            // Use async service in sync context - requires blocking
+            // Use async service in sync context with timeout to prevent deadlock
             let semaphore = DispatchSemaphore(value: 0)
             var result: BurnRate?
             
@@ -103,7 +108,12 @@ final class HybridSessionMonitorService: SessionMonitorService {
                 semaphore.signal()
             }
             
-            semaphore.wait()
+            // Wait with timeout (2 seconds)
+            let timeout = DispatchTime.now() + .seconds(2)
+            if semaphore.wait(timeout: timeout) == .timedOut {
+                print("[HybridSessionMonitorService] Warning: getBurnRate timed out")
+                return nil
+            }
             return result
         } else {
             return syncService?.getBurnRate()
@@ -112,7 +122,7 @@ final class HybridSessionMonitorService: SessionMonitorService {
     
     func getAutoTokenLimit() -> Int? {
         if let asyncService = asyncService {
-            // Use async service in sync context - requires blocking
+            // Use async service in sync context with timeout to prevent deadlock
             let semaphore = DispatchSemaphore(value: 0)
             var result: Int?
             
@@ -121,7 +131,12 @@ final class HybridSessionMonitorService: SessionMonitorService {
                 semaphore.signal()
             }
             
-            semaphore.wait()
+            // Wait with timeout (2 seconds)
+            let timeout = DispatchTime.now() + .seconds(2)
+            if semaphore.wait(timeout: timeout) == .timedOut {
+                print("[HybridSessionMonitorService] Warning: getAutoTokenLimit timed out")
+                return nil
+            }
             return result
         } else {
             return syncService?.getAutoTokenLimit()
