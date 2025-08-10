@@ -10,6 +10,10 @@ import ClaudeCodeUsage
 struct CostMetricsSection: View {
     @Environment(UsageDataModel.self) private var dataModel
     
+    // Cache expensive computations
+    @State private var cachedTodaysCostColor: Color = MenuBarTheme.Colors.Status.normal
+    @State private var lastCostProgress: Double = 0
+    
     var body: some View {
         VStack(spacing: MenuBarTheme.Layout.sectionSpacing) {
             // Today's cost with hourly graph
@@ -19,6 +23,18 @@ struct CostMetricsSection: View {
             if let stats = dataModel.stats {
                 summaryStatsView(stats)
             }
+        }
+        .onChange(of: dataModel.todaysCostProgress) { oldValue, newValue in
+            // Only update color when progress actually changes
+            if abs(oldValue - newValue) > 0.01 {
+                cachedTodaysCostColor = ColorService.colorForCostProgress(newValue)
+                lastCostProgress = newValue
+            }
+        }
+        .onAppear {
+            // Initialize cached values
+            cachedTodaysCostColor = ColorService.colorForCostProgress(dataModel.todaysCostProgress)
+            lastCostProgress = dataModel.todaysCostProgress
         }
     }
     
@@ -33,7 +49,7 @@ struct CostMetricsSection: View {
                 HStack(spacing: 4) {
                     Text(dataModel.todaysCost)
                         .font(MenuBarTheme.Typography.metricValue)
-                        .foregroundColor(todaysCostColor)
+                        .foregroundColor(cachedTodaysCostColor)
                         .monospacedDigit()
                         .lineLimit(1)
                         .fixedSize(horizontal: true, vertical: false)
@@ -86,9 +102,7 @@ struct CostMetricsSection: View {
     }
     
     // MARK: - Helper Properties
-    private var todaysCostColor: Color {
-        ColorService.colorForCostProgress(dataModel.todaysCostProgress)
-    }
+    // Removed computed property to avoid repeated calculations
 }
 
 // MARK: - Y-Axis Labels Component

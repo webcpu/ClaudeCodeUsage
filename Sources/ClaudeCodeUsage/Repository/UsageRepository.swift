@@ -6,6 +6,9 @@
 //
 
 import Foundation
+import OSLog
+
+private let logger = Logger(subsystem: "com.claudecodeusage", category: "Repository")
 
 /// Repository for accessing and processing usage data
 public class UsageRepository {
@@ -13,6 +16,7 @@ public class UsageRepository {
     private let parser: UsageDataParserProtocol
     private let pathDecoder: ProjectPathDecoderProtocol
     private let aggregator: StatisticsAggregatorProtocol
+    private let deduplication: DeduplicationStrategy // Shared deduplication instance
     public let basePath: String
     
     /// Initialize with all dependencies injected
@@ -21,12 +25,14 @@ public class UsageRepository {
         parser: UsageDataParserProtocol,
         pathDecoder: ProjectPathDecoderProtocol,
         aggregator: StatisticsAggregatorProtocol,
+        deduplication: DeduplicationStrategy? = nil,
         basePath: String
     ) {
         self.fileSystem = fileSystem
         self.parser = parser
         self.pathDecoder = pathDecoder
         self.aggregator = aggregator
+        self.deduplication = deduplication ?? HashBasedDeduplication()
         self.basePath = basePath
     }
     
@@ -37,6 +43,7 @@ public class UsageRepository {
             parser: JSONLUsageParser(),
             pathDecoder: ProjectPathDecoder(),
             aggregator: StatisticsAggregator(),
+            deduplication: HashBasedDeduplication(),
             basePath: basePath
         )
     }
@@ -50,8 +57,8 @@ public class UsageRepository {
             return createEmptyStats()
         }
         
-        // Create a new deduplication instance for this operation to avoid race conditions
-        let deduplication = HashBasedDeduplication()
+        // Reset deduplication state for fresh operation
+        deduplication.reset()
         
         // Collect and process all JSONL files
         let filesToProcess = try collectJSONLFiles(from: projectsPath)
@@ -90,8 +97,8 @@ public class UsageRepository {
             return []
         }
         
-        // Create a new deduplication instance for this operation to avoid race conditions
-        let deduplication = HashBasedDeduplication()
+        // Reset deduplication state for fresh operation
+        deduplication.reset()
         
         let filesToProcess = try collectJSONLFiles(from: projectsPath)
         let sortedFiles = sortFilesByTimestamp(filesToProcess)
@@ -116,7 +123,11 @@ public class UsageRepository {
         for projectDir in projectDirs {
             let projectPath = projectsPath + "/" + projectDir
             
-            guard let files = try? fileSystem.contentsOfDirectory(atPath: projectPath) else {
+            let files: [String]
+            do {
+                files = try fileSystem.contentsOfDirectory(atPath: projectPath)
+            } catch {
+                logger.warning("Failed to read directory \(projectPath): \(error.localizedDescription)")
                 continue
             }
             
@@ -163,34 +174,52 @@ public class UsageRepository {
     }
     
     private func processFilesInParallel(_ files: [(path: String, projectDir: String, earliestTimestamp: String)], deduplication: DeduplicationStrategy) throws -> [UsageEntry] {
-        let queue = DispatchQueue(label: "com.claudecodeusage.fileprocessing", attributes: .concurrent)
-        let group = DispatchGroup()
-        var allEntries: [UsageEntry] = []
-        var processingError: Error?
-        let lock = NSLock()
-        
-        for (filePath, projectDir, _) in files {
-            queue.async(group: group) {
-                do {
-                    let entries = try self.processJSONLFile(at: filePath, projectDir: projectDir, deduplication: deduplication)
-                    lock.lock()
-                    allEntries.append(contentsOf: entries)
-                    lock.unlock()
-                } catch {
-                    lock.lock()
-                    processingError = error
-                    lock.unlock()
+        // Use structured concurrency for thread-safe parallel processing
+        let result = try runBlocking {
+            try await withThrowingTaskGroup(of: [UsageEntry].self) { group in
+                for (filePath, projectDir, _) in files {
+                    group.addTask {
+                        try self.processJSONLFile(
+                            at: filePath,
+                            projectDir: projectDir,
+                            deduplication: deduplication
+                        )
+                    }
                 }
+                
+                var allEntries: [UsageEntry] = []
+                for try await entries in group {
+                    allEntries.append(contentsOf: entries)
+                }
+                return allEntries
             }
         }
+        return result
+    }
+    
+    /// Helper to run async code synchronously (temporary bridge)
+    private func runBlocking<T>(_ operation: @escaping () async throws -> T) throws -> T {
+        let semaphore = DispatchSemaphore(value: 0)
+        var result: Result<T, Error>!
         
-        group.wait()
-        
-        if let error = processingError {
-            throw error
+        Task {
+            do {
+                let value = try await operation()
+                result = .success(value)
+            } catch {
+                result = .failure(error)
+            }
+            semaphore.signal()
         }
         
-        return allEntries
+        semaphore.wait()
+        
+        switch result! {
+        case .success(let value):
+            return value
+        case .failure(let error):
+            throw error
+        }
     }
     
     /// Process files in batches to manage memory for very large datasets
@@ -230,8 +259,20 @@ public class UsageRepository {
         let decodedProjectPath = pathDecoder.decode(projectDir)
         
         for line in lines {
-            guard let data = line.data(using: .utf8),
-                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            guard let data = line.data(using: .utf8) else {
+                logger.debug("Failed to convert line to data in file: \(path)")
+                continue
+            }
+            
+            let json: [String: Any]
+            do {
+                guard let parsedJson = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                    logger.debug("Invalid JSON format in file: \(path)")
+                    continue
+                }
+                json = parsedJson
+            } catch {
+                logger.debug("Failed to parse JSON in file \(path): \(error.localizedDescription)")
                 continue
             }
             
@@ -244,8 +285,13 @@ public class UsageRepository {
             }
             
             // Parse entry
-            if let entry = try? parser.parseJSONLLine(line, projectPath: decodedProjectPath) {
-                entries.append(entry)
+            do {
+                if let entry = try parser.parseJSONLLine(line, projectPath: decodedProjectPath) {
+                    entries.append(entry)
+                }
+            } catch {
+                logger.debug("Failed to parse entry in file \(path): \(error.localizedDescription)")
+                // Continue processing other entries
             }
         }
         
@@ -253,7 +299,11 @@ public class UsageRepository {
     }
     
     private func getEarliestTimestamp(from path: String) -> String? {
-        guard let content = try? fileSystem.readFile(atPath: path) else {
+        let content: String
+        do {
+            content = try fileSystem.readFile(atPath: path)
+        } catch {
+            logger.debug("Failed to read file \(path) for timestamp: \(error.localizedDescription)")
             return nil
         }
         

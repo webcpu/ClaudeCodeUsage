@@ -7,6 +7,9 @@ import SwiftUI
 import Observation
 import ClaudeCodeUsage
 import ClaudeLiveMonitorLib
+import OSLog
+
+private let performanceLogger = Logger(subsystem: "com.claudecodeusage", category: "ViewModelPerformance")
 
 // MARK: - View State
 enum ViewState {
@@ -143,6 +146,7 @@ final class UsageViewModel {
     
     // MARK: - Public Methods
     func loadData() async {
+        let loadStartTime = Date()
         #if DEBUG
         print("[UsageViewModel] loadData() called at \(Date())")
         #endif
@@ -164,6 +168,14 @@ final class UsageViewModel {
                     burnRateLoading,
                     tokenLimitLoading
                 )
+                
+                // Log performance metrics
+                let loadDuration = Date().timeIntervalSince(loadStartTime)
+                if loadDuration > 1.0 {
+                    performanceLogger.warning("Slow data load: \(String(format: "%.2f", loadDuration))s | entries=\(stats.byDate.count)")
+                } else {
+                    performanceLogger.debug("Data loaded in \(String(format: "%.2f", loadDuration))s | entries=\(stats.byDate.count)")
+                }
                 
                 #if DEBUG
                 print("[UsageViewModel] Stats loaded: totalCost=\(stats.totalCost), entries=\(stats.byDate.count)")
@@ -209,17 +221,23 @@ final class UsageViewModel {
             // Initial load
             await loadData()
             
+            // Use a clock for more precise timing
+            var nextFireTime = ContinuousClock.now + .seconds(interval)
+            
             while !Task.isCancelled {
-                // Use Task.sleep for better concurrency
                 do {
-                    try await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
+                    // Sleep until next fire time
+                    try await Task.sleep(until: nextFireTime, clock: .continuous)
                     
-                    // Check cancellation after sleep, before next load
+                    // Check cancellation immediately after sleep
                     guard !Task.isCancelled else { break }
                     
                     await loadData()
+                    
+                    // Calculate next fire time from the previous one to avoid drift
+                    nextFireTime = nextFireTime + .seconds(interval)
                 } catch {
-                    // Task was cancelled during sleep
+                    // Task was cancelled during sleep or clock error
                     break
                 }
             }

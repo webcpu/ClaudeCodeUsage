@@ -62,10 +62,10 @@ public actor ModernSessionMonitorActor: AsyncSessionMonitorServiceProtocol {
     }
 }
 
-// MARK: - RunLoop Bridge for Legacy Code
+// MARK: - Efficient Bridge for Legacy Code
 
-/// Bridge for legacy synchronous code using RunLoop instead of semaphores
-public final class RunLoopBridge: SessionMonitorService {
+/// Bridge for legacy synchronous code using efficient semaphore-based blocking
+public final class EfficientBridge: SessionMonitorService {
     private let asyncService: AsyncSessionMonitorServiceProtocol
     private let timeout: TimeInterval
     
@@ -75,71 +75,48 @@ public final class RunLoopBridge: SessionMonitorService {
     }
     
     public func getActiveSession() -> SessionBlock? {
-        var result: SessionBlock?
-        var taskCompleted = false
-        
-        Task {
-            result = await asyncService.getActiveSession()
-            taskCompleted = true
-        }
-        
-        // Use RunLoop to wait for async operation
-        let deadline = Date().addingTimeInterval(timeout)
-        while !taskCompleted && Date() < deadline {
-            RunLoop.current.run(until: Date().addingTimeInterval(0.001))
-        }
-        
-        if !taskCompleted {
-            print("[RunLoopBridge] getActiveSession timed out after \(timeout) seconds")
-        }
-        
-        return result
+        return runBlockingWithTimeout {
+            await self.asyncService.getActiveSession()
+        } ?? nil
     }
     
     public func getBurnRate() -> BurnRate? {
-        var result: BurnRate?
-        var taskCompleted = false
-        
-        Task {
-            result = await asyncService.getBurnRate()
-            taskCompleted = true
-        }
-        
-        // Use RunLoop to wait for async operation
-        let deadline = Date().addingTimeInterval(timeout)
-        while !taskCompleted && Date() < deadline {
-            RunLoop.current.run(until: Date().addingTimeInterval(0.001))
-        }
-        
-        if !taskCompleted {
-            print("[RunLoopBridge] getBurnRate timed out after \(timeout) seconds")
-        }
-        
-        return result
+        return runBlockingWithTimeout {
+            await self.asyncService.getBurnRate()
+        } ?? nil
     }
     
     public func getAutoTokenLimit() -> Int? {
-        var result: Int?
-        var taskCompleted = false
+        return runBlockingWithTimeout {
+            await self.asyncService.getAutoTokenLimit()
+        } ?? nil
+    }
+    
+    /// Efficiently run async code synchronously with timeout
+    private func runBlockingWithTimeout<T>(_ operation: @escaping () async -> T?) -> T? {
+        let semaphore = DispatchSemaphore(value: 0)
+        var result: T?
+        var taskHandle: Task<Void, Never>?
         
-        Task {
-            result = await asyncService.getAutoTokenLimit()
-            taskCompleted = true
+        taskHandle = Task {
+            result = await operation()
+            semaphore.signal()
         }
         
-        // Use RunLoop to wait for async operation
-        let deadline = Date().addingTimeInterval(timeout)
-        while !taskCompleted && Date() < deadline {
-            RunLoop.current.run(until: Date().addingTimeInterval(0.001))
-        }
+        let timeoutResult = semaphore.wait(timeout: .now() + timeout)
         
-        if !taskCompleted {
-            print("[RunLoopBridge] getAutoTokenLimit timed out after \(timeout) seconds")
+        if timeoutResult == .timedOut {
+            taskHandle?.cancel()
+            print("[EfficientBridge] Operation timed out after \(timeout) seconds")
+            return nil
         }
         
         return result
     }
 }
+
+/// Legacy compatibility alias
+public typealias RunLoopBridge = EfficientBridge
 
 // MARK: - Continuation-based Bridge (Alternative)
 

@@ -205,37 +205,38 @@ final class LiveMonitorActorTests: XCTestCase {
     // MARK: - Feature Flag Tests
     
     func testFeatureFlagPersistence() {
+        // Reset to ensure clean state
+        FeatureFlags.reset()
+        
+        // Test setting to true
         FeatureFlags.useActorBasedLiveMonitor = true
         XCTAssertTrue(FeatureFlags.useActorBasedLiveMonitor)
         
+        // Test setting to false
         FeatureFlags.useActorBasedLiveMonitor = false
         XCTAssertFalse(FeatureFlags.useActorBasedLiveMonitor)
         
+        // Test reset functionality
         FeatureFlags.reset()
         XCTAssertFalse(FeatureFlags.useActorBasedLiveMonitor)
     }
     
-    func testFeatureFlagPercentageRollout() {
-        // Test 0% rollout
-        FeatureFlags.enableActorBasedLiveMonitor(percentage: 0)
-        XCTAssertFalse(FeatureFlags.useActorBasedLiveMonitor)
-        
-        // Test 100% rollout
-        FeatureFlags.enableActorBasedLiveMonitor(percentage: 100)
-        XCTAssertTrue(FeatureFlags.useActorBasedLiveMonitor)
-        
-        // Reset
-        FeatureFlags.reset()
-    }
+    // Feature flag percentage rollout test moved to FeatureFlagTests.swift for serial execution
     
     #if DEBUG
     func testDebugFeatureFlags() {
+        // Reset to ensure clean state
+        FeatureFlags.reset()
+        
+        // Test enabling all features
         FeatureFlags.enableAllExperimentalFeatures()
         XCTAssertTrue(FeatureFlags.useActorBasedLiveMonitor)
         
+        // Test disabling all features
         FeatureFlags.disableAllExperimentalFeatures()
         XCTAssertFalse(FeatureFlags.useActorBasedLiveMonitor)
         
+        // Clean up after test
         FeatureFlags.reset()
     }
     #endif
