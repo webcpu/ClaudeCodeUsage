@@ -7,9 +7,9 @@
 
 import Foundation
 
-/// Async stream-based usage repository
-@MainActor
-public class AsyncUsageRepository: UsageRepositoryProtocol {
+/// Async stream-based usage repository with sequential execution
+/// Uses actor isolation for thread safety while ensuring methods execute sequentially
+public actor AsyncUsageRepository: UsageRepositoryProtocol {
     private let basePath: String
     private let fileSystem: AsyncFileSystemProtocol
     private let pathDecoder: ProjectPathDecoderProtocol
@@ -298,7 +298,7 @@ public class AsyncUsageRepository: UsageRepositoryProtocol {
         return aggregator.aggregateStatistics(from: entries, sessionCount: sessionCount)
     }
     
-    nonisolated private func countUniqueSessions(from files: [(path: String, projectDir: String, earliestTimestamp: String)]) -> Int {
+    private func countUniqueSessions(from files: [(path: String, projectDir: String, earliestTimestamp: String)]) -> Int {
         var sessionIds = Set<String>()
         
         for (filePath, _, _) in files {
@@ -312,7 +312,7 @@ public class AsyncUsageRepository: UsageRepositoryProtocol {
         return sessionIds.count
     }
     
-    nonisolated private func createEmptyStats() -> UsageStats {
+    private func createEmptyStats() -> UsageStats {
         return UsageStats(
             totalCost: 0,
             totalTokens: 0,
