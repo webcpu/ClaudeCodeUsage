@@ -3,7 +3,8 @@
 //  Tests for chart data synchronization with today's cost
 //
 
-import XCTest
+import Testing
+import Foundation
 @testable import UsageDashboardApp
 @testable import ClaudeCodeUsage
 
@@ -33,10 +34,12 @@ final class ChartSyncMockUsageDataService: UsageDataService {
     }
 }
 
-final class ChartDataSyncTests: XCTestCase {
+@Suite("Chart Data Sync Tests")
+struct ChartDataSyncTests {
     
     @MainActor
-    func testChartDataSyncsWithTodaysCost() async throws {
+    @Test("Chart data syncs with today's cost")
+    func chartDataSyncsWithTodaysCost() async throws {
         // Given: Use fixed date for deterministic testing
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
@@ -95,7 +98,7 @@ final class ChartDataSyncTests: XCTestCase {
         try await Task.sleep(nanoseconds: 100_000_000) // 100ms
         
         // Then: Verify today's cost matches
-        XCTAssertEqual(dataModel.todaysCost, "$128.49", "Today's cost should match the daily usage")
+        #expect(dataModel.todaysCost == "$128.49")
         
         // Verify chart total matches today's cost
         let chartTotal = dataModel.chartDataService.todayHourlyCosts.reduce(0, +)
@@ -106,12 +109,12 @@ final class ChartDataSyncTests: XCTestCase {
         print("Chart hourly costs: \(dataModel.chartDataService.todayHourlyCosts)")
         
         // Allow for small floating point differences
-        XCTAssertEqual(chartTotal, todaysCostValue, accuracy: 0.01, 
-                      "Chart total should match today's cost")
+        #expect(abs(chartTotal - todaysCostValue) < 0.01)
     }
     
     @MainActor
-    func testChartUpdatesOnRefresh() async throws {
+    @Test("Chart updates on refresh")
+    func chartUpdatesOnRefresh() async throws {
         // Given: Use fixed date for deterministic testing
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
@@ -166,7 +169,7 @@ final class ChartDataSyncTests: XCTestCase {
         
         // Verify initial state
         let initialChartTotal = dataModel.chartDataService.todayHourlyCosts.reduce(0, +)
-        XCTAssertEqual(initialChartTotal, 50.0, accuracy: 0.01)
+        #expect(abs(initialChartTotal - 50.0) < 0.01)
         
         // When: Update with new data
         let updatedStats = UsageStats(
@@ -210,12 +213,12 @@ final class ChartDataSyncTests: XCTestCase {
         
         // Then: Chart should update
         let updatedChartTotal = dataModel.chartDataService.todayHourlyCosts.reduce(0, +)
-        XCTAssertEqual(updatedChartTotal, 128.49, accuracy: 0.01,
-                      "Chart should update to new today's cost")
+        #expect(abs(updatedChartTotal - 128.49) < 0.01)
     }
     
     @MainActor  
-    func testChartDataCallbackTriggersOnDataLoad() async throws {
+    @Test("Chart data callback triggers on data load")
+    func chartDataCallbackTriggersOnDataLoad() async throws {
         // Given: Use fixed date and setup with callback tracking
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
@@ -251,11 +254,12 @@ final class ChartDataSyncTests: XCTestCase {
         await viewModel.loadData()
         
         // Then: Callback should be triggered
-        XCTAssertTrue(callbackTriggered, "onDataLoaded callback should be triggered")
+        #expect(callbackTriggered)
     }
     
     @MainActor
-    func testTodaysCostAlwaysMatchesChartTotal() async throws {
+    @Test("Today's cost always matches chart total")
+    func todaysCostAlwaysMatchesChartTotal() async throws {
         // Given: Use fixed date for deterministic testing
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
@@ -332,11 +336,8 @@ final class ChartDataSyncTests: XCTestCase {
         print("Chart total: $\(String(format: "%.2f", chartTotal))")
         
         // Both should match the actual entries total, not the stats
-        XCTAssertEqual(todaysCostValue, expectedTotal, accuracy: 0.01,
-                      "Today's cost should match entries total")
-        XCTAssertEqual(chartTotal, expectedTotal, accuracy: 0.01,
-                      "Chart total should match entries total")
-        XCTAssertEqual(todaysCostValue, chartTotal, accuracy: 0.01,
-                      "Today's cost and chart total must always match")
+        #expect(abs(todaysCostValue - expectedTotal) < 0.01)
+        #expect(abs(chartTotal - expectedTotal) < 0.01)
+        #expect(abs(todaysCostValue - chartTotal) < 0.01)
     }
 }

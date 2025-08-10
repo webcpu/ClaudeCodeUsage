@@ -3,8 +3,8 @@
 //  TDD-compliant tests for hourly cost chart functionality
 //
 
-import XCTest
 import Testing
+import Foundation
 @testable import ClaudeCodeUsage
 @testable import UsageDashboardApp
 

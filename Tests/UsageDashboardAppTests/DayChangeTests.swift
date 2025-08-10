@@ -3,7 +3,8 @@
 //  Tests for day change detection and today's cost reset
 //
 
-import XCTest
+import Testing
+import Foundation
 @testable import UsageDashboardApp
 @testable import ClaudeCodeUsage
 // Import specific types to avoid UsageEntry conflict
@@ -11,11 +12,13 @@ import struct ClaudeLiveMonitorLib.SessionBlock
 import struct ClaudeLiveMonitorLib.BurnRate
 
 @MainActor
-final class DayChangeTests: XCTestCase {
+@Suite("Day Change Tests")
+struct DayChangeTests {
     
     // MARK: - Test Calculate Seconds Until Midnight
     
-    func testCalculateSecondsUntilMidnight() async {
+    @Test("Calculate seconds until midnight")
+    func calculateSecondsUntilMidnight() async {
         // Given
         let container = TestDependencyContainer()
         let viewModel = UsageViewModel(container: container)
@@ -35,7 +38,7 @@ final class DayChangeTests: XCTestCase {
         
         // Then - Verify the monitoring task is running
         // We can't directly test the private task, but we can verify it doesn't crash
-        XCTAssertNotNil(viewModel) // Basic sanity check
+        #expect(viewModel != nil) // Basic sanity check
         
         // Clean up
         viewModel.stopAutoRefresh()
@@ -43,7 +46,8 @@ final class DayChangeTests: XCTestCase {
     
     // MARK: - Test Today's Cost Reset on Day Change
     
-    func testTodaysCostResetsOnDayChange() async {
+    @Test("Today's cost resets on day change")
+    func todaysCostResetsOnDayChange() async {
         // Given
         let container = TestDependencyContainer()
         let viewModel = UsageViewModel(container: container)
@@ -80,8 +84,8 @@ final class DayChangeTests: XCTestCase {
         await viewModel.loadData()
         
         // Then - Today's cost should be 0 (no data for today)
-        XCTAssertEqual(viewModel.todaysCostValue, 0.0, "Today's cost should be 0 when no data for today")
-        XCTAssertEqual(viewModel.todaysCost, "$0.00", "Today's cost string should be $0.00")
+        #expect(viewModel.todaysCostValue == 0.0)
+        #expect(viewModel.todaysCost == "$0.00")
         
         // When - Simulate data for today
         let todayString = formatter.string(from: Date())
@@ -115,13 +119,14 @@ final class DayChangeTests: XCTestCase {
         await viewModel.loadData()
         
         // Then - Today's cost should now be 50
-        XCTAssertEqual(viewModel.todaysCostValue, 50.0, "Today's cost should be 50 after loading today's data")
-        XCTAssertEqual(viewModel.todaysCost, "$50.00", "Today's cost string should be $50.00")
+        #expect(viewModel.todaysCostValue == 50.0)
+        #expect(viewModel.todaysCost == "$50.00")
     }
     
     // MARK: - Test Auto Refresh Includes Day Change Monitoring
     
-    func testAutoRefreshStartsDayChangeMonitoring() async {
+    @Test("Auto refresh starts day change monitoring")
+    func autoRefreshStartsDayChangeMonitoring() async {
         // Given
         let container = TestDependencyContainer()
         let viewModel = UsageViewModel(container: container)
@@ -134,7 +139,7 @@ final class DayChangeTests: XCTestCase {
         
         // Then - Both regular refresh and day change monitoring should be active
         // We can't directly inspect private tasks, but we can verify no crashes
-        XCTAssertNotNil(viewModel)
+        #expect(viewModel != nil)
         
         // When - Stop auto refresh
         viewModel.stopAutoRefresh()
@@ -143,12 +148,13 @@ final class DayChangeTests: XCTestCase {
         try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
         
         // Then - Tasks should be cancelled (no crashes)
-        XCTAssertNotNil(viewModel)
+        #expect(viewModel != nil)
     }
     
     // MARK: - Test Last Known Day Initialization
     
-    func testLastKnownDayInitializedCorrectly() async {
+    @Test("Last known day initialized correctly")
+    func lastKnownDayInitializedCorrectly() async {
         // Given
         let container = TestDependencyContainer()
         
@@ -157,11 +163,11 @@ final class DayChangeTests: XCTestCase {
         
         // Then - lastKnownDay should be initialized to today
         // We can't access private property directly, but we can verify the view model initializes
-        XCTAssertNotNil(viewModel)
+        #expect(viewModel != nil)
         
         // Verify today's cost calculation works immediately
         let todaysCost = viewModel.todaysCostValue
-        XCTAssertEqual(todaysCost, 0.0, "Initial today's cost should be 0")
+        #expect(todaysCost == 0.0)
     }
 }
 

@@ -3,8 +3,8 @@
 //  Comprehensive error scenario testing following TDD principles
 //
 
-import XCTest
 import Testing
+import Foundation
 @testable import ClaudeCodeUsage
 @testable import UsageDashboardApp
 

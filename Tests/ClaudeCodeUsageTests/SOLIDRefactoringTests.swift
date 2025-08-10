@@ -5,14 +5,17 @@
 //  Unit tests for SOLID refactoring components
 //
 
-import XCTest
+import Testing
+import Foundation
 @testable import ClaudeCodeUsage
 
-final class SOLIDRefactoringTests: XCTestCase {
+@Suite("SOLID Refactoring Tests")
+struct SOLIDRefactoringTests {
     
     // MARK: - FileSystem Tests
     
-    func testMockFileSystemReturnsCorrectFiles() {
+    @Test("Mock file system returns correct files")
+    func mockFileSystemReturnsCorrectFiles() {
         // Given
         let mockFS = MockFileSystem(
             files: [
@@ -30,23 +33,29 @@ final class SOLIDRefactoringTests: XCTestCase {
         let dirContents = try? mockFS.contentsOfDirectory(atPath: "/test")
         
         // Then
-        XCTAssertTrue(exists)
-        XCTAssertEqual(content, "content1")
-        XCTAssertEqual(dirContents?.count, 2)
+        #expect(exists)
+        #expect(content == "content1")
+        #expect(dirContents?.count == 2)
     }
     
-    func testMockFileSystemThrowsForMissingFiles() {
+    @Test("Mock file system throws for missing files")
+    func mockFileSystemThrowsForMissingFiles() {
         // Given
         let mockFS = MockFileSystem()
         
         // When/Then
-        XCTAssertThrowsError(try mockFS.readFile(atPath: "/nonexistent"))
-        XCTAssertThrowsError(try mockFS.contentsOfDirectory(atPath: "/nonexistent"))
+        #expect(throws: (any Error).self) {
+            try mockFS.readFile(atPath: "/nonexistent")
+        }
+        #expect(throws: (any Error).self) {
+            try mockFS.contentsOfDirectory(atPath: "/nonexistent")
+        }
     }
     
     // MARK: - Parser Tests
     
-    func testJSONLParserExtractsUsageData() throws {
+    @Test("JSONL parser extracts usage data")
+    func jsonLParserExtractsUsageData() throws {
         // Given
         let parser = JSONLUsageParser()
         let jsonLine = """
@@ -57,15 +66,16 @@ final class SOLIDRefactoringTests: XCTestCase {
         let entry = try parser.parseJSONLLine(jsonLine, projectPath: "/test/project")
         
         // Then
-        XCTAssertNotNil(entry)
-        XCTAssertEqual(entry?.inputTokens, 100)
-        XCTAssertEqual(entry?.outputTokens, 200)
-        XCTAssertEqual(entry?.cacheWriteTokens, 10)
-        XCTAssertEqual(entry?.cacheReadTokens, 5)
-        XCTAssertEqual(entry?.model, "claude-opus-4")
+        #expect(entry != nil)
+        #expect(entry?.inputTokens == 100)
+        #expect(entry?.outputTokens == 200)
+        #expect(entry?.cacheWriteTokens == 10)
+        #expect(entry?.cacheReadTokens == 5)
+        #expect(entry?.model == "claude-opus-4")
     }
     
-    func testParserSkipsEntriesWithoutTokens() throws {
+    @Test("Parser skips entries without tokens")
+    func parserSkipsEntriesWithoutTokens() throws {
         // Given
         let parser = JSONLUsageParser()
         let jsonLine = """
@@ -76,10 +86,11 @@ final class SOLIDRefactoringTests: XCTestCase {
         let entry = try parser.parseJSONLLine(jsonLine, projectPath: "/test/project")
         
         // Then
-        XCTAssertNil(entry)
+        #expect(entry == nil)
     }
     
-    func testParserExtractsIdentifiers() {
+    @Test("Parser extracts identifiers")
+    func parserExtractsIdentifiers() {
         // Given
         let parser = JSONLUsageParser()
         let json: [String: Any] = [
@@ -94,14 +105,15 @@ final class SOLIDRefactoringTests: XCTestCase {
         let timestamp = parser.extractTimestamp(from: json)
         
         // Then
-        XCTAssertEqual(messageId, "msg123")
-        XCTAssertEqual(requestId, "req456")
-        XCTAssertEqual(timestamp, "2025-08-06T10:00:00Z")
+        #expect(messageId == "msg123")
+        #expect(requestId == "req456")
+        #expect(timestamp == "2025-08-06T10:00:00Z")
     }
     
     // MARK: - Deduplication Tests
     
-    func testHashBasedDeduplicationPreventsduplicates() {
+    @Test("Hash-based deduplication prevents duplicates")
+    func hashBasedDeduplicationPreventsDuplicates() {
         // Given
         let dedup = HashBasedDeduplication()
         
@@ -111,12 +123,13 @@ final class SOLIDRefactoringTests: XCTestCase {
         let different = dedup.shouldInclude(messageId: "msg2", requestId: "req2")
         
         // Then
-        XCTAssertTrue(first)
-        XCTAssertFalse(duplicate)
-        XCTAssertTrue(different)
+        #expect(first)
+        #expect(!duplicate)
+        #expect(different)
     }
     
-    func testDeduplicationReset() {
+    @Test("Deduplication reset")
+    func deduplicationReset() {
         // Given
         let dedup = HashBasedDeduplication()
         _ = dedup.shouldInclude(messageId: "msg1", requestId: "req1")
@@ -126,10 +139,11 @@ final class SOLIDRefactoringTests: XCTestCase {
         let afterReset = dedup.shouldInclude(messageId: "msg1", requestId: "req1")
         
         // Then
-        XCTAssertTrue(afterReset)
+        #expect(afterReset)
     }
     
-    func testNoDeduplicationAllowsAll() {
+    @Test("No deduplication allows all")
+    func noDeduplicationAllowsAll() {
         // Given
         let dedup = NoDeduplication()
         
@@ -138,13 +152,14 @@ final class SOLIDRefactoringTests: XCTestCase {
         let duplicate = dedup.shouldInclude(messageId: "msg1", requestId: "req1")
         
         // Then
-        XCTAssertTrue(first)
-        XCTAssertTrue(duplicate)
+        #expect(first)
+        #expect(duplicate)
     }
     
     // MARK: - Path Decoder Tests
     
-    func testProjectPathDecoderHandlesLeadingDash() {
+    @Test("Project path decoder handles leading dash")
+    func projectPathDecoderHandlesLeadingDash() {
         // Given
         let decoder = ProjectPathDecoder()
         
@@ -152,10 +167,11 @@ final class SOLIDRefactoringTests: XCTestCase {
         let decoded = decoder.decode("-Users-liang-Downloads")
         
         // Then
-        XCTAssertEqual(decoded, "/Users/liang/Downloads")
+        #expect(decoded == "/Users/liang/Downloads")
     }
     
-    func testProjectPathDecoderHandlesNoLeadingDash() {
+    @Test("Project path decoder handles no leading dash")
+    func projectPathDecoderHandlesNoLeadingDash() {
         // Given
         let decoder = ProjectPathDecoder()
         
@@ -163,12 +179,13 @@ final class SOLIDRefactoringTests: XCTestCase {
         let decoded = decoder.decode("Users-liang-Downloads")
         
         // Then
-        XCTAssertEqual(decoded, "Users/liang/Downloads")
+        #expect(decoded == "Users/liang/Downloads")
     }
     
     // MARK: - Statistics Aggregator Tests
     
-    func testStatisticsAggregatorCalculatesTotals() {
+    @Test("Statistics aggregator calculates totals")
+    func statisticsAggregatorCalculatesTotals() {
         // Given
         let aggregator = StatisticsAggregator()
         let entries = [
@@ -200,15 +217,16 @@ final class SOLIDRefactoringTests: XCTestCase {
         let stats = aggregator.aggregateStatistics(from: entries, sessionCount: 2)
         
         // Then
-        XCTAssertEqual(stats.totalCost, 3.5)
-        XCTAssertEqual(stats.totalInputTokens, 250)
-        XCTAssertEqual(stats.totalOutputTokens, 450)
-        XCTAssertEqual(stats.totalCacheCreationTokens, 25)
-        XCTAssertEqual(stats.totalCacheReadTokens, 13)
-        XCTAssertEqual(stats.totalSessions, 2)
+        #expect(stats.totalCost == 3.5)
+        #expect(stats.totalInputTokens == 250)
+        #expect(stats.totalOutputTokens == 450)
+        #expect(stats.totalCacheCreationTokens == 25)
+        #expect(stats.totalCacheReadTokens == 13)
+        #expect(stats.totalSessions == 2)
     }
     
-    func testStatisticsAggregatorGroupsByModel() {
+    @Test("Statistics aggregator groups by model")
+    func statisticsAggregatorGroupsByModel() {
         // Given
         let aggregator = StatisticsAggregator()
         let entries = [
@@ -240,14 +258,15 @@ final class SOLIDRefactoringTests: XCTestCase {
         let stats = aggregator.aggregateStatistics(from: entries, sessionCount: 2)
         
         // Then
-        XCTAssertEqual(stats.byModel.count, 2)
-        XCTAssertTrue(stats.byModel.contains { $0.model == "claude-opus-4" })
-        XCTAssertTrue(stats.byModel.contains { $0.model == "claude-sonnet-3.5" })
+        #expect(stats.byModel.count == 2)
+        #expect(stats.byModel.contains { $0.model == "claude-opus-4" })
+        #expect(stats.byModel.contains { $0.model == "claude-sonnet-3.5" })
     }
     
     // MARK: - Repository Integration Tests
     
-    func testRepositoryWithMockComponents() async throws {
+    @Test("Repository with mock components")
+    func repositoryWithMockComponents() async throws {
         // Given
         let mockFS = MockFileSystem(
             files: [
@@ -274,14 +293,15 @@ final class SOLIDRefactoringTests: XCTestCase {
         let stats = try await repository.getUsageStats()
         
         // Then
-        XCTAssertEqual(stats.totalInputTokens, 250)
-        XCTAssertEqual(stats.totalOutputTokens, 450)
-        XCTAssertEqual(stats.totalSessions, 1)
+        #expect(stats.totalInputTokens == 250)
+        #expect(stats.totalOutputTokens == 450)
+        #expect(stats.totalSessions == 1)
     }
     
     // MARK: - Filter Service Tests
     
-    func testFilterServiceFiltersDateRange() {
+    @Test("Filter service filters date range")
+    func filterServiceFiltersDateRange() {
         // Given
         let stats = UsageStats(
             totalCost: 100,
@@ -310,14 +330,15 @@ final class SOLIDRefactoringTests: XCTestCase {
         let filtered = FilterService.filterByDateRange(stats, start: startDate, end: endDate)
         
         // Then
-        XCTAssertEqual(filtered.byDate.count, 2)
-        XCTAssertEqual(filtered.totalCost, 50) // 20 + 30
-        XCTAssertEqual(filtered.totalTokens, 500) // 200 + 300
+        #expect(filtered.byDate.count == 2)
+        #expect(filtered.totalCost == 50) // 20 + 30
+        #expect(filtered.totalTokens == 500) // 200 + 300
     }
     
     // MARK: - Sorting Service Tests
     
-    func testSortingServiceSortsProjects() {
+    @Test("Sorting service sorts projects")
+    func sortingServiceSortsProjects() {
         // Given
         let projects = [
             ProjectUsage(projectPath: "/p1", projectName: "p1", totalCost: 30, totalTokens: 300, sessionCount: 1, lastUsed: ""),
@@ -330,12 +351,12 @@ final class SOLIDRefactoringTests: XCTestCase {
         let descending = SortingService.sortProjects(projects, order: .descending)
         
         // Then
-        XCTAssertEqual(ascending[0].totalCost, 10)
-        XCTAssertEqual(ascending[1].totalCost, 20)
-        XCTAssertEqual(ascending[2].totalCost, 30)
+        #expect(ascending[0].totalCost == 10)
+        #expect(ascending[1].totalCost == 20)
+        #expect(ascending[2].totalCost == 30)
         
-        XCTAssertEqual(descending[0].totalCost, 30)
-        XCTAssertEqual(descending[1].totalCost, 20)
-        XCTAssertEqual(descending[2].totalCost, 10)
+        #expect(descending[0].totalCost == 30)
+        #expect(descending[1].totalCost == 20)
+        #expect(descending[2].totalCost == 10)
     }
 }

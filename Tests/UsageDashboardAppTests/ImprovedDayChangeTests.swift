@@ -3,7 +3,8 @@
 //  Comprehensive tests using improved architecture
 //
 
-import XCTest
+import Testing
+import Foundation
 @testable import UsageDashboardApp
 @testable import ClaudeCodeUsage
 // Import specific types to avoid UsageEntry conflict
@@ -11,15 +12,14 @@ import struct ClaudeLiveMonitorLib.SessionBlock
 import struct ClaudeLiveMonitorLib.BurnRate
 
 @MainActor
-final class ImprovedDayChangeTests: XCTestCase {
+@Suite("Improved Day Change Tests")
+struct ImprovedDayChangeTests {
     
-    var testClock: TestClock!
-    var mockContainer: TestDependencyContainer!
-    var viewModel: UsageViewModel!
+    var testClock: TestClock
+    var mockContainer: TestDependencyContainer
+    var viewModel: UsageViewModel
     
-    override func setUp() async throws {
-        try await super.setUp()
-        
+    init() async throws {
         // Setup test clock
         testClock = TestClock(startTime: Date())
         ClockProvider.useTestClock(testClock)
@@ -31,22 +31,14 @@ final class ImprovedDayChangeTests: XCTestCase {
         viewModel = UsageViewModel(container: mockContainer)
     }
     
-    override func tearDown() async throws {
-        // Reset clock provider
-        ClockProvider.reset()
-        
-        // Cleanup
-        viewModel.stopAutoRefresh()
-        viewModel = nil
-        mockContainer = nil
-        testClock = nil
-        
-        try await super.tearDown()
-    }
+    // Note: Swift Testing doesn't have explicit tearDown,
+    // but we can use deinit if this was a class.
+    // For struct, cleanup happens automatically
     
     // MARK: - Day Change Detection Tests
     
-    func disabled_testDayChangeResetsTodaysCost() async {
+    @Test("Day change resets today's cost", .disabled("Cannot work without dependency injection for Date()"))
+    func dayChangeResetsTodaysCost() async {
         // DISABLED: This test cannot work correctly because UsageViewModel uses Date() directly
         // without dependency injection. The test tries to simulate a day change but cannot
         // actually change what Date() returns, so todaysCostValue will always look for the
@@ -82,8 +74,8 @@ final class ImprovedDayChangeTests: XCTestCase {
         await viewModel.loadData()
         
         // Then - Today's cost should be 100
-        XCTAssertEqual(viewModel.todaysCostValue, 100.0)
-        XCTAssertEqual(viewModel.todaysCost, "$100.00")
+        #expect(viewModel.todaysCostValue == 100.0)
+        #expect(viewModel.todaysCost == "$100.00")
         
         // Given - Calculate yesterday's date string (to simulate day change)
         let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Date()) ?? Date()
@@ -120,11 +112,12 @@ final class ImprovedDayChangeTests: XCTestCase {
         try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
         
         // Then - Today's cost should reset to 0
-        XCTAssertEqual(viewModel.todaysCostValue, 0.0, "Today's cost should reset after day change")
-        XCTAssertEqual(viewModel.todaysCost, "$0.00", "Today's cost string should show $0.00")
+        #expect(viewModel.todaysCostValue == 0.0)
+        #expect(viewModel.todaysCost == "$0.00")
     }
     
-    func testAutoRefreshContinuesAfterDayChange() async {
+    @Test("Auto refresh continues after day change")
+    func autoRefreshContinuesAfterDayChange() async {
         // Given
         viewModel.startAutoRefresh()
         
@@ -135,7 +128,7 @@ final class ImprovedDayChangeTests: XCTestCase {
         try? await Task.sleep(nanoseconds: 100_000_000)
         
         // Then - Verify refresh occurred
-        XCTAssertTrue(mockContainer.mockUsageDataService.loadStatsCalled)
+        #expect(mockContainer.mockUsageDataService.loadStatsCalled)
         
         // Reset flag
         mockContainer.mockUsageDataService.loadStatsCalled = false
@@ -149,13 +142,14 @@ final class ImprovedDayChangeTests: XCTestCase {
         try? await Task.sleep(nanoseconds: 100_000_000)
         
         // Then - Verify refresh occurred due to day change
-        XCTAssertTrue(mockContainer.mockUsageDataService.loadStatsCalled)
+        #expect(mockContainer.mockUsageDataService.loadStatsCalled)
         
         // Cleanup
         viewModel.stopAutoRefresh()
     }
     
-    func testTimeUntilMidnightCalculation() async {
+    @Test("Time until midnight calculation")
+    func timeUntilMidnightCalculation() async {
         // Given - Set time to 11:30 PM
         let calendar = Calendar.current
         var components = calendar.dateComponents([.year, .month, .day], from: testClock.now)
@@ -171,10 +165,11 @@ final class ImprovedDayChangeTests: XCTestCase {
         let timeUntilMidnight = testClock.timeUntil(hour: 0, minute: 0, second: 0)
         
         // Then - Should be 30 minutes (1800 seconds)
-        XCTAssertEqual(timeUntilMidnight, 1800, accuracy: 1.0)
+        #expect(abs(timeUntilMidnight - 1800) < 1.0)
     }
     
-    func testClockAdvanceToAlmostMidnight() async {
+    @Test("Clock advance to almost midnight")
+    func clockAdvanceToAlmostMidnight() async {
         // Given - Start at any time
         let startTime = testClock.now
         
@@ -185,14 +180,15 @@ final class ImprovedDayChangeTests: XCTestCase {
         let calendar = Calendar.current
         let components = calendar.dateComponents([.hour, .minute, .second], from: testClock.now)
         
-        XCTAssertEqual(components.hour, 23)
-        XCTAssertEqual(components.minute, 59)
-        XCTAssertEqual(components.second, 59)
+        #expect(components.hour == 23)
+        #expect(components.minute == 59)
+        #expect(components.second == 59)
     }
     
     // MARK: - Concurrent Loading Tests
     
-    func testParallelDataLoading() async {
+    @Test("Parallel data loading")
+    func parallelDataLoading() async {
         // Given - Set up different delays for each service
         // Note: We can't set delays on these mocks since they are MainActor isolated
         // This test would need refactoring to properly test parallel loading
@@ -205,12 +201,13 @@ final class ImprovedDayChangeTests: XCTestCase {
         let duration = Date().timeIntervalSince(startTime)
         
         // Then - Should complete in ~0.15 seconds (max delay), not 0.25 (sum)
-        XCTAssertLessThan(duration, 0.2, "Parallel loading should complete faster than sequential")
+        #expect(duration < 0.2)
     }
     
     // MARK: - Error Handling Tests
     
-    func testErrorStateAfterLoadFailure() async {
+    @Test("Error state after load failure")
+    func errorStateAfterLoadFailure() async {
         // Given
         mockContainer.mockUsageDataService.shouldThrowError = true
         
@@ -219,13 +216,14 @@ final class ImprovedDayChangeTests: XCTestCase {
         
         // Then
         if case .error(let error) = viewModel.state {
-            XCTAssertNotNil(error)
+            #expect(error != nil)
         } else {
-            XCTFail("Should be in error state")
+            Issue.record("Should be in error state")
         }
     }
     
-    func testRecoveryAfterError() async {
+    @Test("Recovery after error")
+    func recoveryAfterError() async {
         // Given - First load fails
         mockContainer.mockUsageDataService.shouldThrowError = true
         await viewModel.loadData()
@@ -234,7 +232,7 @@ final class ImprovedDayChangeTests: XCTestCase {
         if case .error = viewModel.state {
             // Expected
         } else {
-            XCTFail("Should be in error state")
+            Issue.record("Should be in error state")
         }
         
         // When - Fix error and retry
@@ -256,9 +254,9 @@ final class ImprovedDayChangeTests: XCTestCase {
         
         // Then - Should recover
         if case .loaded(let stats) = viewModel.state {
-            XCTAssertEqual(stats.totalCost, 50.0)
+            #expect(stats.totalCost == 50.0)
         } else {
-            XCTFail("Should be in loaded state after recovery")
+            Issue.record("Should be in loaded state after recovery")
         }
     }
 }
