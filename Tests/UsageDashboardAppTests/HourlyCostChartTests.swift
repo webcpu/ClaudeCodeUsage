@@ -1,16 +1,20 @@
 //
 //  HourlyCostChartTests.swift
 //  Tests for HourlyCostChart implementation
+//  Migrated to Swift Testing Framework
 //
 
-import XCTest
+import Testing
+import Foundation
 import SwiftUI
 @testable import UsageDashboardApp
 @testable import ClaudeCodeUsage
 
-final class HourlyCostChartTests: XCTestCase {
+@Suite("Hourly Cost Chart Tests")
+struct HourlyCostChartTests {
     
-    func testHourlyChartDataCreation() {
+    @Test("Hourly chart data creation")
+    func hourlyChartDataCreation() {
         let data = HourlyChartData(
             hour: 10,
             cost: 5.50,
@@ -18,15 +22,16 @@ final class HourlyCostChartTests: XCTestCase {
             project: "TestProject"
         )
         
-        XCTAssertEqual(data.hour, 10)
-        XCTAssertEqual(data.cost, 5.50)
-        XCTAssertEqual(data.model, "claude-opus-4")
-        XCTAssertEqual(data.project, "TestProject")
-        XCTAssertEqual(data.hourLabel, "10:00")
-        XCTAssertEqual(data.costLabel, "$5.50")
+        #expect(data.hour == 10)
+        #expect(data.cost == 5.50)
+        #expect(data.model == "claude-opus-4")
+        #expect(data.project == "TestProject")
+        #expect(data.hourLabel == "10:00")
+        #expect(data.costLabel == "$5.50")
     }
     
-    func testHourlyChartDataEmptyCost() {
+    @Test("Hourly chart data with empty cost")
+    func hourlyChartDataEmptyCost() {
         let data = HourlyChartData(
             hour: 5,
             cost: 0,
@@ -34,15 +39,16 @@ final class HourlyCostChartTests: XCTestCase {
             project: nil
         )
         
-        XCTAssertEqual(data.hour, 5)
-        XCTAssertEqual(data.cost, 0)
-        XCTAssertNil(data.model)
-        XCTAssertNil(data.project)
-        XCTAssertEqual(data.hourLabel, "05:00")
-        XCTAssertEqual(data.costLabel, "")
+        #expect(data.hour == 5)
+        #expect(data.cost == 0)
+        #expect(data.model == nil)
+        #expect(data.project == nil)
+        #expect(data.hourLabel == "05:00")
+        #expect(data.costLabel == "")
     }
     
-    func testDetailedHourlyCostsExtraction() {
+    @Test("Detailed hourly costs extraction")
+    func detailedHourlyCostsExtraction() {
         // Create test entries
         let calendar = Calendar.current
         let now = Date()
@@ -78,52 +84,53 @@ final class HourlyCostChartTests: XCTestCase {
         let chartData = UsageAnalytics.detailedHourlyCosts(from: entries)
         
         // Should have data for all 24 hours
-        XCTAssertTrue(chartData.count >= 24)
+        #expect(chartData.count >= 24)
         
         // Check specific hours with data
         let hour9Data = chartData.filter { $0.hour == 9 }
-        XCTAssertTrue(hour9Data.count > 0)
+        #expect(hour9Data.count > 0)
         
         // Find opus and sonnet entries for hour 9
         let hour9Opus = hour9Data.first { $0.model == "claude-opus-4" }
         let hour9Sonnet = hour9Data.first { $0.model == "claude-sonnet-4" }
         
-        XCTAssertNotNil(hour9Opus)
-        XCTAssertNotNil(hour9Sonnet)
-        XCTAssertEqual(hour9Opus?.cost ?? 0, 2.50, accuracy: 0.01)
-        XCTAssertEqual(hour9Sonnet?.cost ?? 0, 1.50, accuracy: 0.01)
+        #expect(hour9Opus != nil)
+        #expect(hour9Sonnet != nil)
+        #expect(abs((hour9Opus?.cost ?? 0) - 2.50) < 0.01)
+        #expect(abs((hour9Sonnet?.cost ?? 0) - 1.50) < 0.01)
         
         // Check hour 10
         let hour10Data = chartData.filter { $0.hour == 10 }
-        XCTAssertTrue(hour10Data.count > 0)
+        #expect(hour10Data.count > 0)
         let hour10Opus = hour10Data.first { $0.model == "claude-opus-4" }
-        XCTAssertNotNil(hour10Opus)
-        XCTAssertEqual(hour10Opus?.cost ?? 0, 5.00, accuracy: 0.01)
+        #expect(hour10Opus != nil)
+        #expect(abs((hour10Opus?.cost ?? 0) - 5.00) < 0.01)
         
         // Check hour 14
         let hour14Data = chartData.filter { $0.hour == 14 }
-        XCTAssertTrue(hour14Data.count > 0)
+        #expect(hour14Data.count > 0)
         let hour14Haiku = hour14Data.first { $0.model == "claude-haiku" }
-        XCTAssertNotNil(hour14Haiku)
-        XCTAssertEqual(hour14Haiku?.cost ?? 0, 3.25, accuracy: 0.01)
+        #expect(hour14Haiku != nil)
+        #expect(abs((hour14Haiku?.cost ?? 0) - 3.25) < 0.01)
     }
     
     @MainActor
-    func testChartDataServiceIntegration() async {
+    @Test("Chart data service integration")
+    func chartDataServiceIntegration() async {
         let service = ChartDataService()
         
-        // Load data
-        await service.loadTodayHourlyCosts()
+        // Load data (using new method with nil stats for testing)
+        await service.loadHourlyCostsFromStats(nil)
         
         // Check that data is loaded (will be empty if no real data exists)
-        XCTAssertFalse(service.isLoading)
-        XCTAssertNotNil(service.detailedHourlyData)
+        #expect(service.isLoading == false)
+        // detailedHourlyData is non-optional, so just check that it's not loading
         
         // If there's data, verify structure
         if !service.detailedHourlyData.isEmpty {
             let firstData = service.detailedHourlyData.first!
-            XCTAssertTrue(firstData.hour >= 0 && firstData.hour < 24)
-            XCTAssertTrue(firstData.cost >= 0)
+            #expect(firstData.hour >= 0 && firstData.hour < 24)
+            #expect(firstData.cost >= 0)
         }
     }
     

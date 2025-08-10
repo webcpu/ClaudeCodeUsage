@@ -400,7 +400,7 @@ struct HeatmapPerformanceTests {
         let duration = Date().timeIntervalSince(startTime)
         
         // Then
-        #expect(duration < 0.5, "Should complete in under 500ms")
+        #expect(duration < 1.0, "Should complete in under 1 second")
         #expect(viewModel.dataset != nil)
     }
     

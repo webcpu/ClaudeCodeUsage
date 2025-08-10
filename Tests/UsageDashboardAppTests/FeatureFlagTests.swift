@@ -1,67 +1,71 @@
 //
 //  FeatureFlagTests.swift
 //  Tests for FeatureFlags that need serial execution
+//  Migrated to Swift Testing Framework
 //
 
-import XCTest
+import Testing
+import Foundation
 @testable import UsageDashboardApp
 
-/// Separate test class for feature flag tests that need serial execution
+/// Separate test suite for feature flag tests that need serial execution
 /// These tests modify UserDefaults which is a shared resource
-final class FeatureFlagTests: XCTestCase {
+@Suite("Feature Flag Tests", .serialized)
+struct FeatureFlagTests {
     
-    /// Shared lock to ensure feature flag tests don't run simultaneously
-    private static let testLock = NSLock()
+    // Note: Using .serialized trait ensures tests run one at a time
+    // This replaces the NSLock mechanism from XCTest
     
-    override func setUp() {
-        super.setUp()
-        // Acquire lock to ensure exclusive access to UserDefaults
-        Self.testLock.lock()
+    init() {
         // Reset feature flags to ensure clean state for each test
         FeatureFlags.reset()
     }
     
-    override func tearDown() {
-        // Clean up after each test
-        FeatureFlags.reset()
-        // Release lock
-        Self.testLock.unlock()
-        super.tearDown()
-    }
-    
-    func testFeatureFlagPersistence() {
+    @Test("Feature flag persistence")
+    func featureFlagPersistence() {
         // Test setting to true
         FeatureFlags.useActorBasedLiveMonitor = true
-        XCTAssertTrue(FeatureFlags.useActorBasedLiveMonitor)
+        #expect(FeatureFlags.useActorBasedLiveMonitor == true)
         
         // Test setting to false
         FeatureFlags.useActorBasedLiveMonitor = false
-        XCTAssertFalse(FeatureFlags.useActorBasedLiveMonitor)
+        #expect(FeatureFlags.useActorBasedLiveMonitor == false)
         
         // Test reset functionality
         FeatureFlags.reset()
-        XCTAssertFalse(FeatureFlags.useActorBasedLiveMonitor)
+        #expect(FeatureFlags.useActorBasedLiveMonitor == false)
+        
+        // Clean up after test
+        FeatureFlags.reset()
     }
     
-    func testFeatureFlagPercentageRollout() {
+    @Test("Feature flag percentage rollout")
+    func featureFlagPercentageRollout() {
         // Test 0% rollout
         FeatureFlags.enableActorBasedLiveMonitor(percentage: 0)
-        XCTAssertFalse(FeatureFlags.useActorBasedLiveMonitor)
+        #expect(FeatureFlags.useActorBasedLiveMonitor == false)
         
         // Test 100% rollout
         FeatureFlags.enableActorBasedLiveMonitor(percentage: 100)
-        XCTAssertTrue(FeatureFlags.useActorBasedLiveMonitor)
+        #expect(FeatureFlags.useActorBasedLiveMonitor == true)
+        
+        // Clean up after test
+        FeatureFlags.reset()
     }
     
     #if DEBUG
-    func testDebugFeatureFlags() {
+    @Test("Debug feature flags")
+    func debugFeatureFlags() {
         // Test enabling all features
         FeatureFlags.enableAllExperimentalFeatures()
-        XCTAssertTrue(FeatureFlags.useActorBasedLiveMonitor)
+        #expect(FeatureFlags.useActorBasedLiveMonitor == true)
         
         // Test disabling all features
         FeatureFlags.disableAllExperimentalFeatures()
-        XCTAssertFalse(FeatureFlags.useActorBasedLiveMonitor)
+        #expect(FeatureFlags.useActorBasedLiveMonitor == false)
+        
+        // Clean up after test
+        FeatureFlags.reset()
     }
     #endif
     
