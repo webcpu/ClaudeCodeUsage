@@ -1,17 +1,16 @@
 //
-//  UsageViewModel.swift
-//  Refactored view model with proper separation of concerns and concurrency
+//  UsageStore.swift
+//  Single source of truth for usage data (View + Store + Service architecture)
 //
 
 import SwiftUI
 import Observation
 import ClaudeCodeUsageKit
-// Import specific types from ClaudeLiveMonitorLib to avoid UsageEntry conflict
 import struct ClaudeLiveMonitorLib.SessionBlock
 import struct ClaudeLiveMonitorLib.BurnRate
 import OSLog
 
-private let performanceLogger = Logger(subsystem: "com.claudecodeusage", category: "ViewModelPerformance")
+private let performanceLogger = Logger(subsystem: "com.claudecodeusage", category: "StorePerformance")
 
 // MARK: - View State
 enum ViewState {
@@ -25,44 +24,39 @@ actor UsageStateManager {
     private var stats: UsageStats?
     private var activeSession: SessionBlock?
     private var loadTask: Task<Void, Never>?
-    
+
     func updateStats(_ newStats: UsageStats) {
         self.stats = newStats
     }
-    
+
     func updateSession(_ session: SessionBlock?) {
         self.activeSession = session
     }
-    
+
     func getStats() -> UsageStats? {
         stats
     }
-    
+
     func getSession() -> SessionBlock? {
         activeSession
     }
-    
+
     func setLoadTask(_ task: Task<Void, Never>?) {
         loadTask?.cancel()
         loadTask = task
     }
-    
+
     func cancelCurrentLoad() {
         loadTask?.cancel()
         loadTask = nil
     }
 }
 
-// MARK: - Refactored View Model
+// MARK: - Usage Store (Single Source of Truth)
 @Observable
 @MainActor
-final class UsageViewModel {
-    // Memory cleanup support
-    private var memoryCleanupObserver: NSObjectProtocol?
-    // Deduplication tracking
-    private var isCurrentlyLoading = false
-    private var lastLoadStartTime: Date?
-    // Observable properties for UI binding
+final class UsageStore {
+    // MARK: - Observable State
     var state: ViewState = .loading
     var activeSession: SessionBlock?
     var burnRate: BurnRate?
@@ -75,24 +69,44 @@ final class UsageViewModel {
     var dailyCostThreshold: Double = 10.0
     var todaySessionCount: Int = 0
     var estimatedDailySessions: Int = 0
-    var todayEntries: [UsageEntry] = []  // Store today's raw entries for chart sync
-    
-    // Additional properties for ModernDashboardView
+    var todayEntries: [UsageEntry] = []
+    var lastRefreshTime: Date
+
+    // Chart data service
+    var chartDataService: ChartDataService
+
+    // MARK: - Computed Properties
     var isLoading: Bool {
         if case .loading = state { return true }
         return false
     }
-    
+
+    var hasInitiallyLoaded: Bool {
+        if case .loaded = state { return true }
+        return false
+    }
+
     var lastError: Error? {
         if case .error(let error) = state { return error }
         return nil
     }
-    
+
     var errorMessage: String? {
         if case .error(let error) = state { return error.localizedDescription }
         return nil
     }
-    
+
+    var stats: UsageStats? {
+        if case .loaded(let stats) = state {
+            return stats
+        }
+        return nil
+    }
+
+    var todaysCostValue: Double {
+        todayEntries.reduce(0.0) { $0 + $1.cost }
+    }
+
     var totalCost: String {
         guard let stats = stats else { return "$0.00" }
         let formatter = NumberFormatter()
@@ -102,47 +116,48 @@ final class UsageViewModel {
         formatter.minimumFractionDigits = 2
         return formatter.string(from: NSNumber(value: stats.totalCost)) ?? "$0.00"
     }
-    
-    // Dependencies
+
+    var formattedTodaysCost: String? {
+        FormatterService.formatCurrency(todaysCostValue)
+    }
+
+    var formattedTotalCost: String? {
+        stats?.totalCost != nil ? FormatterService.formatCurrency(stats!.totalCost) : nil
+    }
+
+    var lastUpdateTime: Date? {
+        lastRefreshTime
+    }
+
+    // MARK: - Dependencies (Services)
     private let usageDataService: UsageDataService
-    let sessionMonitorService: SessionMonitorService  // Made internal for access
+    let sessionMonitorService: SessionMonitorService
     private let configurationService: ConfigurationService
     private let dateProvider: DateProviding
-    
-    // Callback for when data is loaded (for syncing chart data)
-    var onDataLoaded: (() async -> Void)?
-    
-    // State management
+
+    // MARK: - Internal State
     private let stateManager = UsageStateManager()
+    private var memoryCleanupObserver: NSObjectProtocol?
+    private var isCurrentlyLoading = false
+    private var lastLoadStartTime: Date?
     private var refreshTask: Task<Void, Never>?
     private var timerTask: Task<Void, Never>?
     private var dayChangeTask: Task<Void, Never>?
     private var lastKnownDay: String = ""
     private var dayChangeObserver: NSObjectProtocol?
-    
-    // Computed properties
-    var stats: UsageStats? {
-        if case .loaded(let stats) = state {
-            return stats
-        }
-        return nil
-    }
-    
-    var todaysCostValue: Double {
-        // Calculate from today's entries for consistency with chart
-        return todayEntries.reduce(0.0) { $0 + $1.cost }
-    }
-    
+    private var hasInitialized = false
+
     // MARK: - Initialization
-    init(container: DependencyContainer = ProductionContainer.shared, 
+    init(container: DependencyContainer = ProductionContainer.shared,
          dateProvider: DateProviding = SystemDateProvider()) {
         self.usageDataService = container.usageDataService
         self.sessionMonitorService = container.sessionMonitorService
         self.configurationService = container.configurationService
         self.dateProvider = dateProvider
-        
+        self.lastRefreshTime = dateProvider.now
+        self.chartDataService = ChartDataService(dateProvider: dateProvider)
         self.dailyCostThreshold = container.configurationService.configuration.dailyCostThreshold
-        
+
         // Setup memory cleanup observer
         memoryCleanupObserver = NotificationCenter.default.addObserver(
             forName: .performMemoryCleanup,
@@ -153,50 +168,57 @@ final class UsageViewModel {
                 self?.performMemoryCleanup()
             }
         }
-        
+
         // Initialize last known day
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
         self.lastKnownDay = formatter.string(from: dateProvider.now)
     }
-    
-    // MARK: - Public Methods
+
+    // MARK: - Initialization (called once at app start)
+    func initializeIfNeeded() async {
+        guard !hasInitialized else { return }
+        hasInitialized = true
+
+        if !hasInitiallyLoaded {
+            await loadData()
+        }
+        startRefreshTimer()
+    }
+
+    // MARK: - Data Loading
     @MainActor
     func loadData() async {
         // Deduplication: Check if already loading
         if isCurrentlyLoading {
             #if DEBUG
-            print("[UsageViewModel] loadData() SKIPPED - already loading")
+            print("[UsageStore] loadData() SKIPPED - already loading")
             #endif
             return
         }
-        
+
         // Deduplication: Check if loaded very recently (within 0.5 seconds)
         if let lastTime = lastLoadStartTime,
            dateProvider.now.timeIntervalSince(lastTime) < 0.5 {
             #if DEBUG
-            print("[UsageViewModel] loadData() SKIPPED - loaded \(dateProvider.now.timeIntervalSince(lastTime))s ago")
+            print("[UsageStore] loadData() SKIPPED - loaded \(dateProvider.now.timeIntervalSince(lastTime))s ago")
             #endif
             return
         }
-        
+
         // Mark as loading and record time
         isCurrentlyLoading = true
         lastLoadStartTime = dateProvider.now
+        lastRefreshTime = dateProvider.now
         defer { isCurrentlyLoading = false }
-        
+
         let loadStartTime = dateProvider.now
         #if DEBUG
-        print("[UsageViewModel] loadData() called at \(dateProvider.now)")
+        print("[UsageStore] loadData() called at \(dateProvider.now)")
         #endif
-        
-        //await stateManager.cancelCurrentLoad()
-        
+
         do {
-            // ═══════════════════════════════════════════════════════════════
-            // PHASE 1: Load today's data + session info (FAST - ~0.5s)
-            // Shows today's cost immediately while historical data loads
-            // ═══════════════════════════════════════════════════════════════
+            // PHASE 1: Load today's data + session info (FAST)
             let phase1Start = dateProvider.now
 
             async let todayDataLoading = usageDataService.loadTodayEntriesAndStats()
@@ -213,29 +235,23 @@ final class UsageViewModel {
 
             #if DEBUG
             let phase1Time = dateProvider.now.timeIntervalSince(phase1Start)
-            print("[UsageViewModel] Phase 1 (today) completed in: \(String(format: "%.3f", phase1Time))s")
-            print("[UsageViewModel] Today's entries: \(todaysEntries.count), cost: $\(String(format: "%.2f", todaysEntries.reduce(0.0) { $0 + $1.cost }))")
+            print("[UsageStore] Phase 1 (today) completed in: \(String(format: "%.3f", phase1Time))s")
             #endif
 
             // Update UI immediately with today's data
-            await MainActor.run {
-                self.activeSession = session
-                self.burnRate = burnRate
-                self.autoTokenLimit = autoTokenLimit
-                self.todayEntries = todaysEntries
-                updateCalculatedProperties(stats: todayStats)
-            }
+            self.activeSession = session
+            self.burnRate = burnRate
+            self.autoTokenLimit = autoTokenLimit
+            self.todayEntries = todaysEntries
+            updateCalculatedProperties(stats: todayStats)
 
-            // ═══════════════════════════════════════════════════════════════
-            // PHASE 2: Load full historical data (for charts)
-            // ═══════════════════════════════════════════════════════════════
+            // PHASE 2: Load full historical data
             let phase2Start = dateProvider.now
-            let (allEntries, fullStats) = try await usageDataService.loadEntriesAndStats()
+            let (_, fullStats) = try await usageDataService.loadEntriesAndStats()
 
             #if DEBUG
             let phase2Time = dateProvider.now.timeIntervalSince(phase2Start)
-            print("[UsageViewModel] Phase 2 (full) completed in: \(String(format: "%.3f", phase2Time))s")
-            print("[UsageViewModel] Total entries: \(allEntries.count), days: \(fullStats.byDate.count)")
+            print("[UsageStore] Phase 2 (full) completed in: \(String(format: "%.3f", phase2Time))s")
             #endif
 
             // Update state manager with full stats
@@ -243,18 +259,14 @@ final class UsageViewModel {
             await stateManager.updateSession(session)
 
             // Update UI with full historical data
-            await MainActor.run {
-                self.state = .loaded(fullStats)
-            }
+            self.state = .loaded(fullStats)
 
-            // Notify chart to update with full data
-            if let onDataLoaded = self.onDataLoaded {
-                await onDataLoaded()
-            }
+            // Update chart data
+            await updateChartData()
 
             let totalTime = dateProvider.now.timeIntervalSince(loadStartTime)
             #if DEBUG
-            print("[UsageViewModel] Total load time: \(String(format: "%.3f", totalTime))s")
+            print("[UsageStore] Total load time: \(String(format: "%.3f", totalTime))s")
             #endif
 
             if totalTime > 2.0 {
@@ -263,74 +275,95 @@ final class UsageViewModel {
 
         } catch {
             #if DEBUG
-            print("[UsageViewModel] Error loading data: \(error)")
+            print("[UsageStore] Error loading data: \(error)")
             #endif
-
-            await MainActor.run {
-                self.state = .error(error)
-            }
+            self.state = .error(error)
         }
-        
-        //await stateManager.setLoadTask(task)
-        // IMPORTANT: Wait for the task to complete before returning
-        //await task.value
     }
-    
-    func startAutoRefresh(performInitialLoad: Bool = false) {
-        stopAutoRefresh()
-        
-        // Start regular refresh using async/await
+
+    func refresh() async {
+        await loadData()
+    }
+
+    // MARK: - Chart Data
+    func updateChartData() async {
+        await chartDataService.loadHourlyCostsFromEntries(todayEntries)
+
+        #if DEBUG
+        if stats != nil {
+            let cost = todaysCostValue
+            let chartTotal = chartDataService.todayHourlyCosts.reduce(0, +)
+            print("[UsageStore] Chart sync - Today's cost: $\(String(format: "%.2f", cost)), Chart total: $\(String(format: "%.2f", chartTotal))")
+        }
+        #endif
+    }
+
+    // MARK: - Auto Refresh
+    func startRefreshTimer() {
+        stopRefreshTimer()
+
         let interval = configurationService.configuration.refreshInterval
-        
+
         timerTask = Task { @MainActor in
-            // Optionally perform initial load (default: false to prevent duplicate loads)
-            // When called after AppState.initializeIfNeeded(), data is already loaded
-            if performInitialLoad {
-                await loadData()
-            }
-            
-            // Use a clock for more precise timing
             var nextFireTime = ContinuousClock.now + .seconds(interval)
-            
+
             while !Task.isCancelled {
                 do {
-                    // Sleep until next fire time
                     try await Task.sleep(until: nextFireTime, clock: .continuous)
-                    
-                    // Check cancellation immediately after sleep
                     guard !Task.isCancelled else { break }
-                    
                     await loadData()
-                    
-                    // Calculate next fire time from the previous one to avoid drift
                     nextFireTime = nextFireTime + .seconds(interval)
                 } catch {
-                    // Task was cancelled during sleep or clock error
                     break
                 }
             }
         }
-        
-        // Start day change monitoring
+
         startDayChangeMonitoring()
     }
-    
-    func stopAutoRefresh() {
+
+    func stopRefreshTimer() {
         timerTask?.cancel()
         timerTask = nil
         stopDayChangeMonitoring()
     }
-    
-    func refresh() async {
-        await loadData()
+
+    // MARK: - Lifecycle Events
+    func handleAppBecameActive() {
+        #if DEBUG
+        print("[UsageStore] handleAppBecameActive() called")
+        #endif
+        let timeSinceLastRefresh = dateProvider.now.timeIntervalSince(lastRefreshTime)
+        if timeSinceLastRefresh > 2.0 {
+            lastRefreshTime = dateProvider.now
+            Task {
+                await refresh()
+            }
+        }
+        startRefreshTimer()
     }
-    
+
+    func handleAppResignActive() {
+        stopRefreshTimer()
+    }
+
+    func handleWindowFocus() {
+        #if DEBUG
+        print("[UsageStore] handleWindowFocus() called")
+        #endif
+        let timeSinceLastRefresh = dateProvider.now.timeIntervalSince(lastRefreshTime)
+        if timeSinceLastRefresh > 2.0 {
+            lastRefreshTime = dateProvider.now
+            Task {
+                await refresh()
+            }
+        }
+    }
+
     // MARK: - Day Change Detection
     private func startDayChangeMonitoring() {
-        // Remove any existing observer
         stopDayChangeMonitoring()
-        
-        // Method 1: Use significant time change notification (more reliable)
+
         dayChangeObserver = NotificationCenter.default.addObserver(
             forName: .NSCalendarDayChanged,
             object: nil,
@@ -338,34 +371,27 @@ final class UsageViewModel {
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self = self else { return }
-                
+
                 #if DEBUG
-                print("[UsageViewModel] Day changed detected via notification at \(self.dateProvider.now)")
+                print("[UsageStore] Day changed detected")
                 #endif
-                
-                // Update last known day
+
                 let formatter = DateFormatter()
                 formatter.dateFormat = "yyyy-MM-dd"
                 self.lastKnownDay = formatter.string(from: dateProvider.now)
-                
-                // Refresh data for the new day
+
                 await self.loadData()
             }
         }
-        
-        // Method 2: Also monitor for significant time changes (handles manual time changes)
+
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleSignificantTimeChange),
             name: NSNotification.Name.NSSystemClockDidChange,
             object: nil
         )
-        
-        #if DEBUG
-        print("[UsageViewModel] Day change monitoring started")
-        #endif
     }
-    
+
     private func stopDayChangeMonitoring() {
         if let observer = dayChangeObserver {
             NotificationCenter.default.removeObserver(observer)
@@ -374,55 +400,34 @@ final class UsageViewModel {
         dayChangeTask?.cancel()
         dayChangeTask = nil
     }
-    
+
     @objc private func handleSignificantTimeChange() {
         Task { @MainActor in
-            #if DEBUG
-            print("[UsageViewModel] Significant time change detected at \(dateProvider.now)")
-            #endif
-            
-            // Check if the day actually changed
             let formatter = DateFormatter()
             formatter.dateFormat = "yyyy-MM-dd"
             let currentDay = formatter.string(from: dateProvider.now)
-            
+
             if currentDay != lastKnownDay {
                 lastKnownDay = currentDay
                 await loadData()
             }
         }
     }
-    
+
     // MARK: - Private Methods
     private func updateCalculatedProperties(stats: UsageStats) {
-        // Today's cost
         let todayValue = todaysCostValue
         todaysCost = todayValue.asCurrency
         todaysCostProgress = min(todayValue / dailyCostThreshold, 1.5)
-        
-        #if DEBUG
-        print("[UsageViewModel] Today's cost updated: \(todaysCost) (value: \(todayValue))")
-        print("[UsageViewModel] Total stats cost: \(stats.totalCost)")
-        print("[UsageViewModel] Number of daily entries: \(stats.byDate.count)")
-        if let todayEntry = stats.byDate.first(where: { 
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyyy-MM-dd"
-            return $0.date == formatter.string(from: dateProvider.now)
-        }) {
-            print("[UsageViewModel] Today's entry found: \(todayEntry.date) = $\(todayEntry.totalCost)")
-        }
-        #endif
-        
-        // Session counts
+
         todaySessionCount = activeSession != nil ? 1 : 0
         estimatedDailySessions = stats.byDate.isEmpty ? 0 : max(1, stats.totalSessions / stats.byDate.count)
-        
-        // Session progress
+
         if let session = activeSession {
             let elapsed = dateProvider.now.timeIntervalSince(session.startTime)
             let total = session.endTime.timeIntervalSince(session.startTime)
             sessionTimeProgress = min(elapsed / total, 1.5)
-            
+
             if let limit = autoTokenLimit, limit > 0 {
                 sessionTokenProgress = min(Double(session.tokenCounts.total) / Double(limit), 1.5)
             }
@@ -430,66 +435,51 @@ final class UsageViewModel {
             sessionTimeProgress = 0
             sessionTokenProgress = 0
         }
-        
-        // Average daily cost
+
         if !stats.byDate.isEmpty {
             let recentDays = stats.byDate.suffix(7)
-            // Single-pass reduction for performance
             let totalRecentCost = recentDays.reduce(0.0) { $0 + $1.totalCost }
             averageDailyCost = totalRecentCost / Double(recentDays.count)
-            
+
             if averageDailyCost > 0 {
                 dailyCostThreshold = max(averageDailyCost * 1.5, 10.0)
             }
         }
     }
-    
-    deinit {
-        // Clean up notification observers
-        NotificationCenter.default.removeObserver(self)
-        // Note: dayChangeObserver will be cleaned up automatically
-        // Tasks are automatically cancelled when the class is deallocated
-    }
-    
-    // MARK: - Memory Management
-    
-    /// Perform memory cleanup when system memory pressure is high
+
     private func performMemoryCleanup() {
         performanceLogger.info("Performing memory cleanup")
-        
-        // Clear cached entries older than today
+
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: dateProvider.now)
-        
+
         todayEntries = todayEntries.filter { entry in
             guard let date = entry.date else { return false }
             return calendar.startOfDay(for: date) == today
         }
-        
-        // Clear chart data cache if needed
-        // Chart services will reload when data refreshes
-        
-        // Force refresh state with minimal data
+
         Task {
             await stateManager.cancelCurrentLoad()
-            // Only reload if we have an active session
             if activeSession != nil {
                 await loadData()
             }
         }
-        
+
         performanceLogger.info("Memory cleanup completed")
     }
-}
 
-// MARK: - SwiftUI Environment Extension
-extension EnvironmentValues {
-    var usageViewModel: UsageViewModel? {
-        get { self[UsageViewModelKey.self] }
-        set { self[UsageViewModelKey.self] = newValue }
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 }
 
-private struct UsageViewModelKey: EnvironmentKey {
-    static let defaultValue: UsageViewModel? = nil
+// MARK: - Helper function for token formatting
+func formatTokenCount(_ count: Int) -> String {
+    if count >= 1_000_000 {
+        return String(format: "%.1fM", Double(count) / 1_000_000)
+    } else if count >= 1_000 {
+        return String(format: "%.1fK", Double(count) / 1_000)
+    } else {
+        return "\(count)"
+    }
 }

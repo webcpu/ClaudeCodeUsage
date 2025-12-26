@@ -8,11 +8,11 @@ import ClaudeCodeUsageKit
 import ClaudeLiveMonitorLib
 
 struct SessionMetricsSection: View {
-    @Environment(UsageDataModel.self) private var dataModel
-    
+    @Environment(UsageStore.self) private var store
+
     var body: some View {
         VStack(spacing: MenuBarTheme.Layout.sectionSpacing) {
-            if let session = dataModel.activeSession {
+            if let session = store.activeSession {
                 // Time progress only
                 MetricRow(
                     title: "Time",
@@ -21,7 +21,7 @@ struct SessionMetricsSection: View {
                         totalInterval: session.endTime.timeIntervalSince(session.startTime)
                     ),
                     subvalue: nil,
-                    percentage: dataModel.sessionTimeProgress * 100,
+                    percentage: store.sessionTimeProgress * 100,
                     segments: ColorService.sessionTimeSegments(),
                     trendData: nil,
                     showWarning: false

@@ -8,7 +8,7 @@ import ClaudeCodeUsageKit
 
 // MARK: - Main Menu Bar Content View
 struct MenuBarContentView: View {
-    @Environment(UsageDataModel.self) private var dataModel
+    @Environment(UsageStore.self) private var store
     let settingsService: AppSettingsService
     @FocusState private var focusedField: FocusField?
     let viewMode: MenuBarViewMode
@@ -28,7 +28,7 @@ struct MenuBarContentView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Live Session Section
-            if let session = dataModel.activeSession, session.isActive {
+            if let session = store.activeSession, session.isActive {
                 SectionHeader(
                     title: "Live Session",
                     icon: "dot.radiowaves.left.and.right",
@@ -164,7 +164,7 @@ struct MenuBarContentView: View {
     // MARK: - Actions
     private func handleRefresh() {
         Task {
-            await dataModel.loadData()
+            await store.loadData()
         }
     }
 }

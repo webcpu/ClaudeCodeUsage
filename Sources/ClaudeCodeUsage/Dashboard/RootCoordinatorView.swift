@@ -17,14 +17,14 @@ enum NavigationDestination: Hashable {
 
 // MARK: - Root Coordinator View
 struct RootCoordinatorView: View {
-    @Environment(UsageDataModel.self) private var dataModel
+    @Environment(UsageStore.self) private var store
     @State private var selectedDestination: NavigationDestination? = .overview
     let settingsService: AppSettingsService
-    
+
     var body: some View {
         ModernNavigationView(
             selectedDestination: $selectedDestination,
-            dataModel: dataModel,
+            store: store,
             settingsService: settingsService
         )
     }
@@ -33,22 +33,22 @@ struct RootCoordinatorView: View {
 // MARK: - Modern Navigation
 struct ModernNavigationView: View {
     @Binding var selectedDestination: NavigationDestination?
-    let dataModel: UsageDataModel
+    let store: UsageStore
     let settingsService: AppSettingsService
-    
+
     var body: some View {
         NavigationSplitView {
             NavigationSidebar(selectedDestination: $selectedDestination)
         } detail: {
             NavigationDetailView(
                 destination: selectedDestination ?? .overview,
-                dataModel: dataModel,
+                store: store,
                 settingsService: settingsService
             )
         }
         .onReceive(NotificationCenter.default.publisher(for: .refreshData)) { _ in
             Task {
-                await dataModel.loadData()
+                await store.loadData()
             }
         }
     }
@@ -90,26 +90,26 @@ struct NavigationSidebar: View {
 // MARK: - Navigation Detail View
 struct NavigationDetailView: View {
     let destination: NavigationDestination
-    let dataModel: UsageDataModel
+    let store: UsageStore
     let settingsService: AppSettingsService
-    
+
     var body: some View {
         switch destination {
         case .overview:
             OverviewScreen()
-                .environment(dataModel)
+                .environment(store)
         case .models:
             ModelsScreen()
-                .environment(dataModel)
+                .environment(store)
         case .dailyUsage:
             DailyUsageScreen()
-                .environment(dataModel)
+                .environment(store)
         case .analytics:
             AnalyticsScreen()
-                .environment(dataModel)
+                .environment(store)
         case .liveMetrics:
             MenuBarContentView(settingsService: settingsService, viewMode: .liveMetrics)
-                .environment(dataModel)
+                .environment(store)
         }
     }
 }

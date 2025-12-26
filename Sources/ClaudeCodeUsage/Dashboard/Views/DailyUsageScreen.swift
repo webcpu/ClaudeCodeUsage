@@ -7,14 +7,14 @@ import SwiftUI
 import ClaudeCodeUsageKit
 
 struct DailyUsageScreen: View {
-    @Environment(UsageDataModel.self) private var dataModel
-    
+    @Environment(UsageStore.self) private var store
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 DailyUsageHeader()
-                
-                if let stats = dataModel.stats {
+
+                if let stats = store.stats {
                     if stats.byDate.isEmpty {
                         EmptyStateView(
                             icon: "calendar",
@@ -24,7 +24,7 @@ struct DailyUsageScreen: View {
                     } else {
                         DailyUsageList(stats: stats)
                     }
-                } else if dataModel.isLoading {
+                } else if store.isLoading {
                     ProgressView("Loading daily usage...")
                         .frame(maxWidth: .infinity)
                         .padding(.top, 50)

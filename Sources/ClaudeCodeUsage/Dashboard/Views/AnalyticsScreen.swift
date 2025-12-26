@@ -7,14 +7,14 @@ import SwiftUI
 import ClaudeCodeUsageKit
 
 struct AnalyticsScreen: View {
-    @Environment(UsageDataModel.self) private var dataModel
-    
+    @Environment(UsageStore.self) private var store
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 AnalyticsHeader()
-                
-                if let stats = dataModel.stats {
+
+                if let stats = store.stats {
                     VStack(spacing: 16) {
                         YearlyCostHeatmapCard(stats: stats)
                         TokenDistributionCard(stats: stats)
@@ -22,7 +22,7 @@ struct AnalyticsScreen: View {
                         EfficiencyCard(stats: stats)
                         TrendsCard(stats: stats)
                     }
-                } else if dataModel.isLoading {
+                } else if store.isLoading {
                     ProgressView("Analyzing data...")
                         .frame(maxWidth: .infinity)
                         .padding(.top, 50)

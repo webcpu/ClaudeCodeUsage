@@ -7,20 +7,20 @@ import SwiftUI
 import ClaudeCodeUsageKit
 
 struct OverviewScreen: View {
-    @Environment(UsageDataModel.self) private var dataModel
-    
+    @Environment(UsageStore.self) private var store
+
     var body: some View {
         ScrollView {
-            if dataModel.isLoading {
+            if store.isLoading {
                 ProgressView("Loading...")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .padding(.top, 100)
-            } else if let stats = dataModel.stats {
+            } else if let stats = store.stats {
                 VStack(alignment: .leading, spacing: 20) {
                     OverviewHeader()
-                    
+
                     MetricsGrid(stats: stats)
-                    
+
                     CostBreakdownSection(stats: stats)
                 }
                 .padding()

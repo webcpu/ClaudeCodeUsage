@@ -8,7 +8,7 @@ import Charts
 import ClaudeCodeUsageKit
 
 struct CostMetricsSection: View {
-    @Environment(UsageDataModel.self) private var dataModel
+    @Environment(UsageStore.self) private var store
     
     // Cache expensive computations
     @State private var cachedTodaysCostColor: Color = MenuBarTheme.Colors.Status.normal
@@ -20,11 +20,11 @@ struct CostMetricsSection: View {
             todaysCostView
             
             // Summary stats
-            if let stats = dataModel.stats {
+            if let stats = store.stats {
                 summaryStatsView(stats)
             }
         }
-        .onChange(of: dataModel.todaysCostProgress) { oldValue, newValue in
+        .onChange(of: store.todaysCostProgress) { oldValue, newValue in
             // Only update color when progress actually changes
             if abs(oldValue - newValue) > 0.01 {
                 cachedTodaysCostColor = ColorService.colorForCostProgress(newValue)
@@ -33,8 +33,8 @@ struct CostMetricsSection: View {
         }
         .onAppear {
             // Initialize cached values
-            cachedTodaysCostColor = ColorService.colorForCostProgress(dataModel.todaysCostProgress)
-            lastCostProgress = dataModel.todaysCostProgress
+            cachedTodaysCostColor = ColorService.colorForCostProgress(store.todaysCostProgress)
+            lastCostProgress = store.todaysCostProgress
         }
     }
     
@@ -47,14 +47,14 @@ struct CostMetricsSection: View {
                     .foregroundColor(MenuBarTheme.Colors.UI.secondaryText)
                 
                 HStack(spacing: 4) {
-                    Text(dataModel.todaysCost)
+                    Text(store.todaysCost)
                         .font(MenuBarTheme.Typography.metricValue)
                         .foregroundColor(cachedTodaysCostColor)
                         .monospacedDigit()
                         .lineLimit(1)
                         .fixedSize(horizontal: true, vertical: false)
-                    
-                    if dataModel.todaysCostProgress > 1.0 {
+
+                    if store.todaysCostProgress > 1.0 {
                         Image(systemName: "flame.fill")
                             .font(MenuBarTheme.Typography.warningIcon)
                             .foregroundColor(MenuBarTheme.Colors.Status.critical)
@@ -66,10 +66,10 @@ struct CostMetricsSection: View {
             Spacer()
             
             // Swift Charts-based hourly cost chart
-            if !dataModel.chartDataService.todayHourlyCosts.isEmpty {
-                HourlyCostChartSimple(hourlyData: dataModel.chartDataService.todayHourlyCosts)
-            } else if !dataModel.chartDataService.detailedHourlyData.isEmpty {
-                HourlyCostChartSimple(from: dataModel.chartDataService.detailedHourlyData)
+            if !store.chartDataService.todayHourlyCosts.isEmpty {
+                HourlyCostChartSimple(hourlyData: store.chartDataService.todayHourlyCosts)
+            } else if !store.chartDataService.detailedHourlyData.isEmpty {
+                HourlyCostChartSimple(from: store.chartDataService.detailedHourlyData)
             }
         }
         .padding(.vertical, MenuBarTheme.Layout.verticalPadding)
@@ -93,7 +93,7 @@ struct CostMetricsSection: View {
                 Text("Daily Avg")
                     .font(MenuBarTheme.Typography.summaryLabel)
                     .foregroundColor(MenuBarTheme.Colors.UI.secondaryText)
-                Text(FormatterService.formatDailyAverage(dataModel.averageDailyCost))
+                Text(FormatterService.formatDailyAverage(store.averageDailyCost))
                     .font(MenuBarTheme.Typography.summaryValue)
                     .monospacedDigit()
             }

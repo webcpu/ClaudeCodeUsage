@@ -8,15 +8,15 @@ import ClaudeCodeUsageKit
 import ClaudeLiveMonitorLib
 
 struct UsageMetricsSection: View {
-    @Environment(UsageDataModel.self) private var dataModel
-    
+    @Environment(UsageStore.self) private var store
+
     var body: some View {
         VStack(spacing: MenuBarTheme.Layout.sectionSpacing) {
-            if dataModel.stats != nil {
+            if store.stats != nil {
                 // Token usage (moved from Session section)
-                if let session = dataModel.activeSession,
-                   let tokenLimit = dataModel.autoTokenLimit {
-                    let tokenPercentage = dataModel.sessionTokenProgress * 100
+                if let session = store.activeSession,
+                   let tokenLimit = store.autoTokenLimit {
+                    let tokenPercentage = store.sessionTokenProgress * 100
                     MetricRow(
                         title: "Tokens",
                         value: FormatterService.formatValueWithLimit(session.tokenCounts.total, limit: tokenLimit),
@@ -29,7 +29,7 @@ struct UsageMetricsSection: View {
                 }
                 
                 // Burn rate (moved from Session section)
-                if let burnRate = dataModel.burnRate {
+                if let burnRate = store.burnRate {
                     burnRateView(burnRate)
                 }
             }

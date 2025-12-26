@@ -11,14 +11,14 @@ import Combine
 @MainActor
 final class AppLifecycleManager {
     private var cancellables = Set<AnyCancellable>()
-    private weak var dataModel: UsageDataModel?
-    
+    private weak var store: UsageStore?
+
     init() {
         setupNotificationHandlers()
     }
-    
-    func configure(with dataModel: UsageDataModel) {
-        self.dataModel = dataModel
+
+    func configure(with store: UsageStore) {
+        self.store = store
     }
     
     private func setupNotificationHandlers() {
@@ -56,18 +56,18 @@ final class AppLifecycleManager {
     }
     
     private func handleAppBecameActive() {
-        dataModel?.handleAppBecameActive()
+        store?.handleAppBecameActive()
     }
-    
+
     private func handleAppResignActive() {
-        dataModel?.handleAppResignActive()
+        store?.handleAppResignActive()
     }
-    
+
     private func handleWindowFocus() {
-        dataModel?.handleWindowFocus()
+        store?.handleWindowFocus()
     }
-    
+
     private func handleWindowWillClose() {
-        dataModel?.stopRefreshTimer()
+        store?.stopRefreshTimer()
     }
 }

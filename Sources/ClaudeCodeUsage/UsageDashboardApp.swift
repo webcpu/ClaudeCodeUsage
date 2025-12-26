@@ -1,6 +1,6 @@
 //
 //  UsageDashboardApp.swift
-//  Modern SwiftUI app using @Observable
+//  Modern SwiftUI app using View + Store + Service architecture
 //
 
 import SwiftUI
@@ -9,21 +9,21 @@ import ClaudeCodeUsageKit
 
 @main
 struct UsageDashboardApp: App {
-    @State private var appState = AppState()
+    @State private var store = UsageStore()
     @State private var lifecycleManager = AppLifecycleManager()
     @State private var hasAppeared = false
     @State private var settingsService = AppSettingsService()
-    
+
     var body: some Scene {
         Window("Usage Dashboard", id: "main") {
             RootCoordinatorView(settingsService: settingsService)
-                .environment(appState.dataModel)
+                .environment(store)
                 .onAppear {
                     if !hasAppeared {
                         hasAppeared = true
-                        lifecycleManager.configure(with: appState.dataModel)
+                        lifecycleManager.configure(with: store)
                         Task {
-                            await appState.initializeIfNeeded()
+                            await store.initializeIfNeeded()
                         }
                     }
                 }
@@ -34,26 +34,26 @@ struct UsageDashboardApp: App {
         .commands {
             AppCommands(settingsService: settingsService)
         }
-        
-        MenuBarScene(appState: appState, settingsService: settingsService)
+
+        MenuBarScene(store: store, settingsService: settingsService)
     }
 }
 
 // MARK: - Menu Bar Scene
 struct MenuBarScene: Scene {
-    let appState: AppState
+    let store: UsageStore
     let settingsService: AppSettingsService
-    
+
     var body: some Scene {
         MenuBarExtra {
             MenuBarContentView(settingsService: settingsService)
-                .environment(appState.dataModel)
+                .environment(store)
         } label: {
-            MenuBarLabel(appState: appState)
-                .environment(appState.dataModel)
+            MenuBarLabel(store: store)
+                .environment(store)
                 .contextMenu {
                     MenuBarContextMenu(settingsService: settingsService)
-                        .environment(appState.dataModel)
+                        .environment(store)
                 }
         }
         .menuBarExtraStyle(.window)
@@ -62,35 +62,33 @@ struct MenuBarScene: Scene {
 
 // MARK: - Menu Bar Label
 struct MenuBarLabel: View {
-    @Environment(UsageDataModel.self) private var dataModel
-    let appState: AppState
-    
+    let store: UsageStore
+
     private var menuBarIcon: String {
-        // Dynamic icon based on state
-        if let session = dataModel.activeSession, session.isActive {
-            return "dollarsign.circle.fill" // Active session
-        } else if dataModel.todaysCostValue > dataModel.dailyCostThreshold {
-            return "exclamationmark.triangle.fill" // Cost warning
+        if let session = store.activeSession, session.isActive {
+            return "dollarsign.circle.fill"
+        } else if store.todaysCostValue > store.dailyCostThreshold {
+            return "exclamationmark.triangle.fill"
         } else {
-            return "dollarsign.circle" // Normal state
+            return "dollarsign.circle"
         }
     }
-    
+
     private var iconColor: Color {
-        if let session = dataModel.activeSession, session.isActive {
+        if let session = store.activeSession, session.isActive {
             return .green
-        } else if dataModel.todaysCostValue > dataModel.dailyCostThreshold {
+        } else if store.todaysCostValue > store.dailyCostThreshold {
             return .orange
         } else {
             return .primary
         }
     }
-    
+
     var body: some View {
         HStack(spacing: 4) {
             Image(systemName: menuBarIcon)
                 .foregroundColor(iconColor)
-            Text(dataModel.todaysCost)
+            Text(store.todaysCost)
                 .font(.system(.body, design: .monospaced))
         }
     }
@@ -99,14 +97,14 @@ struct MenuBarLabel: View {
 // MARK: - App Commands
 struct AppCommands: Commands {
     let settingsService: AppSettingsService
-    
+
     var body: some Commands {
         CommandGroup(replacing: .appInfo) {
             Button("About Usage Dashboard") {
                 settingsService.showAboutPanel()
             }
         }
-        
+
         CommandGroup(after: .appSettings) {
             Toggle("Open at Login", isOn: Binding(
                 get: { settingsService.isOpenAtLoginEnabled },
@@ -117,15 +115,15 @@ struct AppCommands: Commands {
                 }
             ))
         }
-        
+
         CommandMenu("View") {
             Button("Refresh") {
                 NotificationCenter.default.post(name: .refreshData, object: nil)
             }
             .keyboardShortcut("R", modifiers: .command)
-            
+
             Divider()
-            
+
             Button("Show Main Window") {
                 NSApp.activate(ignoringOtherApps: true)
                 if let window = NSApp.windows.first(where: { $0.identifier?.rawValue == "main" }) {
@@ -137,60 +135,37 @@ struct AppCommands: Commands {
     }
 }
 
-// MARK: - App State
-@Observable
-@MainActor
-final class AppState {
-    let dataModel: UsageDataModel
-    private var hasInitialized = false
-    
-    init() {
-        self.dataModel = UsageDataModel(container: ProductionContainer.shared)
-    }
-    
-    func initializeIfNeeded() async {
-        guard !hasInitialized else { return }
-        hasInitialized = true
-        
-        // Only load data if not already loaded
-        if !dataModel.hasInitiallyLoaded {
-            await dataModel.loadData()
-        }
-        dataModel.startRefreshTimer()
-    }
-}
-
 // MARK: - Menu Bar Context Menu
 struct MenuBarContextMenu: View {
-    @Environment(UsageDataModel.self) private var dataModel
+    @Environment(UsageStore.self) private var store
     let settingsService: AppSettingsService
-    
+
     var body: some View {
         Group {
             Button("Refresh") {
                 Task {
-                    await dataModel.loadData()
+                    await store.loadData()
                 }
             }
-            
+
             Divider()
-            
-            if let session = dataModel.activeSession, session.isActive {
+
+            if let session = store.activeSession, session.isActive {
                 Label("Session Active", systemImage: "dot.radiowaves.left.and.right")
                     .foregroundColor(.green)
             }
-            
-            Text("Today: \(dataModel.formattedTodaysCost ?? "$0.00")")
-            
+
+            Text("Today: \(store.formattedTodaysCost ?? "$0.00")")
+
             Divider()
-            
+
             Button("Open Dashboard") {
                 NSApp.activate(ignoringOtherApps: true)
                 if let window = NSApp.windows.first(where: { $0.identifier?.rawValue == "main" }) {
                     window.makeKeyAndOrderFront(nil)
                 }
             }
-            
+
             Toggle("Open at Login", isOn: Binding(
                 get: { settingsService.isOpenAtLoginEnabled },
                 set: { newValue in
@@ -199,9 +174,9 @@ struct MenuBarContextMenu: View {
                     }
                 }
             ))
-            
+
             Divider()
-            
+
             Button("Quit") {
                 NSApplication.shared.terminate(nil)
             }
