@@ -119,7 +119,7 @@ struct ImprovedDayChangeTests {
     @Test("Auto refresh continues after day change")
     func autoRefreshContinuesAfterDayChange() async {
         // Given
-        viewModel.startAutoRefresh()
+        viewModel.startAutoRefresh(performInitialLoad: true)
         
         // When - Advance clock by refresh interval
         testClock.advance(by: 30) // 30 seconds
@@ -303,7 +303,37 @@ final class EnhancedMockUsageDataService: UsageDataService {
     func loadEntries() async throws -> [UsageEntry] {
         return []
     }
-    
+
+    func loadEntriesAndStats() async throws -> (entries: [UsageEntry], stats: UsageStats) {
+        loadStatsCalled = true
+        loadCount += 1
+        if delay > 0 {
+            try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+        }
+        if shouldThrowError {
+            throw NSError(domain: "TestError", code: 1, userInfo: [
+                NSLocalizedDescriptionKey: "Mock error for testing"
+            ])
+        }
+        let stats = statsToReturn ?? UsageStats(
+            totalCost: 0,
+            totalTokens: 0,
+            totalInputTokens: 0,
+            totalOutputTokens: 0,
+            totalCacheCreationTokens: 0,
+            totalCacheReadTokens: 0,
+            totalSessions: 0,
+            byModel: [],
+            byDate: [],
+            byProject: []
+        )
+        return ([], stats)
+    }
+
+    func loadTodayEntriesAndStats() async throws -> (entries: [UsageEntry], stats: UsageStats) {
+        return try await loadEntriesAndStats()
+    }
+
     nonisolated func getDateRange() -> (start: Date, end: Date) {
         let now = Date()
         let thirtyDaysAgo = now.addingTimeInterval(-30 * 24 * 60 * 60)

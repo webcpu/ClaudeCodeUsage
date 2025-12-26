@@ -221,17 +221,29 @@ private actor MockAsyncFileSystem: AsyncFileSystemProtocol {
         if shouldThrowError {
             throw MockError.fileNotFound
         }
-        
+
         guard let content = mockFiles[path] else {
             throw MockError.fileNotFound
         }
-        
+
         // Simulate async delay
         try await Task.sleep(nanoseconds: 1_000_000) // 1ms
-        
+
         return content
     }
-    
+
+    func readFirstLine(atPath path: String) async throws -> String? {
+        if shouldThrowError {
+            throw MockError.fileNotFound
+        }
+
+        guard let content = mockFiles[path] else {
+            throw MockError.fileNotFound
+        }
+
+        return content.components(separatedBy: .newlines).first
+    }
+
     func setupMockProjectData() {
         let timestamp = ISO8601DateFormatter().string(from: Date())
         let jsonLine = """

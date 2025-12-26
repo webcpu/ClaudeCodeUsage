@@ -46,7 +46,20 @@ struct UsageViewModelTests {
         func loadEntries() async throws -> [UsageEntry] {
             return mockEntries
         }
-        
+
+        func loadEntriesAndStats() async throws -> (entries: [UsageEntry], stats: UsageStats) {
+            loadStatsCalled = true
+            loadStatsCallCount += 1
+            guard let stats = mockStats else {
+                throw NSError(domain: "TestError", code: 1, userInfo: nil)
+            }
+            return (mockEntries, stats)
+        }
+
+        func loadTodayEntriesAndStats() async throws -> (entries: [UsageEntry], stats: UsageStats) {
+            return try await loadEntriesAndStats()
+        }
+
         func getDateRange() -> (start: Date, end: Date) {
             return (Date.distantPast, Date())
         }

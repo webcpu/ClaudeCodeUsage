@@ -28,7 +28,18 @@ final class ChartSyncMockUsageDataService: UsageDataService {
     func loadEntries() async throws -> [UsageEntry] {
         return mockEntries
     }
-    
+
+    func loadEntriesAndStats() async throws -> (entries: [UsageEntry], stats: UsageStats) {
+        guard let stats = mockStats else {
+            throw NSError(domain: "MockError", code: 1)
+        }
+        return (mockEntries, stats)
+    }
+
+    func loadTodayEntriesAndStats() async throws -> (entries: [UsageEntry], stats: UsageStats) {
+        return try await loadEntriesAndStats()
+    }
+
     func getDateRange() -> (start: Date, end: Date) {
         (testDate.addingTimeInterval(-30 * 24 * 60 * 60), testDate)
     }

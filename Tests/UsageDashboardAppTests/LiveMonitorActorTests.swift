@@ -171,15 +171,15 @@ struct LiveMonitorActorTests {
         defer { FeatureFlags.reset() }
         
         let service = HybridSessionMonitorService(configuration: .default)
-        
+
         // These calls should use the actor-based implementation
-        let session = service.getActiveSession()
+        let session = await service.getActiveSession()
         #expect(session == nil)
-        
-        let burnRate = service.getBurnRate()
+
+        let burnRate = await service.getBurnRate()
         #expect(burnRate == nil)
-        
-        let limit = service.getAutoTokenLimit()
+
+        let limit = await service.getAutoTokenLimit()
         #expect(limit == nil)
     }
     
@@ -201,15 +201,15 @@ struct LiveMonitorActorTests {
         )
         
         let service = HybridSessionMonitorService(configuration: testConfig)
-        
+
         // These calls should use the GCD-based implementation
-        let session = service.getActiveSession()
+        let session = await service.getActiveSession()
         #expect(session == nil, "Should return nil when no data in test directory")
-        
-        let burnRate = service.getBurnRate()
+
+        let burnRate = await service.getBurnRate()
         #expect(burnRate == nil, "Should return nil when no data in test directory")
-        
-        let limit = service.getAutoTokenLimit()
+
+        let limit = await service.getAutoTokenLimit()
         #expect(limit == nil, "Should return nil when no data in test directory")
     }
     
@@ -313,21 +313,21 @@ struct LiveMonitorPerformanceComparisonTests {
         
         let gcdStart = Date()
         for _ in 0..<iterations {
-            _ = gcdService.getActiveSession()
-            _ = gcdService.getBurnRate()
-            _ = gcdService.getAutoTokenLimit()
+            _ = await gcdService.getActiveSession()
+            _ = await gcdService.getBurnRate()
+            _ = await gcdService.getAutoTokenLimit()
         }
         let gcdDuration = Date().timeIntervalSince(gcdStart)
-        
+
         // Test Actor implementation
         FeatureFlags.useActorBasedLiveMonitor = true
         let actorService = HybridSessionMonitorService(configuration: config)
-        
+
         let actorStart = Date()
         for _ in 0..<iterations {
-            _ = actorService.getActiveSession()
-            _ = actorService.getBurnRate()
-            _ = actorService.getAutoTokenLimit()
+            _ = await actorService.getActiveSession()
+            _ = await actorService.getBurnRate()
+            _ = await actorService.getAutoTokenLimit()
         }
         let actorDuration = Date().timeIntervalSince(actorStart)
         
@@ -358,21 +358,21 @@ struct LiveMonitorPerformanceComparisonTests {
         await withTaskGroup(of: Void.self) { group in
             for _ in 0..<concurrentTasks {
                 group.addTask {
-                    _ = gcdService.getActiveSession()
+                    _ = await gcdService.getActiveSession()
                 }
             }
         }
         let gcdDuration = Date().timeIntervalSince(gcdStart)
-        
+
         // Test Actor implementation
         FeatureFlags.useActorBasedLiveMonitor = true
         let actorService = HybridSessionMonitorService(configuration: config)
-        
+
         let actorStart = Date()
         await withTaskGroup(of: Void.self) { group in
             for _ in 0..<concurrentTasks {
                 group.addTask {
-                    _ = actorService.getActiveSession()
+                    _ = await actorService.getActiveSession()
                 }
             }
         }

@@ -340,10 +340,23 @@ private actor MockAsyncFileSystem: AsyncFileSystemProtocol {
         guard let content = files[path] else {
             throw MockError.fileNotFound
         }
-        
+
         return content
     }
-    
+
+    func readFirstLine(atPath path: String) async throws -> String? {
+        if shouldFailNTimes > 0 && failureCount < shouldFailNTimes {
+            failureCount += 1
+            throw MockError.operationFailed
+        }
+
+        guard let content = files[path] else {
+            throw MockError.fileNotFound
+        }
+
+        return content.components(separatedBy: .newlines).first
+    }
+
     private enum MockError: Error {
         case fileNotFound
         case operationFailed

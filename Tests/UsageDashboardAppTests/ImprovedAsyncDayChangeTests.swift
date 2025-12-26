@@ -299,7 +299,31 @@ extension ImprovedAsyncDayChangeTests {
         nonisolated func loadEntries() async throws -> [UsageEntry] {
             return await entriesToReturn
         }
-        
+
+        nonisolated func loadEntriesAndStats() async throws -> (entries: [UsageEntry], stats: UsageStats) {
+            if await shouldThrow {
+                throw NSError(domain: "Test", code: 1)
+            }
+            let stats = await statsToReturn ?? UsageStats(
+                totalCost: 0,
+                totalTokens: 0,
+                totalInputTokens: 0,
+                totalOutputTokens: 0,
+                totalCacheCreationTokens: 0,
+                totalCacheReadTokens: 0,
+                totalSessions: 0,
+                byModel: [],
+                byDate: [],
+                byProject: []
+            )
+            let entries = await entriesToReturn
+            return (entries, stats)
+        }
+
+        nonisolated func loadTodayEntriesAndStats() async throws -> (entries: [UsageEntry], stats: UsageStats) {
+            return try await loadEntriesAndStats()
+        }
+
         nonisolated func getDateRange() -> (start: Date, end: Date) {
             (Date().addingTimeInterval(-30 * 24 * 60 * 60), Date())
         }

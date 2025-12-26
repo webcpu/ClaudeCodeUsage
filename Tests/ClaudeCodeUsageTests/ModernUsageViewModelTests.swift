@@ -215,8 +215,8 @@ struct ModernUsageViewModelTests {
             }
         }
         
-        // Start auto-refresh
-        viewModel.startAutoRefresh()
+        // Start auto-refresh with initial load for testing
+        viewModel.startAutoRefresh(performInitialLoad: true)
         
         // Wait for at least 3 calls or timeout after 2 seconds
         await withTaskGroup(of: Void.self) { group in
@@ -314,10 +314,10 @@ struct ModernUsageViewModelTests {
         )
         
         mockContainer.mockSessionMonitorService.mockSession = mockSession
-        
+
         // When
-        let session = viewModel.sessionMonitorService.getActiveSession()
-        
+        let session = await viewModel.sessionMonitorService.getActiveSession()
+
         // Then
         #expect(session != nil)
         #expect(session?.costUSD == 0.05)
@@ -428,7 +428,31 @@ fileprivate final class MockUsageDataService: UsageDataService {
     func loadEntries() async throws -> [UsageEntry] {
         return mockEntries
     }
-    
+
+    func loadEntriesAndStats() async throws -> (entries: [UsageEntry], stats: UsageStats) {
+        onLoadStats?()
+        if shouldThrow {
+            throw DataLoadingError.fileNotFound(path: "/mock/path")
+        }
+        let stats = statsToReturn ?? UsageStats(
+            totalCost: 0,
+            totalTokens: 0,
+            totalInputTokens: 0,
+            totalOutputTokens: 0,
+            totalCacheCreationTokens: 0,
+            totalCacheReadTokens: 0,
+            totalSessions: 0,
+            byModel: [],
+            byDate: [],
+            byProject: []
+        )
+        return (mockEntries, stats)
+    }
+
+    func loadTodayEntriesAndStats() async throws -> (entries: [UsageEntry], stats: UsageStats) {
+        return try await loadEntriesAndStats()
+    }
+
     func getDateRange() -> (start: Date, end: Date) {
         let baseDate = Date() // Use current date for range calculation
         return (baseDate.addingTimeInterval(-30 * 86400), baseDate)

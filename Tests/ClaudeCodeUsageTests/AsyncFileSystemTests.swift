@@ -165,12 +165,24 @@ private class MockFileSystem: FileSystemProtocol {
         if shouldThrowError {
             throw FileSystemError.fileNotFound
         }
-        
+
         guard let content = mockFiles[path] else {
             throw FileSystemError.fileNotFound
         }
-        
+
         return content
+    }
+
+    func readFirstLine(atPath path: String) throws -> String? {
+        if shouldThrowError {
+            throw FileSystemError.fileNotFound
+        }
+
+        guard let content = mockFiles[path] else {
+            throw FileSystemError.fileNotFound
+        }
+
+        return content.components(separatedBy: .newlines).first
     }
 }
 

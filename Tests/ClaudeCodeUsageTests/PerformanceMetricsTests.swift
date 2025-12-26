@@ -343,7 +343,14 @@ private actor MockAsyncFileSystem: AsyncFileSystemProtocol {
         }
         return content
     }
-    
+
+    func readFirstLine(atPath path: String) async throws -> String? {
+        guard let content = mockFiles[path] else {
+            throw NSError(domain: "MockFS", code: 404)
+        }
+        return content.components(separatedBy: .newlines).first
+    }
+
     func setupTestData() {
         let timestamp = ISO8601DateFormatter().string(from: Date())
         let jsonLine = """

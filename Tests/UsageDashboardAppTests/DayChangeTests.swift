@@ -31,7 +31,7 @@ struct DayChangeTests {
         // by observing when the refresh happens
         
         // The day change monitoring should be active after starting auto refresh
-        viewModel.startAutoRefresh()
+        viewModel.startAutoRefresh(performInitialLoad: true)
         
         // Wait a moment to ensure the monitoring task starts
         try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
@@ -132,7 +132,7 @@ struct DayChangeTests {
         let viewModel = UsageViewModel(container: container)
         
         // When
-        viewModel.startAutoRefresh()
+        viewModel.startAutoRefresh(performInitialLoad: true)
         
         // Wait a moment for tasks to start
         try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
@@ -204,7 +204,31 @@ final class MockUsageDataService: UsageDataService {
         // Return empty array for day change tests
         return []
     }
-    
+
+    func loadEntriesAndStats() async throws -> (entries: [UsageEntry], stats: UsageStats) {
+        loadStatsCalled = true
+        if shouldThrowError {
+            throw NSError(domain: "TestError", code: 1, userInfo: nil)
+        }
+        let stats = statsToReturn ?? UsageStats(
+            totalCost: 0,
+            totalTokens: 0,
+            totalInputTokens: 0,
+            totalOutputTokens: 0,
+            totalCacheCreationTokens: 0,
+            totalCacheReadTokens: 0,
+            totalSessions: 0,
+            byModel: [],
+            byDate: [],
+            byProject: []
+        )
+        return ([], stats)
+    }
+
+    func loadTodayEntriesAndStats() async throws -> (entries: [UsageEntry], stats: UsageStats) {
+        return try await loadEntriesAndStats()
+    }
+
     nonisolated func getDateRange() -> (start: Date, end: Date) {
         let now = Date()
         let thirtyDaysAgo = now.addingTimeInterval(-30 * 24 * 60 * 60)
