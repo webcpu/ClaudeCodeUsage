@@ -9,39 +9,35 @@
 import SwiftUI
 import Foundation
 
+// MARK: - Intensity Level Calculation (Pure Functions)
+
+private enum IntensityLevel {
+    /// Intensity thresholds for each level
+    static let thresholds: [(range: PartialRangeFrom<Double>, level: Int)] = [
+        (0.75..., 4),  // High
+        (0.5..., 3),   // Medium-high
+        (0.25..., 2),  // Medium-low
+        (0.0..., 1)    // Low (anything > 0)
+    ]
+
+    /// Convert intensity (0.0-1.0) to discrete level (0-4)
+    static func fromIntensity(_ intensity: Double) -> Int {
+        intensity == 0 ? 0 : (thresholds.first { $0.range.contains(intensity) }?.level ?? 1)
+    }
+}
+
 // MARK: - Color Manager
 
 /// Advanced color management for heatmap visualizations
 public final class HeatmapColorManager {
-    
+
     // MARK: - Singleton
-    
+
     public static let shared = HeatmapColorManager()
     private init() {}
-    
-    // MARK: - Color Caching
-    
-    /// Cache for expensive color calculations
-    private var colorCache: [ColorCacheKey: Color] = [:]
-    private let cacheQueue = DispatchQueue(label: "heatmap.color.cache", qos: .userInitiated)
-    
-    /// Key for color cache
-    private struct ColorCacheKey: Hashable {
-        let cost: Double
-        let maxCost: Double
-        let theme: HeatmapColorTheme
-        let variation: ColorVariation
-        
-        func hash(into hasher: inout Hasher) {
-            hasher.combine(cost)
-            hasher.combine(maxCost)
-            hasher.combine(theme.rawValue)
-            hasher.combine(variation.rawValue)
-        }
-    }
-    
-    // MARK: - Color Variations
-    
+
+    // MARK: - Types
+
     /// Different color variations for special states
     public enum ColorVariation: String, CaseIterable {
         case normal = "normal"
@@ -50,134 +46,149 @@ public final class HeatmapColorManager {
         case dimmed = "dimmed"
         case highlighted = "highlighted"
     }
-    
-    // MARK: - Color Calculation
-    
+
+    // MARK: - Public Interface (High Level)
+
     /// Get color for a cost value with caching
-    /// - Parameters:
-    ///   - cost: The cost value
-    ///   - maxCost: The maximum cost for scaling
-    ///   - theme: The color theme to use
-    ///   - variation: Color variation for special states
-    /// - Returns: Optimized color for the given parameters
     public func color(
         for cost: Double,
         maxCost: Double,
         theme: HeatmapColorTheme = .github,
         variation: ColorVariation = .normal
     ) -> Color {
-        let cacheKey = ColorCacheKey(cost: cost, maxCost: maxCost, theme: theme, variation: variation)
-        
-        // Check cache first
-        if let cachedColor = colorCache[cacheKey] {
-            return cachedColor
-        }
-        
-        // Calculate color
-        let baseColor = calculateBaseColor(cost: cost, maxCost: maxCost, theme: theme)
-        let finalColor = applyVariation(baseColor, variation: variation)
-        
-        // Cache result
-        cacheQueue.async { [weak self] in
-            self?.colorCache[cacheKey] = finalColor
-        }
-        
-        return finalColor
+        cachedColor(for: cost, maxCost: maxCost, theme: theme, variation: variation)
+            ?? computeAndCacheColor(for: cost, maxCost: maxCost, theme: theme, variation: variation)
     }
-    
-    /// Calculate base color for cost value
-    private func calculateBaseColor(cost: Double, maxCost: Double, theme: HeatmapColorTheme) -> Color {
-        if cost == 0 { return theme.colors[0] }
-        
-        let intensity = maxCost > 0 ? min(cost / maxCost, 1.0) : 0.0
-        let levelIndex = intensityToLevel(intensity)
-        
-        return theme.colors[levelIndex]
-    }
-    
-    /// Convert intensity to discrete level (0-4)
-    private func intensityToLevel(_ intensity: Double) -> Int {
-        switch intensity {
-        case 0:
-            return 0 // Empty
-        case 0..<0.25:
-            return 1 // Low
-        case 0.25..<0.5:
-            return 2 // Medium-low
-        case 0.5..<0.75:
-            return 3 // Medium-high
-        default:
-            return 4 // High
-        }
-    }
-    
-    /// Apply color variation for different states
-    private func applyVariation(_ baseColor: Color, variation: ColorVariation) -> Color {
-        switch variation {
-        case .normal:
-            return baseColor
-        case .hovered:
-            return baseColor.opacity(0.8) // Slightly more transparent
-        case .selected:
-            return baseColor.brightness(0.2) // Slightly brighter
-        case .dimmed:
-            return baseColor.opacity(0.5) // More transparent
-        case .highlighted:
-            return baseColor.saturation(1.3) // More saturated
-        }
-    }
-    
-    // MARK: - Batch Operations
-    
+
     /// Pre-calculate colors for a range of values (performance optimization)
-    /// - Parameters:
-    ///   - costs: Array of cost values
-    ///   - maxCost: Maximum cost for scaling
-    ///   - theme: Color theme to use
-    /// - Returns: Dictionary mapping costs to colors
     public func preCalculateColors(
         for costs: [Double],
         maxCost: Double,
         theme: HeatmapColorTheme = .github
     ) -> [Double: Color] {
-        var colorMap: [Double: Color] = [:]
-        
-        for cost in costs {
+        costs.reduce(into: [:]) { colorMap, cost in
             colorMap[cost] = color(for: cost, maxCost: maxCost, theme: theme)
         }
-        
-        return colorMap
     }
-    
+
+    /// Analyze color distribution for a dataset
+    public func analyzeColorDistribution(costs: [Double], maxCost: Double) -> ColorDistribution {
+        let levelCounts = countCostsByLevel(costs, maxCost: maxCost)
+        let averageCost = calculateAverageCost(costs)
+
+        return ColorDistribution(
+            totalItems: costs.count,
+            levelCounts: levelCounts,
+            maxCost: maxCost,
+            averageCost: averageCost
+        )
+    }
+
     /// Clear color cache to free memory
     public func clearCache() {
         cacheQueue.async { [weak self] in
             self?.colorCache.removeAll()
         }
     }
-    
-    // MARK: - Color Analysis
-    
-    /// Analyze color distribution for a dataset
-    /// - Parameters:
-    ///   - costs: Array of cost values
-    ///   - maxCost: Maximum cost value
-    /// - Returns: Color distribution statistics
-    public func analyzeColorDistribution(costs: [Double], maxCost: Double) -> ColorDistribution {
-        var levelCounts = [0, 0, 0, 0, 0] // 5 levels
-        
-        for cost in costs {
-            let intensity = maxCost > 0 ? min(cost / maxCost, 1.0) : 0.0
-            let level = intensityToLevel(intensity)
-            levelCounts[level] += 1
+
+    // MARK: - Color Calculation (Mid Level)
+
+    private func computeAndCacheColor(
+        for cost: Double,
+        maxCost: Double,
+        theme: HeatmapColorTheme,
+        variation: ColorVariation
+    ) -> Color {
+        let baseColor = calculateBaseColor(cost: cost, maxCost: maxCost, theme: theme)
+        let finalColor = applyVariation(baseColor, variation: variation)
+
+        storeInCache(finalColor, for: cost, maxCost: maxCost, theme: theme, variation: variation)
+
+        return finalColor
+    }
+
+    private func calculateBaseColor(cost: Double, maxCost: Double, theme: HeatmapColorTheme) -> Color {
+        if cost == 0 { return theme.colors[0] }
+
+        let intensity = calculateIntensity(cost: cost, maxCost: maxCost)
+        let levelIndex = IntensityLevel.fromIntensity(intensity)
+
+        return theme.colors[levelIndex]
+    }
+
+    private func calculateIntensity(cost: Double, maxCost: Double) -> Double {
+        maxCost > 0 ? min(cost / maxCost, 1.0) : 0.0
+    }
+
+    private func countCostsByLevel(_ costs: [Double], maxCost: Double) -> [Int] {
+        costs.reduce(into: [0, 0, 0, 0, 0]) { counts, cost in
+            let intensity = calculateIntensity(cost: cost, maxCost: maxCost)
+            let level = IntensityLevel.fromIntensity(intensity)
+            counts[level] += 1
         }
-        
-        return ColorDistribution(
-            totalItems: costs.count,
-            levelCounts: levelCounts,
-            maxCost: maxCost,
-            averageCost: costs.isEmpty ? 0 : costs.reduce(0, +) / Double(costs.count)
-        )
+    }
+
+    private func calculateAverageCost(_ costs: [Double]) -> Double {
+        costs.isEmpty ? 0 : costs.reduce(0, +) / Double(costs.count)
+    }
+
+    // MARK: - Caching (Infrastructure)
+
+    private var colorCache: [ColorCacheKey: Color] = [:]
+    private let cacheQueue = DispatchQueue(label: "heatmap.color.cache", qos: .userInitiated)
+
+    private struct ColorCacheKey: Hashable {
+        let cost: Double
+        let maxCost: Double
+        let theme: HeatmapColorTheme
+        let variation: ColorVariation
+
+        func hash(into hasher: inout Hasher) {
+            hasher.combine(cost)
+            hasher.combine(maxCost)
+            hasher.combine(theme.rawValue)
+            hasher.combine(variation.rawValue)
+        }
+    }
+
+    private func cachedColor(
+        for cost: Double,
+        maxCost: Double,
+        theme: HeatmapColorTheme,
+        variation: ColorVariation
+    ) -> Color? {
+        let cacheKey = ColorCacheKey(cost: cost, maxCost: maxCost, theme: theme, variation: variation)
+        return colorCache[cacheKey]
+    }
+
+    private func storeInCache(
+        _ color: Color,
+        for cost: Double,
+        maxCost: Double,
+        theme: HeatmapColorTheme,
+        variation: ColorVariation
+    ) {
+        let cacheKey = ColorCacheKey(cost: cost, maxCost: maxCost, theme: theme, variation: variation)
+        cacheQueue.async { [weak self] in
+            self?.colorCache[cacheKey] = color
+        }
+    }
+
+    // MARK: - Color Variations (Low Level)
+
+    private func applyVariation(_ baseColor: Color, variation: ColorVariation) -> Color {
+        switch variation {
+        case .normal:
+            return baseColor
+        case .hovered:
+            return baseColor.opacity(0.8)
+        case .selected:
+            return baseColor.brightness(0.2)
+        case .dimmed:
+            return baseColor.opacity(0.5)
+        case .highlighted:
+            return baseColor.saturation(1.3)
+        }
     }
 }
 
@@ -290,16 +301,10 @@ public struct HeatmapColorPerformance {
         steps: Int = 100,
         theme: HeatmapColorTheme = .github
     ) -> [Color] {
-        var lut: [Color] = []
-        lut.reserveCapacity(steps + 1)
-        
-        for i in 0...steps {
+        (0...steps).map { i in
             let cost = Double(i) / Double(steps) * maxCost
-            let color = HeatmapColorManager.shared.color(for: cost, maxCost: maxCost, theme: theme)
-            lut.append(color)
+            return HeatmapColorManager.shared.color(for: cost, maxCost: maxCost, theme: theme)
         }
-        
-        return lut
     }
     
     /// Get color from lookup table for performance

@@ -9,55 +9,83 @@
 import SwiftUI
 import Foundation
 
+// MARK: - Date Formatting Helpers
+
+private enum HeatmapDateFormatter {
+    private static let idFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
+    private static let displayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d, yyyy"
+        return formatter
+    }()
+
+    static func stableIdentifier(for date: Date) -> String {
+        idFormatter.string(from: date)
+    }
+
+    static func displayString(for date: Date) -> String {
+        displayFormatter.string(from: date)
+    }
+
+    static func isToday(_ date: Date) -> Bool {
+        Calendar.current.isDateInToday(date)
+    }
+}
+
 // MARK: - Core Data Models
 
 /// Represents a single day in the heatmap with pre-computed display values for performance
 public struct HeatmapDay: Identifiable, Equatable, Hashable {
-    
+
     // MARK: - Identification & Core Data
-    
+
     /// Stable date-based identifier to prevent SwiftUI view recreation
     public let id: String
-    
+
     /// The date this day represents
     public let date: Date
-    
+
     /// The cost value for this day
     public let cost: Double
-    
+
     // MARK: - Calendar Properties
-    
+
     /// Day of the year (1-366)
     public let dayOfYear: Int
-    
+
     /// Week number within the heatmap
     public let weekOfYear: Int
-    
+
     /// Day of the week (0=Sunday, 6=Saturday)
     public let dayOfWeek: Int
-    
+
     // MARK: - Display Properties
-    
+
     /// Whether this day has no usage (cost == 0)
     public let isEmpty: Bool
-    
+
     /// Whether this day is today
     public let isToday: Bool
-    
+
     /// Pre-formatted date string for display (e.g., "Jan 15, 2024")
     public let dateString: String
-    
+
     /// Pre-formatted cost string for display (e.g., "$1.23" or "No usage")
     public let costString: String
-    
+
     /// Pre-computed color to avoid repeated calculations during rendering
     public let color: Color
-    
+
     /// Intensity level (0.0 to 1.0) relative to the maximum cost
     public let intensity: Double
-    
+
     // MARK: - Initialization
-    
+
     public init(
         date: Date,
         cost: Double,
@@ -66,43 +94,28 @@ public struct HeatmapDay: Identifiable, Equatable, Hashable {
         dayOfWeek: Int,
         maxCost: Double
     ) {
-        // Create stable date-based ID
-        let idFormatter = DateFormatter()
-        idFormatter.dateFormat = "yyyy-MM-dd"
-        self.id = idFormatter.string(from: date)
-        
+        self.id = HeatmapDateFormatter.stableIdentifier(for: date)
         self.date = date
         self.cost = cost
         self.dayOfYear = dayOfYear
         self.weekOfYear = weekOfYear
         self.dayOfWeek = dayOfWeek
-        
-        // Computed properties
+
         self.isEmpty = cost == 0
-        
-        // Check if this is today
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        let dayStart = calendar.startOfDay(for: date)
-        self.isToday = dayStart == today
-        
-        // Pre-format strings to avoid repeated formatting during hover
-        let displayFormatter = DateFormatter()
-        displayFormatter.dateFormat = "MMM d, yyyy"
-        self.dateString = displayFormatter.string(from: date)
+        self.isToday = HeatmapDateFormatter.isToday(date)
+        self.dateString = HeatmapDateFormatter.displayString(for: date)
         self.costString = cost > 0 ? cost.asCurrency : "No usage"
-        
-        // Calculate intensity and pre-compute color
-        self.intensity = maxCost > 0 ? min(cost / maxCost, 1.0) : 0.0
+
+        self.intensity = IntensityLevelCalculator.intensity(cost: cost, maxCost: maxCost)
         self.color = HeatmapColorScheme.color(for: cost, maxCost: maxCost)
     }
-    
+
     // MARK: - Equatable & Hashable
-    
+
     public static func == (lhs: HeatmapDay, rhs: HeatmapDay) -> Bool {
         lhs.id == rhs.id && lhs.cost == rhs.cost
     }
-    
+
     public func hash(into hasher: inout Hasher) {
         hasher.combine(id)
         hasher.combine(cost)
@@ -215,78 +228,56 @@ public struct HeatmapDataset: Equatable {
     }
 }
 
+// MARK: - Intensity Level Calculation (Pure Functions)
+
+private enum IntensityLevelCalculator {
+    /// Thresholds for each level (checked in order)
+    static let thresholds: [(range: PartialRangeFrom<Double>, level: Int)] = [
+        (0.75..., 4),  // High
+        (0.5..., 3),   // Medium-high
+        (0.25..., 2),  // Medium-low
+        (0.0..., 1)    // Low (anything > 0)
+    ]
+
+    /// Convert intensity (0.0-1.0) to discrete level (0-4)
+    static func level(for intensity: Double) -> Int {
+        intensity == 0 ? 0 : (thresholds.first { $0.range.contains(intensity) }?.level ?? 1)
+    }
+
+    /// Calculate intensity from cost
+    static func intensity(cost: Double, maxCost: Double) -> Double {
+        maxCost > 0 ? min(cost / maxCost, 1.0) : 0.0
+    }
+}
+
 // MARK: - Color Scheme
 
 /// Optimized color scheme for heatmap visualization
 public enum HeatmapColorScheme {
-    
+
     // MARK: - Color Constants
-    
-    /// Color for days with no usage
-    public static let emptyColor = Color(red: 240/255, green: 242/255, blue: 245/255)
-    
-    /// Color for low usage days
-    public static let lowColor = Color(red: 186/255, green: 236/255, blue: 191/255)
-    
-    /// Color for medium-low usage days
-    public static let mediumLowColor = Color(red: 109/255, green: 191/255, blue: 116/255)
-    
-    /// Color for medium-high usage days
-    public static let mediumHighColor = Color(red: 83/255, green: 162/255, blue: 88/255)
-    
-    /// Color for high usage days
-    public static let highColor = Color(red: 45/255, green: 97/255, blue: 48/255)
-    
+
     /// Array of all legend colors (5 levels from no activity to high activity)
     public static let legendColors: [Color] = [
-        emptyColor,      // Level 0: No contributions
-        lowColor,        // Level 1: Low contributions
-        mediumLowColor,  // Level 2: Medium-low contributions
-        mediumHighColor, // Level 3: Medium-high contributions
-        highColor        // Level 4: High contributions
+        Color(red: 240/255, green: 242/255, blue: 245/255),  // Level 0: No contributions
+        Color(red: 186/255, green: 236/255, blue: 191/255),  // Level 1: Low contributions
+        Color(red: 109/255, green: 191/255, blue: 116/255),  // Level 2: Medium-low contributions
+        Color(red: 83/255, green: 162/255, blue: 88/255),    // Level 3: Medium-high contributions
+        Color(red: 45/255, green: 97/255, blue: 48/255)      // Level 4: High contributions
     ]
-    
+
     // MARK: - Color Calculation
-    
+
     /// Returns the appropriate color for a given cost value
-    /// - Parameters:
-    ///   - cost: The cost value for the day
-    ///   - maxCost: The maximum cost value for scaling
-    /// - Returns: Pre-computed color for optimal performance
     public static func color(for cost: Double, maxCost: Double) -> Color {
-        if cost == 0 { return emptyColor }
-        
-        let intensity = maxCost > 0 ? min(cost / maxCost, 1.0) : 0.0
-        
-        // Use pre-computed colors to avoid repeated Color.green.opacity() calls
-        switch intensity {
-        case 0..<0.25:
-            return lowColor
-        case 0.25..<0.5:
-            return mediumLowColor
-        case 0.5..<0.75:
-            return mediumHighColor
-        default:
-            return highColor
-        }
+        let level = intensityLevel(for: cost, maxCost: maxCost)
+        return legendColors[level]
     }
-    
+
     /// Returns the intensity level (0-4) for legend purposes
     public static func intensityLevel(for cost: Double, maxCost: Double) -> Int {
-        if cost == 0 { return 0 }
-        
-        let intensity = maxCost > 0 ? min(cost / maxCost, 1.0) : 0.0
-        
-        switch intensity {
-        case 0..<0.25:
-            return 1
-        case 0.25..<0.5:
-            return 2
-        case 0.5..<0.75:
-            return 3
-        default:
-            return 4
-        }
+        let intensity = IntensityLevelCalculator.intensity(cost: cost, maxCost: maxCost)
+        return IntensityLevelCalculator.level(for: intensity)
     }
 }
 
