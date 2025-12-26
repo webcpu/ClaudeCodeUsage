@@ -19,39 +19,6 @@ enum ViewState {
     case error(Error)
 }
 
-// MARK: - Actor for Thread-Safe State Management
-actor UsageStateManager {
-    private var stats: UsageStats?
-    private var activeSession: SessionBlock?
-    private var loadTask: Task<Void, Never>?
-
-    func updateStats(_ newStats: UsageStats) {
-        self.stats = newStats
-    }
-
-    func updateSession(_ session: SessionBlock?) {
-        self.activeSession = session
-    }
-
-    func getStats() -> UsageStats? {
-        stats
-    }
-
-    func getSession() -> SessionBlock? {
-        activeSession
-    }
-
-    func setLoadTask(_ task: Task<Void, Never>?) {
-        loadTask?.cancel()
-        loadTask = task
-    }
-
-    func cancelCurrentLoad() {
-        loadTask?.cancel()
-        loadTask = nil
-    }
-}
-
 // MARK: - Usage Store (Single Source of Truth)
 @Observable
 @MainActor
@@ -136,7 +103,6 @@ final class UsageStore {
     private let dateProvider: DateProviding
 
     // MARK: - Internal State
-    private let stateManager = UsageStateManager()
     private var memoryCleanupObserver: NSObjectProtocol?
     private var isCurrentlyLoading = false
     private var lastLoadStartTime: Date?
@@ -260,10 +226,6 @@ final class UsageStore {
             let phase2Time = dateProvider.now.timeIntervalSince(phase2Start)
             print("[UsageStore] Phase 2 (full) completed in: \(String(format: "%.3f", phase2Time))s")
             #endif
-
-            // Update state manager with full stats
-            await stateManager.updateStats(fullStats)
-            await stateManager.updateSession(session)
 
             // Update UI with full historical data
             self.state = .loaded(fullStats)
@@ -465,9 +427,8 @@ final class UsageStore {
             return calendar.startOfDay(for: date) == today
         }
 
-        Task {
-            await stateManager.cancelCurrentLoad()
-            if activeSession != nil {
+        if activeSession != nil {
+            Task {
                 await loadData()
             }
         }
