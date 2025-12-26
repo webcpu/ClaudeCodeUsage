@@ -151,17 +151,11 @@ struct ErrorStateView: View {
     }
     
     private var errorDescription: String {
-        if let claudeError = error as? ClaudeUsageError {
-            return claudeError.errorDescription
-        }
-        return error.localizedDescription
+        error.localizedDescription
     }
-    
+
     private var recoverySuggestion: String? {
-        if let claudeError = error as? ClaudeUsageError {
-            return claudeError.recoverySuggestion
-        }
-        return nil
+        (error as NSError).localizedRecoverySuggestion
     }
 }
 
@@ -312,7 +306,7 @@ struct EmptyStateViews_Previews: PreviewProvider {
             .previewDisplayName("No Search Results")
             
             ErrorStateView(
-                error: DataLoadingError.fileNotFound(path: "/test/path"),
+                error: NSError(domain: "Preview", code: 1, userInfo: [NSLocalizedDescriptionKey: "File not found"]),
                 onRetry: { }
             )
             .previewDisplayName("Error State")

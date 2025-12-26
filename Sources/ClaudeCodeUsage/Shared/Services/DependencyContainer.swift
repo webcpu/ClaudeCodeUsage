@@ -231,7 +231,6 @@ protocol DependencyContainer {
     var usageDataService: UsageDataService { get }
     var sessionMonitorService: SessionMonitorService { get }
     var configurationService: ConfigurationService { get }
-    var performanceMetrics: PerformanceMetricsProtocol { get }
 }
 
 @MainActor
@@ -239,22 +238,15 @@ final class ProductionContainer: DependencyContainer {
     lazy var usageDataService: UsageDataService = {
         DefaultUsageDataService(configuration: configurationService.configuration)
     }()
-    
+
     lazy var sessionMonitorService: SessionMonitorService = {
-        // Use ModernHybridSessionMonitor that switches based on feature flag without semaphores
-        let hybrid = ModernHybridSessionMonitor(configuration: configurationService.configuration)
-        // Wrap with performance monitoring for A/B testing
-        return MonitoredSessionService(wrapped: hybrid, metrics: performanceMetrics)
+        DefaultSessionMonitorService(configuration: configurationService.configuration)
     }()
-    
+
     lazy var configurationService: ConfigurationService = {
         DefaultConfigurationService()
     }()
-    
-    lazy var performanceMetrics: PerformanceMetricsProtocol = {
-        PerformanceMetrics.default
-    }()
-    
+
     static let shared = ProductionContainer()
 }
 
@@ -264,18 +256,15 @@ final class TestContainer: DependencyContainer {
     var usageDataService: UsageDataService
     var sessionMonitorService: SessionMonitorService
     var configurationService: ConfigurationService
-    var performanceMetrics: PerformanceMetricsProtocol
-    
+
     init(
         usageDataService: UsageDataService? = nil,
         sessionMonitorService: SessionMonitorService? = nil,
-        configurationService: ConfigurationService? = nil,
-        performanceMetrics: PerformanceMetricsProtocol? = nil
+        configurationService: ConfigurationService? = nil
     ) {
         self.usageDataService = usageDataService ?? MockUsageDataService()
         self.sessionMonitorService = sessionMonitorService ?? MockSessionMonitorService()
         self.configurationService = configurationService ?? DefaultConfigurationService()
-        self.performanceMetrics = performanceMetrics ?? NullPerformanceMetrics()
     }
 }
 
