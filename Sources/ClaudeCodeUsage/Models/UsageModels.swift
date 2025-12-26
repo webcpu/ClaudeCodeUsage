@@ -7,6 +7,23 @@
 
 import Foundation
 
+// MARK: - Cached Date Formatters
+
+/// Static formatters to avoid re-allocation on every date parse (16,600+ calls)
+private enum DateFormatters {
+    static let withFractionalSeconds: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+
+    static let basic: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
+}
+
 // MARK: - Core Usage Models
 
 /// Represents a single usage entry
@@ -53,25 +70,21 @@ public struct UsageEntry: Codable {
         inputTokens + outputTokens + cacheWriteTokens + cacheReadTokens
     }
     
-    /// Parsed timestamp as Date
+    /// Parsed timestamp as Date (uses cached formatters for performance)
     public var date: Date? {
-        // Try different date formats
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        
-        if let date = formatter.date(from: timestamp) {
+        // Try with fractional seconds first (most common format)
+        if let date = DateFormatters.withFractionalSeconds.date(from: timestamp) {
             return date
         }
-        
+
         // Fallback to basic ISO8601
-        formatter.formatOptions = [.withInternetDateTime]
-        if let date = formatter.date(from: timestamp) {
+        if let date = DateFormatters.basic.date(from: timestamp) {
             return date
         }
-        
-        // Try without milliseconds
+
+        // Last resort: strip milliseconds and try again
         let cleanTimestamp = timestamp.replacingOccurrences(of: "\\.\\d{3}", with: "", options: .regularExpression)
-        return formatter.date(from: cleanTimestamp)
+        return DateFormatters.basic.date(from: cleanTimestamp)
     }
 }
 
@@ -337,48 +350,52 @@ public struct ModelPricing {
     public let cacheWritePricePerMillion: Double
     public let cacheReadPricePerMillion: Double
     
-    /// Predefined pricing for Claude Opus 4
+    /// Predefined pricing for Claude Opus 4/4.5
     public static let opus4 = ModelPricing(
-        model: "claude-opus-4-1-20250805",
-        inputPricePerMillion: 15.0,
-        outputPricePerMillion: 75.0,
-        cacheWritePricePerMillion: 18.75,
-        cacheReadPricePerMillion: 1.50
+        model: "claude-opus-4-5-20251101",
+        inputPricePerMillion: 5.0,
+        outputPricePerMillion: 25.0,
+        cacheWritePricePerMillion: 6.25,
+        cacheReadPricePerMillion: 0.50
     )
-    
-    /// Predefined pricing for Claude Sonnet 4
+
+    /// Predefined pricing for Claude Sonnet 4/4.5
     public static let sonnet4 = ModelPricing(
-        model: "claude-3-5-sonnet-20241022",
+        model: "claude-sonnet-4-5-20250929",
         inputPricePerMillion: 3.0,
         outputPricePerMillion: 15.0,
         cacheWritePricePerMillion: 3.75,
         cacheReadPricePerMillion: 0.30
     )
-    
+
+    /// Predefined pricing for Claude Haiku 4.5
+    public static let haiku4 = ModelPricing(
+        model: "claude-haiku-4-5-20251001",
+        inputPricePerMillion: 0.80,
+        outputPricePerMillion: 4.0,
+        cacheWritePricePerMillion: 1.0,
+        cacheReadPricePerMillion: 0.08
+    )
+
     /// All available model pricing
-    public static let all = [opus4, sonnet4]
-    
+    public static let all = [opus4, sonnet4, haiku4]
+
     /// Find pricing for a model name
     public static func pricing(for model: String) -> ModelPricing? {
         let modelLower = model.lowercased()
-        
-        // Check for opus models
+
         if modelLower.contains("opus") {
             return opus4
         }
-        
-        // Check for sonnet models (including sonnet-4)
+
         if modelLower.contains("sonnet") {
             return sonnet4
         }
-        
-        // Check for haiku models (if needed)
+
         if modelLower.contains("haiku") {
-            // Default to sonnet pricing for now
-            return sonnet4
+            return haiku4
         }
-        
-        // Default to sonnet pricing for unknown models
+
         return sonnet4
     }
     
