@@ -11,6 +11,46 @@ import Foundation
 import Observation
 import ClaudeCodeUsage
 
+// MARK: - Tooltip Position Calculator (Pure Functions)
+
+private enum TooltipPositionCalculator {
+    /// Calculate tooltip position for a hovered day
+    /// - Parameters:
+    ///   - day: The day being hovered
+    ///   - cellSize: Size of each cell in the grid
+    ///   - squareSize: Size of the day square
+    ///   - gridContentPadding: Horizontal padding applied to grid content
+    /// - Returns: Position for the tooltip
+    static func position(
+        for day: HeatmapDay,
+        cellSize: CGFloat,
+        squareSize: CGFloat,
+        gridContentPadding: CGFloat = 4
+    ) -> CGPoint {
+        let squareCenterX = CGFloat(day.weekOfYear) * cellSize + (cellSize / 2) + gridContentPadding
+        let squareCenterY = CGFloat(day.dayOfWeek) * cellSize + (cellSize / 2)
+        return CGPoint(
+            x: squareCenterX,
+            y: squareCenterY - squareSize - 20
+        )
+    }
+}
+
+// MARK: - Date Validation (Pure Functions)
+
+private enum DailyUsageValidator {
+    /// Validate daily usage dates and return invalid date strings
+    /// - Parameters:
+    ///   - dailyUsage: Array of daily usage records
+    ///   - dateFormatter: Formatter to validate dates
+    /// - Returns: Array of invalid date strings
+    static func findInvalidDates(in dailyUsage: [DailyUsage], using dateFormatter: DateFormatter) -> [String] {
+        dailyUsage
+            .map(\.date)
+            .filter { dateFormatter.date(from: $0) == nil }
+    }
+}
+
 // MARK: - Heatmap View Model
 
 /// View model managing heatmap data, state, and business logic
@@ -71,71 +111,35 @@ public final class HeatmapViewModel {
         self.configuration = configuration
     }
     
-    // MARK: - Public Interface
-    
+    // MARK: - Public Interface (High Level)
+
     /// Update heatmap with new usage statistics
     /// - Parameter stats: Usage statistics to visualize
     public func updateStats(_ stats: UsageStats) async {
         isLoading = true
         error = nil
         currentStats = stats
-        
+
         await generateDataset(from: stats)
-        
+
         isLoading = false
     }
-    
+
     /// Handle hover at specific location
     /// - Parameters:
     ///   - location: Cursor location in heatmap coordinate space
     ///   - gridBounds: Bounds of the heatmap grid
     public func handleHover(at location: CGPoint, in gridBounds: CGRect) {
-        performanceMetrics.hoverEventCount += 1
-        let startTime = CFAbsoluteTimeGetCurrent()
-        
-        defer {
-            let duration = CFAbsoluteTimeGetCurrent() - startTime
-            performanceMetrics.averageHoverTime = (performanceMetrics.averageHoverTime + duration) / 2
-        }
-        
-        guard let dataset = dataset else {
-            hoveredDay = nil
-            return
-        }
-        
-        let day = findDayAtLocation(location, in: gridBounds, dataset: dataset)
-        
-        // Only update if different day to minimize state changes
-        if hoveredDay?.id != day?.id {
-            hoveredDay = day
-            
-            if let day = day {
-                // Calculate the exact position of the day square
-                let cellSize = configuration.cellSize
-                let weekIndex = day.weekOfYear
-                let dayIndex = day.dayOfWeek
-                
-                // Account for the horizontal padding applied to grid content (4 points from HeatmapGrid)
-                let gridContentPadding: CGFloat = 4
-                
-                // Calculate center of the day square
-                let squareCenterX = CGFloat(weekIndex) * cellSize + (cellSize / 2) + gridContentPadding
-                let squareCenterY = CGFloat(dayIndex) * cellSize + (cellSize / 2)
-                
-                // Position tooltip above the day square
-                tooltipPosition = CGPoint(
-                    x: squareCenterX,
-                    y: squareCenterY - configuration.squareSize - 20 // Above the square with gap
-                )
-            }
+        trackHoverPerformance {
+            updateHoveredDay(at: location, in: gridBounds)
         }
     }
-    
+
     /// End hover interaction
     public func endHover() {
         hoveredDay = nil
     }
-    
+
     /// Get accessibility label for a specific day
     /// - Parameter day: The day to get accessibility info for
     /// - Returns: Accessibility label string
@@ -144,11 +148,11 @@ public final class HeatmapViewModel {
         let costPrefix = "Cost:"
         return "\(datePrefix) \(day.dateString), \(costPrefix) \(day.costString)"
     }
-    
+
     /// Get summary statistics for the current dataset
     public var summaryStats: SummaryStats? {
         guard let dataset = dataset else { return nil }
-        
+
         return SummaryStats(
             totalCost: dataset.totalCost,
             daysWithUsage: dataset.daysWithUsage,
@@ -158,147 +162,122 @@ public final class HeatmapViewModel {
             dateRange: dataset.dateRange
         )
     }
-    
-    // MARK: - Private Methods
-    
-    // Note: @Observable automatically tracks property changes, no manual setup needed
-    
+
+    // MARK: - Data Generation (Orchestration)
+
     /// Generate heatmap dataset from usage statistics
     /// - Parameter stats: Usage statistics to process
     private func generateDataset(from stats: UsageStats) async {
         do {
             let startTime = CFAbsoluteTimeGetCurrent()
-            
-            // Add small delay to ensure loading state can be tested
-            try await Task.sleep(nanoseconds: 10_000_000) // 10ms
-            
-            // Validate daily usage dates first to catch invalid dates
-            let validDailyUsage = try validateAndParseDailyUsage(stats.byDate)
-            
-            // Calculate date range (365 days ending today, adjusted for complete weeks)
-            let dateRange = dateCalculator.rollingDateRangeWithCompleteWeeks(numberOfDays: 365)
-            
-            // Validate date range
-            let validationErrors = dateCalculator.validateDateRange(
-                startDate: dateRange.start,
-                endDate: dateRange.end
-            )
-            
-            guard validationErrors.isEmpty else {
-                throw HeatmapError.invalidDateRange(validationErrors.joined(separator: ", "))
-            }
-            
-            // Generate heatmap data using validated daily usage
-            let weeks = await generateWeeksData(
-                from: dateRange.start,
-                to: dateRange.end,
-                dailyUsage: validDailyUsage
-            )
-            
-            // Generate month labels
-            let monthLabels = generateMonthLabels(from: dateRange.start, to: dateRange.end)
-            
-            // Calculate maximum cost for scaling - use validated daily usage
-            let maxCost = validDailyUsage.map(\.totalCost).max() ?? 1.0
-            
-            // Create dataset
-            let dataset = HeatmapDataset(
-                weeks: weeks,
-                monthLabels: monthLabels,
-                maxCost: maxCost,
-                dateRange: dateRange.start...dateRange.end
-            )
-            
+
+            try await Task.sleep(nanoseconds: 10_000_000) // 10ms for testability
+
+            let validDailyUsage = try validateDailyUsage(stats.byDate)
+            let dateRange = try calculateValidDateRange()
+            let dataset = await buildDataset(from: validDailyUsage, dateRange: dateRange)
+
             self.dataset = dataset
-            
-            let duration = CFAbsoluteTimeGetCurrent() - startTime
-            performanceMetrics.datasetGenerationTime = duration
-            
-            print("Generated heatmap dataset in \(String(format: "%.3f", duration))s")
-            
+            recordDatasetGenerationTime(since: startTime)
+
         } catch {
-            self.error = error as? HeatmapError ?? .dataProcessingFailed(error.localizedDescription)
-            self.dataset = nil
+            handleDatasetError(error)
         }
     }
-    
-    /// Validate and parse daily usage data to catch invalid dates early
-    /// - Parameter dailyUsage: Array of daily usage records
-    /// - Returns: Validated daily usage with parsed dates
-    /// - Throws: HeatmapError.invalidDateRange if any dates are invalid
-    private func validateAndParseDailyUsage(_ dailyUsage: [DailyUsage]) throws -> [DailyUsage] {
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd"
-        dateFormatter.timeZone = TimeZone.current
-        
-        var invalidDates: [String] = []
-        
-        for usage in dailyUsage {
-            if dateFormatter.date(from: usage.date) == nil {
-                invalidDates.append(usage.date)
-            }
-        }
-        
-        if !invalidDates.isEmpty {
-            throw HeatmapError.invalidDateRange("Invalid date format(s): \(invalidDates.joined(separator: ", "))")
-        }
-        
-        return dailyUsage
+
+    /// Build complete dataset from validated inputs
+    private func buildDataset(
+        from dailyUsage: [DailyUsage],
+        dateRange: (start: Date, end: Date)
+    ) async -> HeatmapDataset {
+        let weeks = await generateWeeksData(
+            from: dateRange.start,
+            to: dateRange.end,
+            dailyUsage: dailyUsage
+        )
+        let monthLabels = generateMonthLabels(from: dateRange.start, to: dateRange.end)
+        let maxCost = calculateMaxCost(from: dailyUsage)
+
+        return HeatmapDataset(
+            weeks: weeks,
+            monthLabels: monthLabels,
+            maxCost: maxCost,
+            dateRange: dateRange.start...dateRange.end
+        )
     }
-    
+
+    // MARK: - Week/Month Generation (Mid Level)
+
     /// Generate weeks data for heatmap
     private func generateWeeksData(
         from startDate: Date,
         to endDate: Date,
         dailyUsage: [DailyUsage]
     ) async -> [HeatmapWeek] {
-        // Create cost lookup dictionary for O(1) access
-        let costLookup = Dictionary(
-            dailyUsage.map { ($0.date, $0.totalCost) },
-            uniquingKeysWith: { first, _ in first }
-        )
-        
-        let maxCost = dailyUsage.map(\.totalCost).max() ?? 1.0
-        
-        // Generate weeks layout
+        let costLookup = buildCostLookup(from: dailyUsage)
+        let maxCost = calculateMaxCost(from: dailyUsage)
         let weeksLayout = dateCalculator.generateWeeksLayout(from: startDate, to: endDate)
-        
+
+        return buildWeeks(
+            from: weeksLayout,
+            costLookup: costLookup,
+            maxCost: maxCost,
+            dateRange: startDate...endDate
+        )
+    }
+
+    /// Build weeks array from layout
+    private func buildWeeks(
+        from weeksLayout: [[Date?]],
+        costLookup: [String: Double],
+        maxCost: Double,
+        dateRange: ClosedRange<Date>
+    ) -> [HeatmapWeek] {
         var weeks: [HeatmapWeek] = []
         weeks.reserveCapacity(weeksLayout.count)
-        
+
         for (weekIndex, weekDates) in weeksLayout.enumerated() {
-            var weekDays: [HeatmapDay?] = Array(repeating: nil, count: 7)
-            
-            for (dayIndex, dayDate) in weekDates.enumerated() {
-                guard let dayDate = dayDate else { continue }
-                
-                // Only include days within our target range
-                if dayDate >= startDate && dayDate <= endDate {
-                    let dateString = dateCalculator.formatDateAsID(dayDate)
-                    let cost = costLookup[dateString] ?? 0.0
-                    let calendarProps = dateCalculator.calendarProperties(for: dayDate)
-                    
-                    weekDays[dayIndex] = HeatmapDay(
-                        date: dayDate,
-                        cost: cost,
-                        dayOfYear: calendarProps.dayOfYear,
-                        weekOfYear: weekIndex,
-                        dayOfWeek: dayIndex,
-                        maxCost: maxCost
-                    )
-                }
-            }
-            
+            let weekDays = buildWeekDays(
+                from: weekDates,
+                weekIndex: weekIndex,
+                costLookup: costLookup,
+                maxCost: maxCost,
+                dateRange: dateRange
+            )
             weeks.append(HeatmapWeek(weekNumber: weekIndex, days: weekDays))
         }
-        
+
         return weeks
     }
-    
+
+    /// Build days array for a single week
+    private func buildWeekDays(
+        from weekDates: [Date?],
+        weekIndex: Int,
+        costLookup: [String: Double],
+        maxCost: Double,
+        dateRange: ClosedRange<Date>
+    ) -> [HeatmapDay?] {
+        var weekDays: [HeatmapDay?] = Array(repeating: nil, count: 7)
+
+        for (dayIndex, dayDate) in weekDates.enumerated() {
+            guard let dayDate = dayDate, dateRange.contains(dayDate) else { continue }
+            weekDays[dayIndex] = createHeatmapDay(
+                for: dayDate,
+                dayIndex: dayIndex,
+                weekIndex: weekIndex,
+                costLookup: costLookup,
+                maxCost: maxCost
+            )
+        }
+
+        return weekDays
+    }
+
     /// Generate month labels for heatmap header
     private func generateMonthLabels(from startDate: Date, to endDate: Date) -> [HeatmapMonth] {
         let monthInfos = dateCalculator.generateMonthLabels(from: startDate, to: endDate)
-        
+
         return monthInfos.map { info in
             HeatmapMonth(
                 name: info.name,
@@ -309,7 +288,75 @@ public final class HeatmapViewModel {
             )
         }
     }
-    
+
+    // MARK: - Calculations (Low Level)
+
+    /// Validate daily usage dates
+    private func validateDailyUsage(_ dailyUsage: [DailyUsage]) throws -> [DailyUsage] {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        dateFormatter.timeZone = TimeZone.current
+
+        let invalidDates = DailyUsageValidator.findInvalidDates(in: dailyUsage, using: dateFormatter)
+
+        guard invalidDates.isEmpty else {
+            throw HeatmapError.invalidDateRange("Invalid date format(s): \(invalidDates.joined(separator: ", "))")
+        }
+
+        return dailyUsage
+    }
+
+    /// Calculate and validate date range
+    private func calculateValidDateRange() throws -> (start: Date, end: Date) {
+        let dateRange = dateCalculator.rollingDateRangeWithCompleteWeeks(numberOfDays: 365)
+
+        let validationErrors = dateCalculator.validateDateRange(
+            startDate: dateRange.start,
+            endDate: dateRange.end
+        )
+
+        guard validationErrors.isEmpty else {
+            throw HeatmapError.invalidDateRange(validationErrors.joined(separator: ", "))
+        }
+
+        return dateRange
+    }
+
+    /// Build cost lookup dictionary for O(1) access
+    private func buildCostLookup(from dailyUsage: [DailyUsage]) -> [String: Double] {
+        Dictionary(
+            dailyUsage.map { ($0.date, $0.totalCost) },
+            uniquingKeysWith: { first, _ in first }
+        )
+    }
+
+    /// Calculate maximum cost from daily usage
+    private func calculateMaxCost(from dailyUsage: [DailyUsage]) -> Double {
+        dailyUsage.map(\.totalCost).max() ?? 1.0
+    }
+
+    /// Create a HeatmapDay for a specific date
+    private func createHeatmapDay(
+        for date: Date,
+        dayIndex: Int,
+        weekIndex: Int,
+        costLookup: [String: Double],
+        maxCost: Double
+    ) -> HeatmapDay {
+        let dateString = dateCalculator.formatDateAsID(date)
+        let cost = costLookup[dateString] ?? 0.0
+        let calendarProps = dateCalculator.calendarProperties(for: date)
+
+        return HeatmapDay(
+            date: date,
+            cost: cost,
+            dayOfYear: calendarProps.dayOfYear,
+            weekOfYear: weekIndex,
+            dayOfWeek: dayIndex,
+            maxCost: maxCost
+        )
+    }
+
     /// Find day at specific location in heatmap grid
     private func findDayAtLocation(
         _ location: CGPoint,
@@ -317,23 +364,69 @@ public final class HeatmapViewModel {
         dataset: HeatmapDataset
     ) -> HeatmapDay? {
         let cellSize = configuration.cellSize
-        
-        // Account for the horizontal padding applied to grid content (4 points from HeatmapGrid)
         let gridContentPadding: CGFloat = 4
-        
-        // Convert location to grid coordinates
+
         let weekIndex = Int((location.x - gridContentPadding) / cellSize)
         let dayIndex = Int(location.y / cellSize)
-        
-        // Validate coordinates
+
         guard weekIndex >= 0,
               weekIndex < dataset.weeks.count,
               dayIndex >= 0,
               dayIndex < 7 else {
             return nil
         }
-        
+
         return dataset.weeks[weekIndex].days[dayIndex]
+    }
+
+    // MARK: - Hover Handling (Mid Level)
+
+    /// Update hovered day based on location
+    private func updateHoveredDay(at location: CGPoint, in gridBounds: CGRect) {
+        guard let dataset = dataset else {
+            hoveredDay = nil
+            return
+        }
+
+        let day = findDayAtLocation(location, in: gridBounds, dataset: dataset)
+
+        guard hoveredDay?.id != day?.id else { return }
+
+        hoveredDay = day
+
+        if let day = day {
+            tooltipPosition = TooltipPositionCalculator.position(
+                for: day,
+                cellSize: configuration.cellSize,
+                squareSize: configuration.squareSize
+            )
+        }
+    }
+
+    // MARK: - Performance Tracking (Low Level)
+
+    /// Track hover event performance
+    private func trackHoverPerformance(_ operation: () -> Void) {
+        performanceMetrics.hoverEventCount += 1
+        let startTime = CFAbsoluteTimeGetCurrent()
+
+        operation()
+
+        let duration = CFAbsoluteTimeGetCurrent() - startTime
+        performanceMetrics.averageHoverTime = (performanceMetrics.averageHoverTime + duration) / 2
+    }
+
+    /// Record dataset generation time
+    private func recordDatasetGenerationTime(since startTime: CFAbsoluteTime) {
+        let duration = CFAbsoluteTimeGetCurrent() - startTime
+        performanceMetrics.datasetGenerationTime = duration
+        print("Generated heatmap dataset in \(String(format: "%.3f", duration))s")
+    }
+
+    /// Handle dataset generation error
+    private func handleDatasetError(_ error: Error) {
+        self.error = error as? HeatmapError ?? .dataProcessingFailed(error.localizedDescription)
+        self.dataset = nil
     }
 }
 
