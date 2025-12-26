@@ -30,6 +30,9 @@ playground.xcworkspace
 # .swiftpm
 
 .build/
+.build-temp/
+test_output.txt
+*.lcov
 
 # CocoaPods
 #
