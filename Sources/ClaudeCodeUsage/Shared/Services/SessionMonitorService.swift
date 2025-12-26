@@ -17,15 +17,29 @@ protocol SessionMonitorService {
     func getAutoTokenLimit() async -> Int?
 }
 
+// MARK: - Cache Configuration
+
+private enum CacheConfig {
+    static let ttl: TimeInterval = 2.0
+}
+
+// MARK: - Pure Functions
+
+private func isCacheValid(timestamp: Date, ttl: TimeInterval = CacheConfig.ttl) -> Bool {
+    Date().timeIntervalSince(timestamp) < ttl
+}
+
+private func cacheAge(from timestamp: Date) -> TimeInterval {
+    Date().timeIntervalSince(timestamp)
+}
+
 // MARK: - Default Implementation
 
 final class DefaultSessionMonitorService: SessionMonitorService {
     private let monitor: LiveMonitor
 
-    // Cache for session data with short TTL
     private var cachedSession: (session: SessionBlock?, timestamp: Date)?
     private var cachedTokenLimit: (limit: Int?, timestamp: Date)?
-    private let cacheTTL: TimeInterval = 2.0
 
     init(configuration: AppConfiguration) {
         let config = LiveMonitorConfig(
@@ -39,64 +53,60 @@ final class DefaultSessionMonitorService: SessionMonitorService {
     }
 
     func getActiveSession() async -> SessionBlock? {
-        let startTime = Date()
-
-        // Check cache first
-        if let cached = cachedSession,
-           Date().timeIntervalSince(cached.timestamp) < cacheTTL {
-            #if DEBUG
-            print("[SessionMonitorService] getActiveSession returned from cache (age: \(String(format: "%.3f", Date().timeIntervalSince(cached.timestamp)))s)")
-            #endif
+        if let cached = cachedSession, isCacheValid(timestamp: cached.timestamp) {
+            logCacheHit("getActiveSession", age: cacheAge(from: cached.timestamp))
             return cached.session
         }
 
-        // Load fresh data
-        let result = await monitor.getActiveBlock()
-
-        // Update cache
+        let (result, duration) = await timed { await monitor.getActiveBlock() }
         cachedSession = (result, Date())
-
-        #if DEBUG
-        let duration = Date().timeIntervalSince(startTime)
-        print("[SessionMonitorService] getActiveSession completed in \(String(format: "%.3f", duration))s - session: \(result != nil ? "found" : "none")")
-        #endif
+        logFetch("getActiveSession", duration: duration, found: result != nil)
         return result
     }
 
     func getBurnRate() async -> BurnRate? {
-        let startTime = Date()
-        let result = await getActiveSession()?.burnRate
-        #if DEBUG
-        let duration = Date().timeIntervalSince(startTime)
-        print("[SessionMonitorService] getBurnRate completed in \(String(format: "%.3f", duration))s")
-        #endif
+        let (result, duration) = await timed { await getActiveSession()?.burnRate }
+        logFetch("getBurnRate", duration: duration, found: result != nil)
         return result
     }
 
     func getAutoTokenLimit() async -> Int? {
-        let startTime = Date()
-
-        // Check cache first
-        if let cached = cachedTokenLimit,
-           Date().timeIntervalSince(cached.timestamp) < cacheTTL {
-            #if DEBUG
-            print("[SessionMonitorService] getAutoTokenLimit returned from cache (age: \(String(format: "%.3f", Date().timeIntervalSince(cached.timestamp)))s)")
-            #endif
+        if let cached = cachedTokenLimit, isCacheValid(timestamp: cached.timestamp) {
+            logCacheHit("getAutoTokenLimit", age: cacheAge(from: cached.timestamp))
             return cached.limit
         }
 
-        // Load fresh data
-        let result = await monitor.getAutoTokenLimit()
-
-        // Update cache
+        let (result, duration) = await timed { await monitor.getAutoTokenLimit() }
         cachedTokenLimit = (result, Date())
-
-        #if DEBUG
-        let duration = Date().timeIntervalSince(startTime)
-        print("[SessionMonitorService] getAutoTokenLimit completed in \(String(format: "%.3f", duration))s - limit: \(result ?? 0)")
-        #endif
+        logFetch("getAutoTokenLimit", duration: duration, value: result)
         return result
     }
+}
+
+// MARK: - Infrastructure Helpers
+
+private func timed<T>(_ operation: () async -> T) async -> (result: T, duration: TimeInterval) {
+    let start = Date()
+    let result = await operation()
+    return (result, Date().timeIntervalSince(start))
+}
+
+private func logCacheHit(_ method: String, age: TimeInterval) {
+    #if DEBUG
+    print("[SessionMonitorService] \(method) returned from cache (age: \(String(format: "%.3f", age))s)")
+    #endif
+}
+
+private func logFetch(_ method: String, duration: TimeInterval, found: Bool) {
+    #if DEBUG
+    print("[SessionMonitorService] \(method) completed in \(String(format: "%.3f", duration))s - \(found ? "found" : "none")")
+    #endif
+}
+
+private func logFetch(_ method: String, duration: TimeInterval, value: Int?) {
+    #if DEBUG
+    print("[SessionMonitorService] \(method) completed in \(String(format: "%.3f", duration))s - limit: \(value ?? 0)")
+    #endif
 }
 
 // MARK: - Mock for Testing

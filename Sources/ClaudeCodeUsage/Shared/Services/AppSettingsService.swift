@@ -8,7 +8,8 @@ import ServiceManagement
 import SwiftUI
 import Observation
 
-// MARK: - Protocol for Dependency Injection
+// MARK: - Protocol
+
 @MainActor
 protocol AppSettingsServiceProtocol: AnyObject {
     var isOpenAtLoginEnabled: Bool { get }
@@ -17,11 +18,12 @@ protocol AppSettingsServiceProtocol: AnyObject {
 }
 
 // MARK: - Error Handling
+
 enum AppSettingsError: LocalizedError {
     case serviceManagementFailed(Error)
     case permissionDenied
     case unsupportedOS
-    
+
     var errorDescription: String? {
         switch self {
         case .serviceManagementFailed(let error):
@@ -32,7 +34,7 @@ enum AppSettingsError: LocalizedError {
             return "Open at Login requires macOS 13.0 or later"
         }
     }
-    
+
     var recoverySuggestion: String? {
         switch self {
         case .serviceManagementFailed:
@@ -45,89 +47,102 @@ enum AppSettingsError: LocalizedError {
     }
 }
 
+// MARK: - App Metadata
+
+private enum AppMetadata {
+    static let name = "Usage Dashboard"
+    static let version = "1.0.0"
+    static let credits = "Claude Code Usage Tracking"
+}
+
 // MARK: - Main Implementation
+
 @Observable
 @MainActor
 final class AppSettingsService: AppSettingsServiceProtocol {
     private(set) var isOpenAtLoginEnabled: Bool = false
-    
-    // App metadata
-    let appName = "Usage Dashboard"
-    let appVersion = "1.0.0"
-    let appCredits = "Claude Code Usage Tracking"
-    
+
+    var appName: String { AppMetadata.name }
+
     init() {
-        Task {
-            await checkOpenAtLoginStatus()
-        }
+        refreshLoginStatus()
     }
-    
-    // MARK: - Open at Login Management
-    
+
+    // MARK: - Public API (High-Level Intent)
+
     func setOpenAtLogin(_ enabled: Bool) async -> Result<Void, AppSettingsError> {
         guard #available(macOS 13.0, *) else {
             return .failure(.unsupportedOS)
         }
-        
+
+        guard needsChange(to: enabled) else {
+            return .success(())
+        }
+
         do {
-            if enabled {
-                if SMAppService.mainApp.status == .enabled {
-                    return .success(())
-                }
-                try SMAppService.mainApp.register()
-            } else {
-                if SMAppService.mainApp.status != .enabled {
-                    return .success(())
-                }
-                try await SMAppService.mainApp.unregister()
-            }
-            
-            await checkOpenAtLoginStatus()
+            try await updateServiceRegistration(enabled: enabled)
+            refreshLoginStatus()
             return .success(())
         } catch {
             print("[AppSettings] Failed to set launch at login: \(error)")
             return .failure(.serviceManagementFailed(error))
         }
     }
-    
-    @MainActor
-    private func checkOpenAtLoginStatus() async {
+
+    func showAboutPanel() {
+        NSApp.orderFrontStandardAboutPanel(options: aboutPanelOptions)
+    }
+
+    // MARK: - Private Helpers (Infrastructure)
+
+    @available(macOS 13.0, *)
+    private func needsChange(to enabled: Bool) -> Bool {
+        let currentlyEnabled = SMAppService.mainApp.status == .enabled
+        return currentlyEnabled != enabled
+    }
+
+    @available(macOS 13.0, *)
+    private func updateServiceRegistration(enabled: Bool) async throws {
+        if enabled {
+            try SMAppService.mainApp.register()
+        } else {
+            try await SMAppService.mainApp.unregister()
+        }
+    }
+
+    private func refreshLoginStatus() {
         guard #available(macOS 13.0, *) else {
             isOpenAtLoginEnabled = false
             return
         }
-        
         isOpenAtLoginEnabled = SMAppService.mainApp.status == .enabled
     }
-    
-    // MARK: - About Panel
-    
-    func showAboutPanel() {
-        NSApp.orderFrontStandardAboutPanel(
-            options: [
-                .applicationName: appName,
-                .applicationVersion: appVersion,
-                .credits: NSAttributedString(
-                    string: appCredits,
-                    attributes: [.font: NSFont.systemFont(ofSize: 11)]
-                )
-            ]
-        )
+
+    private var aboutPanelOptions: [NSApplication.AboutPanelOptionKey: Any] {
+        [
+            .applicationName: AppMetadata.name,
+            .applicationVersion: AppMetadata.version,
+            .credits: NSAttributedString(
+                string: AppMetadata.credits,
+                attributes: [.font: NSFont.systemFont(ofSize: 11)]
+            )
+        ]
     }
 }
 
 // MARK: - Mock for Testing
+
 #if DEBUG
 @Observable
 @MainActor
 final class MockAppSettingsService: AppSettingsServiceProtocol {
     private(set) var isOpenAtLoginEnabled: Bool = false
-    
+
     func setOpenAtLogin(_ enabled: Bool) async -> Result<Void, AppSettingsError> {
         isOpenAtLoginEnabled = enabled
         return .success(())
     }
-    
+
     func showAboutPanel() {
         print("[Mock] About panel shown")
     }

@@ -14,7 +14,7 @@ ClaudeCodeUsage is a Swift SDK and application suite for analyzing Claude Code u
 swift build
 
 # Run the macOS menu bar app
-swift run UsageDashboardApp
+swift run ClaudeCodeUsage
 
 # Run the CLI dashboard
 swift run UsageDashboardCLI
@@ -97,7 +97,7 @@ struct BadView: View {
 ### Package Structure
 The project uses Swift Package Manager with multiple targets:
 - **ClaudeCodeUsage**: Core SDK library with clean architecture
-- **UsageDashboardApp**: SwiftUI macOS menu bar application  
+- **ClaudeCodeUsage**: SwiftUI macOS menu bar application  
 - **UsageDashboardCLI**: Command-line dashboard interface
 - **SimpleCLI**: Basic CLI usage example
 

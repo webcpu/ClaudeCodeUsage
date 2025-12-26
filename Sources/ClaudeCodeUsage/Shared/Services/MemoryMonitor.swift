@@ -1,6 +1,6 @@
 //
 //  MemoryMonitor.swift
-//  UsageDashboardApp
+//  ClaudeCodeUsage
 //
 //  Memory monitoring and management for the menu bar app
 //
@@ -11,33 +11,96 @@ import os.log
 
 private let logger = Logger(subsystem: "com.claudecodeusage.app", category: "MemoryMonitor")
 
+// MARK: - Constants
+
+private enum MemoryConstants {
+    static let bytesPerMegabyte: Double = 1_048_576
+
+    enum PressureThreshold {
+        static let warning: Double = 0.01
+        static let critical: Double = 0.05
+        static let terminal: Double = 0.10
+    }
+
+    enum TrendThreshold {
+        static let changePercent: Double = 10.0
+        static let sampleCount = 5
+    }
+
+    enum Defaults {
+        static let warningThresholdMB: Double = 100.0
+        static let criticalThresholdMB: Double = 200.0
+        static let historyLimit = 100
+        static let updateInterval: TimeInterval = 30.0
+    }
+}
+
+// MARK: - Pure Functions
+
+private func bytesToMegabytes(_ bytes: Int64) -> Double {
+    Double(bytes) / MemoryConstants.bytesPerMegabyte
+}
+
+private func calculatePressureLevel(footprint: Int64, totalMemory: Int64) -> MemoryPressureLevel {
+    let usageRatio = Double(footprint) / Double(totalMemory)
+    switch usageRatio {
+    case ..<MemoryConstants.PressureThreshold.warning: return .nominal
+    case ..<MemoryConstants.PressureThreshold.critical: return .warning
+    case ..<MemoryConstants.PressureThreshold.terminal: return .critical
+    default: return .terminal
+    }
+}
+
+private func calculateTrend(from history: [MemoryStats]) -> MemoryTrend {
+    guard history.count >= 2 else { return .stable }
+
+    let recent = history.suffix(MemoryConstants.TrendThreshold.sampleCount)
+    guard let first = recent.first, let last = recent.last, first.footprint > 0 else {
+        return .stable
+    }
+
+    let changePercent = Double(last.footprint - first.footprint) / Double(first.footprint) * 100
+
+    switch changePercent {
+    case MemoryConstants.TrendThreshold.changePercent...: return .increasing
+    case ..<(-MemoryConstants.TrendThreshold.changePercent): return .decreasing
+    default: return .stable
+    }
+}
+
+// MARK: - Memory Trend
+
+public enum MemoryTrend: String, Sendable {
+    case increasing
+    case decreasing
+    case stable
+}
+
 // MARK: - Memory Information
 
 /// Memory usage statistics
 public struct MemoryStats: Sendable {
-    public let usedMemory: Int64        // Bytes
-    public let freeMemory: Int64        // Bytes
-    public let totalMemory: Int64       // Bytes
-    public let footprint: Int64         // App's memory footprint
-    public let peakFootprint: Int64     // Peak memory usage
+    public let usedMemory: Int64
+    public let freeMemory: Int64
+    public let totalMemory: Int64
+    public let footprint: Int64
+    public let peakFootprint: Int64
     public let timestamp: Date
-    
+
     public var usedMemoryMB: Double {
-        Double(usedMemory) / 1_048_576
+        bytesToMegabytes(usedMemory)
     }
-    
+
+    public var freeMemoryMB: Double {
+        bytesToMegabytes(freeMemory)
+    }
+
     public var footprintMB: Double {
-        Double(footprint) / 1_048_576
+        bytesToMegabytes(footprint)
     }
-    
+
     public var memoryPressure: MemoryPressureLevel {
-        let usageRatio = Double(footprint) / Double(totalMemory)
-        switch usageRatio {
-        case ..<0.01: return .nominal
-        case ..<0.05: return .warning
-        case ..<0.10: return .critical
-        default: return .terminal
-        }
+        calculatePressureLevel(footprint: footprint, totalMemory: totalMemory)
     }
 }
 
@@ -47,13 +110,22 @@ public enum MemoryPressureLevel: String, CaseIterable, Sendable {
     case warning = "Warning"
     case critical = "Critical"
     case terminal = "Terminal"
-    
+
     public var color: String {
         switch self {
         case .nominal: return "green"
         case .warning: return "yellow"
         case .critical: return "orange"
         case .terminal: return "red"
+        }
+    }
+
+    public var systemImage: String {
+        switch self {
+        case .nominal: return "memorychip"
+        case .warning: return "exclamationmark.triangle"
+        case .critical: return "exclamationmark.triangle.fill"
+        case .terminal: return "xmark.circle.fill"
         }
     }
 }
@@ -73,10 +145,10 @@ public final class MemoryMonitor {
     public private(set) var lastWarning: Date?
     
     // Configuration
-    public var warningThresholdMB: Double = 100.0
-    public var criticalThresholdMB: Double = 200.0
-    public var historyLimit: Int = 100
-    public var updateInterval: TimeInterval = 30.0
+    public var warningThresholdMB: Double = MemoryConstants.Defaults.warningThresholdMB
+    public var criticalThresholdMB: Double = MemoryConstants.Defaults.criticalThresholdMB
+    public var historyLimit: Int = MemoryConstants.Defaults.historyLimit
+    public var updateInterval: TimeInterval = MemoryConstants.Defaults.updateInterval
     
     private var monitoringTask: Task<Void, Never>?
     private var pressureSource: DispatchSourceMemoryPressure?
@@ -140,23 +212,8 @@ public final class MemoryMonitor {
     }
     
     /// Get memory trend (increasing/decreasing)
-    public func getMemoryTrend() -> String {
-        guard memoryHistory.count >= 2 else { return "stable" }
-        
-        let recent = memoryHistory.suffix(5)
-        let firstValue = recent.first?.footprint ?? 0
-        let lastValue = recent.last?.footprint ?? 0
-        
-        let change = lastValue - firstValue
-        let changePercent = Double(change) / Double(firstValue) * 100
-        
-        if changePercent > 10 {
-            return "increasing"
-        } else if changePercent < -10 {
-            return "decreasing"
-        } else {
-            return "stable"
-        }
+    public func getMemoryTrend() -> MemoryTrend {
+        calculateTrend(from: memoryHistory)
     }
     
     // MARK: - Private Methods
@@ -179,51 +236,15 @@ public final class MemoryMonitor {
     }
     
     private func getMemoryStatistics() -> MemoryStats {
-        var info = mach_task_basic_info()
-        var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size) / 4
-        
-        let result = withUnsafeMutablePointer(to: &info) {
-            $0.withMemoryRebound(to: integer_t.self, capacity: 1) {
-                task_info(mach_task_self_,
-                         task_flavor_t(MACH_TASK_BASIC_INFO),
-                         $0,
-                         &count)
-            }
-        }
-        
-        let footprint = result == KERN_SUCCESS ? Int64(info.resident_size) : 0
-        
-        // Get system memory info
-        let pageSize = vm_kernel_page_size
-        var vmStats = vm_statistics64()
-        var vmStatsSize = mach_msg_type_number_t(MemoryLayout<vm_statistics64>.size / MemoryLayout<natural_t>.size)
-        
-        let hostPort = mach_host_self()
-        let vmResult = withUnsafeMutablePointer(to: &vmStats) {
-            $0.withMemoryRebound(to: integer_t.self, capacity: Int(vmStatsSize)) {
-                host_statistics64(hostPort, HOST_VM_INFO64, $0, &vmStatsSize)
-            }
-        }
-        
-        let totalMemory: Int64
-        let freeMemory: Int64
-        
-        if vmResult == KERN_SUCCESS {
-            totalMemory = Int64(ProcessInfo.processInfo.physicalMemory)
-            freeMemory = Int64(vmStats.free_count) * Int64(pageSize)
-        } else {
-            totalMemory = Int64(ProcessInfo.processInfo.physicalMemory)
-            freeMemory = totalMemory / 2 // Rough estimate
-        }
-        
-        let usedMemory = totalMemory - freeMemory
-        
+        let footprint = SystemMemory.fetchTaskFootprint()
+        let systemInfo = SystemMemory.fetchSystemInfo()
+
         return MemoryStats(
-            usedMemory: usedMemory,
-            freeMemory: freeMemory,
-            totalMemory: totalMemory,
+            usedMemory: systemInfo.total - systemInfo.free,
+            freeMemory: systemInfo.free,
+            totalMemory: systemInfo.total,
             footprint: footprint,
-            peakFootprint: footprint, // Would need rusage for actual peak
+            peakFootprint: footprint,
             timestamp: Date()
         )
     }
@@ -306,137 +327,51 @@ extension Notification.Name {
     static let performMemoryCleanup = Notification.Name("performMemoryCleanup")
 }
 
-// MARK: - Memory Monitor View Component
+// MARK: - System Memory Infrastructure
 
-import SwiftUI
+private enum SystemMemory {
+    struct Info {
+        let total: Int64
+        let free: Int64
+    }
 
-/// SwiftUI view for displaying memory stats
-public struct MemoryMonitorView: View {
-    @State private var monitor = MemoryMonitor()
-    @State private var showDetails = false
-    
-    public init() {}
-    
-    public var body: some View {
-        Group {
-            if let stats = monitor.currentStats {
-                HStack {
-                    Image(systemName: memoryIcon(for: stats.memoryPressure))
-                        .foregroundColor(memoryColor(for: stats.memoryPressure))
-                    
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Memory: \(stats.footprintMB, specifier: "%.1f") MB")
-                            .font(.caption)
-                        
-                        if monitor.isMemoryPressureHigh() {
-                            Text("High Usage")
-                                .font(.caption2)
-                                .foregroundColor(.orange)
-                        }
-                    }
-                    
-                    Spacer()
-                    
-                    Button(action: { showDetails.toggle() }) {
-                        Image(systemName: "info.circle")
-                            .font(.caption)
-                    }
-                    .buttonStyle(.plain)
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 4)
-            } else {
-                Text("Memory: --")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 4)
+    static func fetchTaskFootprint() -> Int64 {
+        var info = mach_task_basic_info()
+        var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size) / 4
+
+        let result = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: 1) {
+                task_info(mach_task_self_,
+                         task_flavor_t(MACH_TASK_BASIC_INFO),
+                         $0,
+                         &count)
             }
         }
-        .onAppear {
-            monitor.startMonitoring()
-        }
-        .onDisappear {
-            monitor.stopMonitoring()
-        }
-        .sheet(isPresented: $showDetails) {
-            MemoryDetailsView(monitor: monitor)
-        }
+
+        return result == KERN_SUCCESS ? Int64(info.resident_size) : 0
     }
-    
-    private func memoryIcon(for level: MemoryPressureLevel) -> String {
-        switch level {
-        case .nominal: return "memorychip"
-        case .warning: return "exclamationmark.triangle"
-        case .critical: return "exclamationmark.triangle.fill"
-        case .terminal: return "xmark.circle.fill"
+
+    static func fetchSystemInfo() -> Info {
+        let totalMemory = Int64(ProcessInfo.processInfo.physicalMemory)
+
+        let pageSize = vm_kernel_page_size
+        var vmStats = vm_statistics64()
+        var vmStatsSize = mach_msg_type_number_t(
+            MemoryLayout<vm_statistics64>.size / MemoryLayout<natural_t>.size
+        )
+
+        let hostPort = mach_host_self()
+        let result = withUnsafeMutablePointer(to: &vmStats) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(vmStatsSize)) {
+                host_statistics64(hostPort, HOST_VM_INFO64, $0, &vmStatsSize)
+            }
         }
-    }
-    
-    private func memoryColor(for level: MemoryPressureLevel) -> Color {
-        switch level {
-        case .nominal: return .green
-        case .warning: return .yellow
-        case .critical: return .orange
-        case .terminal: return .red
-        }
+
+        let freeMemory = result == KERN_SUCCESS
+            ? Int64(vmStats.free_count) * Int64(pageSize)
+            : totalMemory / 2
+
+        return Info(total: totalMemory, free: freeMemory)
     }
 }
 
-/// Detailed memory statistics view
-struct MemoryDetailsView: View {
-    let monitor: MemoryMonitor
-    @Environment(\.dismiss) private var dismiss
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text("Memory Statistics")
-                    .font(.headline)
-                
-                Spacer()
-                
-                Button("Done") {
-                    dismiss()
-                }
-            }
-            
-            if let stats = monitor.currentStats {
-                VStack(alignment: .leading, spacing: 8) {
-                    StatRow(label: "App Memory", value: "\(stats.footprintMB) MB")
-                    StatRow(label: "System Used", value: "\(stats.usedMemoryMB) MB")
-                    StatRow(label: "Free Memory", value: "\(Double(stats.freeMemory) / 1_048_576) MB")
-                    StatRow(label: "Pressure Level", value: stats.memoryPressure.rawValue)
-                    StatRow(label: "Trend", value: monitor.getMemoryTrend())
-                }
-                
-                Divider()
-                
-                // Memory history chart could go here
-                Text("History (\(monitor.memoryHistory.count) samples)")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            
-            Spacer()
-        }
-        .padding()
-        .frame(width: 300, height: 250)
-    }
-}
-
-struct StatRow: View {
-    let label: String
-    let value: String
-    
-    var body: some View {
-        HStack {
-            Text(label)
-                .foregroundColor(.secondary)
-            Spacer()
-            Text(value)
-                .fontWeight(.medium)
-        }
-        .font(.caption)
-    }
-}

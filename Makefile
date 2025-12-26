@@ -68,7 +68,7 @@ benchmark:
 
 # Run the menu bar app
 app:
-	swift run UsageDashboardApp
+	swift run ClaudeCodeUsage
 
 # Run the CLI dashboard
 cli:
@@ -88,7 +88,7 @@ release:
 
 # Install the app locally
 install: release
-	cp .build/release/UsageDashboardApp /usr/local/bin/claude-usage-app
+	cp .build/release/ClaudeCodeUsage /usr/local/bin/claude-usage-app
 	cp .build/release/UsageDashboardCLI /usr/local/bin/claude-usage-cli
 	@echo "✅ Installed to /usr/local/bin/"
 

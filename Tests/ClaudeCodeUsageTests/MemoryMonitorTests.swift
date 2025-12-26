@@ -1,6 +1,6 @@
 //
 //  MemoryMonitorTests.swift
-//  UsageDashboardAppTests
+//  ClaudeCodeUsageTests
 //
 //  Tests for memory monitoring functionality
 //
@@ -167,7 +167,7 @@ struct MemoryMonitorTests {
         let trend = monitor.getMemoryTrend()
         
         // Assert
-        #expect(trend == "increasing")
+        #expect(trend == .increasing)
         
         // Test decreasing trend
         monitor.clearHistory()
@@ -184,7 +184,7 @@ struct MemoryMonitorTests {
         }
         
         let decreasingTrend = monitor.getMemoryTrend()
-        #expect(decreasingTrend == "decreasing")
+        #expect(decreasingTrend == .decreasing)
         
         // Test stable trend
         monitor.clearHistory()
@@ -201,7 +201,7 @@ struct MemoryMonitorTests {
         }
         
         let stableTrend = monitor.getMemoryTrend()
-        #expect(stableTrend == "stable")
+        #expect(stableTrend == .stable)
     }
     
     @Test("Force update works")

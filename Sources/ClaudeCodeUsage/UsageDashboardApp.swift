@@ -1,5 +1,5 @@
 //
-//  UsageDashboardApp.swift
+//  ClaudeCodeUsageApp.swift
 //  Modern SwiftUI app using View + Store + Service architecture
 //
 
@@ -8,7 +8,7 @@ import Observation
 import ClaudeCodeUsageKit
 
 @main
-struct UsageDashboardApp: App {
+struct ClaudeCodeUsageApp: App {
     @State private var store = UsageStore()
     @State private var lifecycleManager = AppLifecycleManager()
     @State private var hasAppeared = false

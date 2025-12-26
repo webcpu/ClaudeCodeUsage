@@ -28,69 +28,60 @@ final class DefaultUsageDataService: UsageDataService {
     }
 
     func loadStats() async throws -> UsageStats {
-        let startTime = Date()
-        let range = getDateRange()
-        let result = try await client.getUsageByDateRange(
-            startDate: range.start,
-            endDate: range.end
-        )
-        #if DEBUG
-        let duration = Date().timeIntervalSince(startTime)
-        print("[UsageDataService] loadStats completed in \(String(format: "%.3f", duration))s")
-        #endif
-        return result
+        try await timed("loadStats") {
+            let range = getDateRange()
+            return try await client.getUsageByDateRange(startDate: range.start, endDate: range.end)
+        }
     }
 
     func loadEntries() async throws -> [UsageEntry] {
-        let startTime = Date()
-        let result = try await client.getUsageDetails()
-        #if DEBUG
-        let duration = Date().timeIntervalSince(startTime)
-        print("[UsageDataService] loadEntries completed in \(String(format: "%.3f", duration))s - \(result.count) entries")
-        #endif
-        return result
+        try await timed("loadEntries") { [client] in
+            try await client.getUsageDetails()
+        }
     }
 
     func loadEntriesAndStats() async throws -> (entries: [UsageEntry], stats: UsageStats) {
-        let startTime = Date()
-        let entries = try await client.getUsageDetails()
-
-        #if DEBUG
-        let entriesTime = Date().timeIntervalSince(startTime)
-        print("[UsageDataService] loadEntriesAndStats - entries loaded in \(String(format: "%.3f", entriesTime))s - \(entries.count) entries")
-        #endif
-
-        let aggregator = StatisticsAggregator()
-        let sessionCount = Set(entries.compactMap { $0.sessionId }).count
-        let stats = aggregator.aggregateStatistics(from: entries, sessionCount: sessionCount)
-
-        #if DEBUG
-        let totalTime = Date().timeIntervalSince(startTime)
-        print("[UsageDataService] loadEntriesAndStats completed in \(String(format: "%.3f", totalTime))s")
-        #endif
-
-        return (entries, stats)
+        try await timed("loadEntriesAndStats") { [client] in
+            let entries = try await client.getUsageDetails()
+            return (entries, aggregateStats(from: entries))
+        }
     }
 
     func loadTodayEntriesAndStats() async throws -> (entries: [UsageEntry], stats: UsageStats) {
-        let startTime = Date()
-        let entries = try await client.getTodayUsageEntries()
-
-        let aggregator = StatisticsAggregator()
-        let sessionCount = Set(entries.compactMap { $0.sessionId }).count
-        let stats = aggregator.aggregateStatistics(from: entries, sessionCount: sessionCount)
-
-        #if DEBUG
-        let duration = Date().timeIntervalSince(startTime)
-        print("[UsageDataService] loadTodayEntriesAndStats completed in \(String(format: "%.3f", duration))s - \(entries.count) entries")
-        #endif
-
-        return (entries, stats)
+        try await timed("loadTodayEntriesAndStats") { [client] in
+            let entries = try await client.getTodayUsageEntries()
+            return (entries, aggregateStats(from: entries))
+        }
     }
 
     func getDateRange() -> (start: Date, end: Date) {
         TimeRange.allTime.dateRange
     }
+}
+
+// MARK: - Pure Transformations
+
+private func aggregateStats(from entries: [UsageEntry]) -> UsageStats {
+    let sessionCount = countUniqueSessions(in: entries)
+    return StatisticsAggregator().aggregateStatistics(from: entries, sessionCount: sessionCount)
+}
+
+private func countUniqueSessions(in entries: [UsageEntry]) -> Int {
+    Set(entries.compactMap(\.sessionId)).count
+}
+
+// MARK: - Debug Timing
+
+private func timed<T>(_ label: String, operation: () async throws -> T) async rethrows -> T {
+    #if DEBUG
+    let start = Date()
+    let result = try await operation()
+    let duration = Date().timeIntervalSince(start)
+    print("[UsageDataService] \(label) completed in \(String(format: "%.3f", duration))s")
+    return result
+    #else
+    return try await operation()
+    #endif
 }
 
 // MARK: - Mock for Testing
