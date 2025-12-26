@@ -5,7 +5,7 @@
 
 import Foundation
 import Observation
-import ClaudeCodeUsage
+import ClaudeCodeUsageKit
 // Import specific types from ClaudeLiveMonitorLib to avoid UsageEntry conflict
 import struct ClaudeLiveMonitorLib.SessionBlock
 import struct ClaudeLiveMonitorLib.BurnRate

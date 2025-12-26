@@ -14,8 +14,8 @@ let package = Package(
     products: [
         // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
-            name: "ClaudeCodeUsage",
-            targets: ["ClaudeCodeUsage"]),
+            name: "ClaudeCodeUsageKit",
+            targets: ["ClaudeCodeUsageKit"]),
         .executable(
             name: "UsageDashboardCLI",
             targets: ["UsageDashboardCLI"]),
@@ -34,27 +34,27 @@ let package = Package(
         // Targets are the basic building blocks of a package, defining a module or a test suite.
         // Targets can depend on other targets in this package and products from dependencies.
         .target(
-            name: "ClaudeCodeUsage",
+            name: "ClaudeCodeUsageKit",
             dependencies: [],
-            path: "Sources/ClaudeCodeUsage"),
+            path: "Sources/ClaudeCodeUsageKit"),
         .executableTarget(
             name: "UsageDashboardCLI",
-            dependencies: ["ClaudeCodeUsage"],
+            dependencies: ["ClaudeCodeUsageKit"],
             path: "Sources/UsageDashboardCLI"),
         .executableTarget(
             name: "UsageDashboardApp",
             dependencies: [
-                "ClaudeCodeUsage",
+                "ClaudeCodeUsageKit",
                 .product(name: "ClaudeLiveMonitorLib", package: "ClaudeLiveMonitor")
             ],
             path: "Sources/UsageDashboardApp"),
         .executableTarget(
             name: "SimpleCLI",
-            dependencies: ["ClaudeCodeUsage"],
+            dependencies: ["ClaudeCodeUsageKit"],
             path: "Sources/SimpleCLI"),
         .testTarget(
-            name: "ClaudeCodeUsageTests",
-            dependencies: ["ClaudeCodeUsage"],
+            name: "ClaudeCodeUsageKitTests",
+            dependencies: ["ClaudeCodeUsageKit"],
             path: "Tests/ClaudeCodeUsageTests",
             swiftSettings: [
                 .unsafeFlags(["-enable-testing"]),
@@ -64,7 +64,7 @@ let package = Package(
             name: "UsageDashboardAppTests",
             dependencies: [
                 "UsageDashboardApp",
-                "ClaudeCodeUsage",
+                "ClaudeCodeUsageKit",
                 .product(name: "ClaudeLiveMonitorLib", package: "ClaudeLiveMonitor")
             ],
             path: "Tests/UsageDashboardAppTests",

@@ -4,7 +4,7 @@
 //
 
 import SwiftUI
-import ClaudeCodeUsage
+import ClaudeCodeUsageKit
 
 // MARK: - View Mode
 enum MenuBarViewMode {

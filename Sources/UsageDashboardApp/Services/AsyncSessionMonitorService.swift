@@ -1,5 +1,5 @@
 import Foundation
-import ClaudeCodeUsage
+import ClaudeCodeUsageKit
 import ClaudeLiveMonitorLib
 
 // MARK: - Async Session Monitor Protocol

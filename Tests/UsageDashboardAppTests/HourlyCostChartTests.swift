@@ -8,7 +8,7 @@ import Testing
 import Foundation
 import SwiftUI
 @testable import UsageDashboardApp
-@testable import ClaudeCodeUsage
+@testable import ClaudeCodeUsageKit
 
 @Suite("Hourly Cost Chart Tests")
 struct HourlyCostChartTests {

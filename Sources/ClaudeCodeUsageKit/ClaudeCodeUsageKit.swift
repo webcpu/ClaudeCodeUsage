@@ -1,31 +1,31 @@
 //
-//  ClaudeCodeUsage.swift
-//  ClaudeCodeUsage
+//  ClaudeCodeUsageKit.swift
+//  ClaudeCodeUsageKit
 //
 //  Main SDK entry point - exports all public APIs
 //
 
 import Foundation
 
-/// ClaudeCodeUsage
-/// 
+/// ClaudeCodeUsageKit
+///
 /// A Swift SDK for accessing and analyzing Claude Code usage data.
-/// 
+///
 /// ## Quick Start
 /// ```swift
-/// import ClaudeCodeUsage
-/// 
+/// import ClaudeCodeUsageKit
+///
 /// let client = ClaudeUsageClient()
 /// let stats = try await client.getUsageStats()
 /// print("Total cost: \(stats.totalCost)")
 /// ```
-public struct ClaudeCodeUsage {
+public struct ClaudeCodeUsageKit {
     /// SDK Version
     public static let version = "1.0.0"
-    
+
     /// SDK Build Date
     public static let buildDate = "2025-08-07"
-    
+
     /// Check if the SDK is compatible with the current platform
     public static var isSupported: Bool {
         #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
@@ -34,11 +34,11 @@ public struct ClaudeCodeUsage {
         return false
         #endif
     }
-    
+
     /// Get SDK information
     public static var info: String {
         """
-        ClaudeCodeUsage v\(version)
+        ClaudeCodeUsageKit v\(version)
         Build Date: \(buildDate)
         Platform Support: \(isSupported ? "Yes" : "No")
         """

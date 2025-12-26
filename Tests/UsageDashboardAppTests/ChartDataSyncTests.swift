@@ -6,7 +6,7 @@
 import Testing
 import Foundation
 @testable import UsageDashboardApp
-@testable import ClaudeCodeUsage
+@testable import ClaudeCodeUsageKit
 
 // Custom mock for this test file
 final class ChartSyncMockUsageDataService: UsageDataService {

@@ -7,7 +7,7 @@ import Testing
 import Foundation
 import SwiftUI
 @testable import UsageDashboardApp
-@testable import ClaudeCodeUsage
+@testable import ClaudeCodeUsageKit
 // Import specific types from ClaudeLiveMonitorLib to avoid UsageEntry conflict
 import struct ClaudeLiveMonitorLib.SessionBlock
 import struct ClaudeLiveMonitorLib.BurnRate

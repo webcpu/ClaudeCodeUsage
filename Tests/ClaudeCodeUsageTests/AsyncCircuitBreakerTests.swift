@@ -7,7 +7,7 @@
 
 import Testing
 import Foundation
-@testable import ClaudeCodeUsage
+@testable import ClaudeCodeUsageKit
 
 @Suite("AsyncCircuitBreakerFileSystem Tests")
 struct AsyncCircuitBreakerTests {

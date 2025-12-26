@@ -4,7 +4,7 @@
 //
 
 import Foundation
-import ClaudeCodeUsage
+import ClaudeCodeUsageKit
 
 /// Service responsible for generating hourly chart data from usage entries
 public final class HourlyChartDataService {

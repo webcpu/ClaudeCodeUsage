@@ -5,7 +5,7 @@
 
 import SwiftUI
 import Charts
-import ClaudeCodeUsage
+import ClaudeCodeUsageKit
 import ClaudeLiveMonitorLib
 
 // MARK: - Navigation Items

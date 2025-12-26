@@ -4,7 +4,7 @@
 //
 
 import SwiftUI
-import ClaudeCodeUsage
+import ClaudeCodeUsageKit
 
 // MARK: - Main Menu Bar Content View
 struct MenuBarContentView: View {

@@ -31,7 +31,7 @@ Or in Xcode:
 ## Quick Start
 
 ```swift
-import ClaudeUsageSDK
+import ClaudeCodeUsageKit
 
 // Initialize the client
 let client = ClaudeUsageClient()
@@ -203,7 +203,7 @@ The SDK is designed to work seamlessly with SwiftUI:
 
 ```swift
 import SwiftUI
-import ClaudeUsageSDK
+import ClaudeCodeUsageKit
 
 struct UsageDashboard: View {
     @State private var stats: UsageStats?

@@ -5,7 +5,7 @@
 
 import SwiftUI
 import Charts
-import ClaudeCodeUsage
+import ClaudeCodeUsageKit
 
 struct CostMetricsSection: View {
     @Environment(UsageDataModel.self) private var dataModel

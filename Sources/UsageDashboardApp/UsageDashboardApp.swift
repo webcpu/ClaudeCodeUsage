@@ -5,7 +5,7 @@
 
 import SwiftUI
 import Observation
-import ClaudeCodeUsage
+import ClaudeCodeUsageKit
 
 @main
 struct UsageDashboardApp: App {

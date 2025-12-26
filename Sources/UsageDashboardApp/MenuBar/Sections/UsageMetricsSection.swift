@@ -4,7 +4,7 @@
 //
 
 import SwiftUI
-import ClaudeCodeUsage
+import ClaudeCodeUsageKit
 import ClaudeLiveMonitorLib
 
 struct UsageMetricsSection: View {

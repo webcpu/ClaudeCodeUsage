@@ -5,7 +5,7 @@
 
 import SwiftUI
 import Charts
-import ClaudeCodeUsage
+import ClaudeCodeUsageKit
 
 // MARK: - Simple Tooltip View
 struct HourlyTooltipView: View {

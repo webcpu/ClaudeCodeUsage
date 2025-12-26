@@ -5,7 +5,7 @@
 
 import Foundation
 import Observation
-import ClaudeCodeUsage
+import ClaudeCodeUsageKit
 
 @Observable
 @MainActor

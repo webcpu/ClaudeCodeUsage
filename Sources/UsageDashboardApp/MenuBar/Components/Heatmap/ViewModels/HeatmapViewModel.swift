@@ -9,7 +9,7 @@
 import SwiftUI
 import Foundation
 import Observation
-import ClaudeCodeUsage
+import ClaudeCodeUsageKit
 
 // MARK: - Tooltip Position Calculator (Pure Functions)
 

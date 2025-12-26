@@ -5,7 +5,7 @@
 
 import SwiftUI
 import Charts
-import ClaudeCodeUsage
+import ClaudeCodeUsageKit
 
 // MARK: - Data Model for Chart
 struct HourlyChartData: Identifiable {

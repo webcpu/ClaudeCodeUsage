@@ -7,7 +7,7 @@
 
 import Foundation
 import Testing
-@testable import ClaudeCodeUsage
+@testable import ClaudeCodeUsageKit
 
 @Suite("File Processing Benchmarks")
 struct FileProcessingBenchmarksTests {

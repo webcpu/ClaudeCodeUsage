@@ -4,7 +4,7 @@
 //
 
 import SwiftUI
-import ClaudeCodeUsage
+import ClaudeCodeUsageKit
 
 struct OverviewScreen: View {
     @Environment(UsageDataModel.self) private var dataModel

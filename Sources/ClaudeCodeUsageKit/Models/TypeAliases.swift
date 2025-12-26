@@ -29,7 +29,7 @@ public typealias ClaudeProjectUsage = ProjectUsage
 // use these type aliases to explicitly reference types from this module:
 //
 // Example:
-//   import ClaudeCodeUsage
+//   import ClaudeCodeUsageKit
 //   import ClaudeLiveMonitorLib
 //
 //   let historicalEntry: ClaudeCodeUsage.ClaudeUsageEntry = ...

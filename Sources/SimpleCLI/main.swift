@@ -1,5 +1,5 @@
 import Foundation
-import ClaudeCodeUsage
+import ClaudeCodeUsageKit
 
 print("🚀 Claude Usage Dashboard - Real Data")
 print(String(repeating: "=", count: 72))
