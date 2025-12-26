@@ -2,12 +2,24 @@
 //  HeatmapLegend.swift
 //  Legend component for heatmap visualization
 //
-//  Provides customizable legend with accessibility support,
-//  multiple layout options, and comprehensive labeling.
-//
 
 import SwiftUI
-import Foundation
+
+// MARK: - Activity Level Labels (Pure Data)
+
+private enum ActivityLevelLabels {
+    static let labels = [
+        "No activity",
+        "Low activity",
+        "Medium-low activity",
+        "Medium-high activity",
+        "High activity"
+    ]
+
+    static func label(for level: Int) -> String {
+        labels.indices.contains(level) ? labels[level] : "Activity level \(level)"
+    }
+}
 
 // MARK: - Heatmap Legend
 
@@ -102,115 +114,102 @@ public struct HeatmapLegend: View {
         }
     }
     
-    // MARK: - Horizontal Legend
-    
+    // MARK: - Legend Variants (Mid Level)
+
     @ViewBuilder
     private var horizontalLegend: some View {
         VStack(alignment: .leading, spacing: 4) {
-            // Title
-            if let title = effectiveTitle {
-                Text(title)
-                    .font(font.weight(.semibold))
-                    .foregroundColor(.primary)
-                    .accessibilityAddTraits(.isHeader)
-            }
-            
-            // Legend content
-            HStack(spacing: 8) {
-                // Intensity labels
-                if showIntensityLabels {
-                    Text("Less")
-                        .font(font)
-                        .foregroundColor(.secondary)
-                }
-                
-                // Color squares
-                colorSquares
-                
-                if showIntensityLabels {
-                    Text("More")
-                        .font(font)
-                        .foregroundColor(.secondary)
-                }
-                
-                Spacer()
-                
-                // Cost reference
-                if showCostLabels && maxCost > 0 {
-                    costReference
-                }
-            }
+            legendTitle
+            horizontalLegendContent
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(legendAccessibilityLabel)
     }
-    
-    // MARK: - Vertical Legend
-    
+
     @ViewBuilder
     private var verticalLegend: some View {
         VStack(alignment: .center, spacing: 8) {
-            // Title
-            if let title = effectiveTitle {
-                Text(title)
-                    .font(font.weight(.semibold))
-                    .foregroundColor(.primary)
-                    .accessibilityAddTraits(.isHeader)
-            }
-            
-            // Color squares (vertical)
-            VStack(spacing: 3) {
-                if showIntensityLabels {
-                    Text("More")
-                        .font(font)
-                        .foregroundColor(.secondary)
-                }
-                
-                ForEach(Array(colorTheme.colors.reversed().enumerated()), id: \.offset) { index, color in
-                    LegendSquare(
-                        color: color,
-                        level: colorTheme.colors.count - 1 - index,
-                        accessibility: accessibility
-                    )
-                }
-                
-                if showIntensityLabels {
-                    Text("Less")
-                        .font(font)
-                        .foregroundColor(.secondary)
-                }
-            }
-            
-            // Cost reference
-            if showCostLabels && maxCost > 0 {
-                costReference
-            }
+            legendTitle
+            verticalColorScale
+            conditionalCostReference
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(legendAccessibilityLabel)
     }
-    
-    // MARK: - Compact Legend
+
+    // MARK: - Legend Content (Mid Level)
+
+    @ViewBuilder
+    private var horizontalLegendContent: some View {
+        HStack(spacing: 8) {
+            lessLabel
+            colorSquares
+            moreLabel
+            Spacer()
+            conditionalCostReference
+        }
+    }
+
+    @ViewBuilder
+    private var verticalColorScale: some View {
+        VStack(spacing: 3) {
+            moreLabel
+            verticalColorSquares
+            lessLabel
+        }
+    }
+
+    @ViewBuilder
+    private var verticalColorSquares: some View {
+        ForEach(Array(colorTheme.colors.reversed().enumerated()), id: \.offset) { index, color in
+            LegendSquare(
+                color: color,
+                level: colorTheme.colors.count - 1 - index,
+                accessibility: accessibility
+            )
+        }
+    }
     
     @ViewBuilder
     private var compactLegend: some View {
         HStack(spacing: 4) {
-            // Color squares only
             colorSquares
-            
-            // Minimal cost reference
-            if showCostLabels && maxCost > 0 {
-                Text("Max: \(maxCost.asCurrency)")
-                    .font(.system(size: 9))
-                    .foregroundColor(.secondary)
-            }
+            compactCostLabel
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(compactAccessibilityLabel)
     }
-    
-    // MARK: - Color Squares
-    
+
+    // MARK: - Components (Low Level)
+
+    @ViewBuilder
+    private var legendTitle: some View {
+        if let title = effectiveTitle {
+            Text(title)
+                .font(font.weight(.semibold))
+                .foregroundColor(.primary)
+                .accessibilityAddTraits(.isHeader)
+        }
+    }
+
+    @ViewBuilder
+    private var lessLabel: some View {
+        if showIntensityLabels {
+            Text("Less")
+                .font(font)
+                .foregroundColor(.secondary)
+        }
+    }
+
+    @ViewBuilder
+    private var moreLabel: some View {
+        if showIntensityLabels {
+            Text("More")
+                .font(font)
+                .foregroundColor(.secondary)
+        }
+    }
+
     @ViewBuilder
     private var colorSquares: some View {
         HStack(spacing: 3) {
@@ -223,16 +222,21 @@ public struct HeatmapLegend: View {
             }
         }
     }
-    
-    // MARK: - Cost Reference
-    
+
+    @ViewBuilder
+    private var conditionalCostReference: some View {
+        if showCostLabels && maxCost > 0 {
+            costReference
+        }
+    }
+
     @ViewBuilder
     private var costReference: some View {
         VStack(alignment: .trailing, spacing: 2) {
             Text("Max: \(maxCost.asCurrency)")
                 .font(font)
                 .foregroundColor(.secondary)
-            
+
             if maxCost > 1 {
                 let quarterCost = maxCost * 0.25
                 Text("~\(quarterCost.asCurrency) per level")
@@ -241,26 +245,37 @@ public struct HeatmapLegend: View {
             }
         }
     }
-    
+
+    @ViewBuilder
+    private var compactCostLabel: some View {
+        if showCostLabels && maxCost > 0 {
+            Text("Max: \(maxCost.asCurrency)")
+                .font(.system(size: 9))
+                .foregroundColor(.secondary)
+        }
+    }
+
     // MARK: - Computed Properties
-    
+
     private var effectiveTitle: String? {
         customTitle ?? (showCostLabels ? "Daily Cost Activity" : nil)
     }
-    
+
+    // MARK: - Accessibility (Low Level)
+
     private var legendAccessibilityLabel: String {
         guard accessibility.enableAccessibilityLabels else { return "" }
-        
+
         var label = "Activity legend: "
         label += "5 levels from no activity to high activity, "
-        
+
         if showCostLabels && maxCost > 0 {
             label += "maximum daily cost \(maxCost.asCurrency)"
         }
-        
+
         return label
     }
-    
+
     private var compactAccessibilityLabel: String {
         guard accessibility.enableAccessibilityLabels else { return "" }
         return "Activity scale with maximum cost \(maxCost.asCurrency)"
@@ -291,21 +306,7 @@ private struct LegendSquare: View {
     
     private var accessibilityLabel: String {
         guard accessibility.enableAccessibilityLabels else { return "" }
-        
-        switch level {
-        case 0:
-            return "No activity"
-        case 1:
-            return "Low activity"
-        case 2:
-            return "Medium-low activity"
-        case 3:
-            return "Medium-high activity"
-        case 4:
-            return "High activity"
-        default:
-            return "Activity level \(level)"
-        }
+        return ActivityLevelLabels.label(for: level)
     }
     
     private var accessibilityValue: String {

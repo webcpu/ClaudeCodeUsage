@@ -2,12 +2,27 @@
 //  HeatmapGrid.swift
 //  Reusable grid component for heatmap visualization
 //
-//  Provides optimized grid rendering with efficient hover detection,
-//  accessibility support, and customizable appearance.
-//
 
 import SwiftUI
-import Foundation
+
+// MARK: - Border Style (Pure Data)
+
+private struct BorderStyle {
+    let color: Color
+    let width: CGFloat
+
+    static let none = BorderStyle(color: .clear, width: 0)
+
+    static func forDay(_ day: HeatmapDay, isHovered: Bool, config: HeatmapConfiguration) -> BorderStyle {
+        if day.isToday {
+            return BorderStyle(color: config.todayHighlightColor, width: config.todayHighlightWidth)
+        } else if isHovered {
+            return BorderStyle(color: .primary, width: 1)
+        } else {
+            return .none
+        }
+    }
+}
 
 // MARK: - Heatmap Grid
 
@@ -60,164 +75,119 @@ public struct HeatmapGrid: View {
         self.onEndHover = onEndHover
     }
     
-    // MARK: - Body
+    // MARK: - Public API (High Level)
 
     public var body: some View {
         VStack(spacing: 8) {
-            // Main grid with day labels (month labels now scroll with grid)
-            HStack(alignment: .top, spacing: 2) {
-                // Day of week labels
-                if configuration.showDayLabels {
-                    VStack(spacing: 0) {
-                        // Spacer for month labels row
-                        if configuration.showMonthLabels {
-                            Spacer().frame(height: 20)
-                        }
-                        dayLabelsColumn
-                    }
-                }
+            mainGridLayout
+        }
+    }
 
-                // Calendar grid with month labels
-                scrollableGridWithMonthLabels
-            }
-        }
-    }
-    
-    // MARK: - Month Labels Header
-    
+    // MARK: - Orchestration (Coordination)
+
     @ViewBuilder
-    private var monthLabelsHeader: some View {
-        HStack(spacing: 0) {
-            // Spacer for day labels column
-            if configuration.showDayLabels {
-                Spacer()
-                    .frame(width: 30)
-            }
-            
-            // Month labels positioned based on their week spans
-            ZStack(alignment: .topLeading) {
-                // Create a full-width container to match the scrollable grid
-                Rectangle()
-                    .fill(Color.clear)
-                    .frame(width: totalGridWidth, height: 20)
-                
-                // Position each month label at the correct offset
-                ForEach(dataset.monthLabels) { month in
-                    Text(month.name)
-                        .font(configuration.monthLabelFont)
-                        .foregroundColor(.secondary)
-                        .accessibilityLabel(accessibility.enableAccessibilityLabels ? month.fullName : "")
-                        .offset(x: monthLabelOffset(for: month), y: 0)
-                }
-            }
-            
-            Spacer() // Push content to leading edge
+    private var mainGridLayout: some View {
+        HStack(alignment: .top, spacing: 2) {
+            dayLabelsSidebar
+            scrollableGridWithMonthLabels
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
-    
-    // MARK: - Month Label Positioning
-    
-    /// Calculate the horizontal offset for a month label based on its week span
-    private func monthLabelOffset(for month: HeatmapMonth) -> CGFloat {
-        let weekStartIndex = CGFloat(month.weekSpan.lowerBound)
-        
-        // Calculate offset: (week_index * square_size) + (week_index * spacing) + horizontal_padding
-        let squareOffset = weekStartIndex * configuration.squareSize
-        let spacingOffset = weekStartIndex * configuration.spacing
-        let paddingOffset: CGFloat = 4 // Match the horizontal padding from gridContent
-        
-        return squareOffset + spacingOffset + paddingOffset
-    }
-    
-    /// Calculate the total width of the grid to match the scrollable content
-    private var totalGridWidth: CGFloat {
-        let weekCount = CGFloat(dataset.weeks.count)
-        let totalSpacing = (weekCount - 1) * configuration.spacing
-        let totalSquares = weekCount * configuration.squareSize
-        return totalSquares + totalSpacing + 8 // 8 for horizontal padding (4 on each side)
-    }
-    
-    // MARK: - Day Labels Column
-    
+
     @ViewBuilder
-    private var dayLabelsColumn: some View {
-        VStack(spacing: configuration.spacing) {
-            ForEach(Array(configuration.dayLabels.enumerated()), id: \.offset) { index, dayLabel in
-                Text(dayLabel)
-                    .font(configuration.dayLabelFont)
-                    .foregroundColor(.secondary)
-                    .frame(width: 28, height: configuration.squareSize, alignment: .trailing)
-                    .accessibilityHidden(!accessibility.enableAccessibilityLabels)
+    private var dayLabelsSidebar: some View {
+        if configuration.showDayLabels {
+            VStack(spacing: 0) {
+                monthLabelsSpacer
+                dayLabelsColumn
             }
         }
     }
-    
-    // MARK: - Scrollable Grid with Month Labels
 
     @ViewBuilder
     private var scrollableGridWithMonthLabels: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             VStack(spacing: 8) {
-                // Month labels inside scroll view so they scroll with content
-                if configuration.showMonthLabels {
-                    scrollableMonthLabels
-                }
-
-                // Grid content with hover overlay
-                ZStack {
-                    gridContent
-
-                    if configuration.enableTooltips {
-                        hoverOverlay
-                    }
-                }
+                monthLabelsRowIfNeeded
+                gridWithHoverOverlay
             }
         }
         .accessibilityElement(children: accessibility.groupAccessibilityElements ? .contain : .ignore)
         .accessibilityLabel("Heatmap grid showing daily usage over time")
     }
 
-    // MARK: - Scrollable Month Labels
+    @ViewBuilder
+    private var gridWithHoverOverlay: some View {
+        ZStack {
+            gridContent
+            hoverOverlayIfEnabled
+        }
+    }
+
+    // MARK: - Content Builders (Mid Level)
 
     @ViewBuilder
-    private var scrollableMonthLabels: some View {
+    private var monthLabelsSpacer: some View {
+        if configuration.showMonthLabels {
+            Spacer().frame(height: 20)
+        }
+    }
+
+    @ViewBuilder
+    private var monthLabelsRowIfNeeded: some View {
+        if configuration.showMonthLabels {
+            monthLabelsRow
+        }
+    }
+
+    @ViewBuilder
+    private var monthLabelsRow: some View {
         ZStack(alignment: .topLeading) {
-            Rectangle()
-                .fill(Color.clear)
-                .frame(width: totalGridWidth, height: 20)
-
-            ForEach(dataset.monthLabels) { month in
-                Text(month.name)
-                    .font(configuration.monthLabelFont)
-                    .foregroundColor(.secondary)
-                    .accessibilityLabel(accessibility.enableAccessibilityLabels ? month.fullName : "")
-                    .offset(x: monthLabelOffset(for: month), y: 0)
-            }
+            monthLabelsBackground
+            monthLabelItems
         }
     }
-
-    // MARK: - Legacy Scrollable Grid (kept for reference)
 
     @ViewBuilder
-    private var scrollableGrid: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            ZStack {
-                // Grid content
-                gridContent
+    private var monthLabelsBackground: some View {
+        Rectangle()
+            .fill(Color.clear)
+            .frame(width: totalGridWidth, height: 20)
+    }
 
-                // Hover overlay (performance-critical)
-                if configuration.enableTooltips {
-                    hoverOverlay
-                }
+    @ViewBuilder
+    private var monthLabelItems: some View {
+        ForEach(dataset.monthLabels) { month in
+            monthLabel(for: month)
+        }
+    }
+
+    @ViewBuilder
+    private func monthLabel(for month: HeatmapMonth) -> some View {
+        Text(month.name)
+            .font(configuration.monthLabelFont)
+            .foregroundColor(.secondary)
+            .accessibilityLabel(accessibility.enableAccessibilityLabels ? month.fullName : "")
+            .offset(x: monthLabelOffset(for: month), y: 0)
+    }
+
+    @ViewBuilder
+    private var dayLabelsColumn: some View {
+        VStack(spacing: configuration.spacing) {
+            ForEach(Array(configuration.dayLabels.enumerated()), id: \.offset) { index, dayLabel in
+                dayLabelView(dayLabel)
             }
         }
-        .accessibilityElement(children: accessibility.groupAccessibilityElements ? .contain : .ignore)
-        .accessibilityLabel("Heatmap grid showing daily usage over time")
     }
-    
-    // MARK: - Grid Content
-    
+
+    @ViewBuilder
+    private func dayLabelView(_ label: String) -> some View {
+        Text(label)
+            .font(configuration.dayLabelFont)
+            .foregroundColor(.secondary)
+            .frame(width: 28, height: configuration.squareSize, alignment: .trailing)
+            .accessibilityHidden(!accessibility.enableAccessibilityLabels)
+    }
+
     @ViewBuilder
     private var gridContent: some View {
         HStack(spacing: configuration.spacing) {
@@ -232,28 +202,55 @@ public struct HeatmapGrid: View {
         }
         .padding(.horizontal, 4)
     }
-    
-    // MARK: - Hover Overlay
-    
+
+    @ViewBuilder
+    private var hoverOverlayIfEnabled: some View {
+        if configuration.enableTooltips {
+            hoverOverlay
+        }
+    }
+
     @ViewBuilder
     private var hoverOverlay: some View {
         Rectangle()
             .fill(Color.clear)
             .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { value in
-                        onHover(value.location)
-                    }
-            )
-            .onContinuousHover { phase in
-                switch phase {
-                case .active(let location):
-                    onHover(location)
-                case .ended:
-                    onEndHover()
-                }
+            .gesture(dragGesture)
+            .onContinuousHover(perform: handleHoverPhase)
+    }
+
+    // MARK: - Layout Calculations (Low Level)
+
+    private var dragGesture: some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                onHover(value.location)
             }
+    }
+
+    private func handleHoverPhase(_ phase: HoverPhase) {
+        switch phase {
+        case .active(let location):
+            onHover(location)
+        case .ended:
+            onEndHover()
+        }
+    }
+
+    private func monthLabelOffset(for month: HeatmapMonth) -> CGFloat {
+        let weekStartIndex = CGFloat(month.weekSpan.lowerBound)
+        let squareOffset = weekStartIndex * configuration.squareSize
+        let spacingOffset = weekStartIndex * configuration.spacing
+        let horizontalPadding: CGFloat = 4
+        return squareOffset + spacingOffset + horizontalPadding
+    }
+
+    private var totalGridWidth: CGFloat {
+        let weekCount = CGFloat(dataset.weeks.count)
+        let totalSpacing = (weekCount - 1) * configuration.spacing
+        let totalSquares = weekCount * configuration.squareSize
+        let horizontalPadding: CGFloat = 8
+        return totalSquares + totalSpacing + horizontalPadding
     }
 }
 
@@ -316,78 +313,49 @@ private struct DaySquare: View {
     let configuration: HeatmapConfiguration
     let isHovered: Bool
     let accessibility: HeatmapAccessibility
-    
+
+    private var borderStyle: BorderStyle {
+        BorderStyle.forDay(day, isHovered: isHovered, config: configuration)
+    }
+
+    private var scaleEffect: CGFloat {
+        configuration.scaleOnHover && isHovered ? configuration.hoverScale : 1.0
+    }
+
+    private var hoverAnimation: Animation? {
+        configuration.animationDuration > 0
+            ? .easeInOut(duration: configuration.animationDuration)
+            : nil
+    }
+
     var body: some View {
         Rectangle()
-            .fill(day.color) // Pre-computed color for performance
+            .fill(day.color)
             .frame(width: configuration.squareSize, height: configuration.squareSize)
             .cornerRadius(configuration.cornerRadius)
-            .overlay(borderOverlay)
+            .overlay(
+                RoundedRectangle(cornerRadius: configuration.cornerRadius)
+                    .stroke(borderStyle.color, lineWidth: borderStyle.width)
+            )
             .scaleEffect(scaleEffect)
             .animation(hoverAnimation, value: isHovered)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(accessibilityLabel)
             .accessibilityValue(accessibilityValue)
     }
-    
-    // MARK: - Border Overlay
-    
-    @ViewBuilder
-    private var borderOverlay: some View {
-        RoundedRectangle(cornerRadius: configuration.cornerRadius)
-            .stroke(borderColor, lineWidth: borderWidth)
-    }
-    
-    private var borderColor: Color {
-        if day.isToday {
-            return configuration.todayHighlightColor
-        } else if isHovered {
-            return Color.primary
-        } else {
-            return Color.clear
-        }
-    }
-    
-    private var borderWidth: CGFloat {
-        if day.isToday {
-            return configuration.todayHighlightWidth
-        } else if isHovered {
-            return 1
-        } else {
-            return 0
-        }
-    }
-    
-    // MARK: - Scale Effect
-    
-    private var scaleEffect: CGFloat {
-        if configuration.scaleOnHover && isHovered {
-            return configuration.hoverScale
-        } else {
-            return 1.0
-        }
-    }
-    
-    // MARK: - Animation
-    
-    private var hoverAnimation: Animation? {
-        if configuration.animationDuration > 0 {
-            return .easeInOut(duration: configuration.animationDuration)
-        } else {
-            return nil
-        }
-    }
-    
+
     // MARK: - Accessibility
-    
+
     private var accessibilityLabel: String {
-        guard accessibility.enableAccessibilityLabels else { return "" }
-        return "\(accessibility.dateAccessibilityPrefix) \(day.dateString)"
+        accessibility.enableAccessibilityLabels
+            ? "\(accessibility.dateAccessibilityPrefix) \(day.dateString)"
+            : ""
     }
-    
+
     private var accessibilityValue: String {
-        guard accessibility.enableAccessibilityValues else { return "" }
-        return "\(accessibility.costAccessibilityPrefix) \(day.costString)"
+        accessibility.enableAccessibilityValues
+            ? "\(accessibility.costAccessibilityPrefix) \(day.costString)"
+            : ""
     }
 }
 

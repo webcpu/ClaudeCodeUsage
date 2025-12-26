@@ -2,12 +2,100 @@
 //  HeatmapTooltip.swift
 //  Tooltip component for heatmap hover interactions
 //
-//  Provides customizable tooltips with smart positioning,
-//  rich content support, and smooth animations.
-//
 
 import SwiftUI
-import Foundation
+
+// MARK: - Activity Level (Pure Data)
+
+/// Activity level classification based on intensity
+private enum ActivityLevel {
+    case none, low, medium, high, veryHigh
+
+    init(intensity: Double) {
+        switch intensity {
+        case 0: self = .none
+        case ..<0.25: self = .low
+        case ..<0.5: self = .medium
+        case ..<0.75: self = .high
+        default: self = .veryHigh
+        }
+    }
+
+    var text: String {
+        switch self {
+        case .none: "None"
+        case .low: "Low"
+        case .medium: "Medium"
+        case .high: "High"
+        case .veryHigh: "Very High"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .none: .gray
+        case .low: .green.opacity(0.7)
+        case .medium: .green
+        case .high: .orange
+        case .veryHigh: .red
+        }
+    }
+}
+
+// MARK: - Tooltip Positioning (Pure Functions)
+
+private enum TooltipPositioning {
+
+    static func offset(
+        for strategy: HeatmapTooltip.PositioningStrategy,
+        position: CGPoint,
+        screenBounds: CGRect,
+        style: HeatmapTooltip.TooltipStyle
+    ) -> CGSize {
+        switch strategy {
+        case .automatic:
+            smartOffset(position: position, screenBounds: screenBounds, style: style)
+        case .fixed:
+            CGSize(width: 10, height: -30)
+        case .adaptive:
+            adaptiveOffset(style: style)
+        }
+    }
+
+    private static func smartOffset(
+        position: CGPoint,
+        screenBounds: CGRect,
+        style: HeatmapTooltip.TooltipStyle
+    ) -> CGSize {
+        let size = estimatedSize(for: style)
+        let preferredX: CGFloat = 10
+        let preferredY: CGFloat = -size.height - 10
+
+        let adjustedX = position.x + preferredX + size.width > screenBounds.maxX
+            ? -size.width - 10
+            : preferredX
+
+        let adjustedY = position.y + preferredY < screenBounds.minY
+            ? 10
+            : preferredY
+
+        return CGSize(width: adjustedX, height: adjustedY)
+    }
+
+    private static func adaptiveOffset(style: HeatmapTooltip.TooltipStyle) -> CGSize {
+        let size = estimatedSize(for: style)
+        return CGSize(width: -size.width / 2, height: -size.height - 15)
+    }
+
+    static func estimatedSize(for style: HeatmapTooltip.TooltipStyle) -> CGSize {
+        switch style {
+        case .minimal: CGSize(width: 100, height: 35)
+        case .standard: CGSize(width: 140, height: 50)
+        case .detailed: CGSize(width: 180, height: 85)
+        case .custom: CGSize(width: 150, height: 60)
+        }
+    }
+}
 
 // MARK: - Heatmap Tooltip
 
@@ -137,123 +225,173 @@ public struct HeatmapTooltip: View {
     @ViewBuilder
     private var standardContent: some View {
         VStack(alignment: .leading, spacing: 4) {
-            // Primary info
-            HStack(spacing: 8) {
-                Text(day.costString)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.primary)
-                
-                if day.isToday {
-                    Text("Today")
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.blue)
-                        .cornerRadius(4)
-                }
-            }
-            
-            // Date
-            Text(day.dateString)
-                .font(.system(size: 10))
-                .foregroundColor(.secondary)
-            
-            // Usage status
-            if day.isEmpty {
-                Text("No usage")
-                    .font(.system(size: 9))
-                    .foregroundColor(.secondary)
-            } else {
-                Text("Usage recorded")
-                    .font(.system(size: 9))
-                    .foregroundColor(.green)
-            }
+            standardPrimaryRow
+            standardDateLabel
+            standardUsageStatus
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
+    }
+
+    // MARK: - Standard Content Components
+
+    @ViewBuilder
+    private var standardPrimaryRow: some View {
+        HStack(spacing: 8) {
+            Text(day.costString)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.primary)
+
+            if day.isToday {
+                standardTodayBadge
+            }
+        }
+    }
+
+    private var standardTodayBadge: some View {
+        Text("Today")
+            .font(.system(size: 9, weight: .medium))
+            .foregroundColor(.white)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(Color.blue)
+            .cornerRadius(4)
+    }
+
+    private var standardDateLabel: some View {
+        Text(day.dateString)
+            .font(.system(size: 10))
+            .foregroundColor(.secondary)
+    }
+
+    @ViewBuilder
+    private var standardUsageStatus: some View {
+        if day.isEmpty {
+            Text("No usage")
+                .font(.system(size: 9))
+                .foregroundColor(.secondary)
+        } else {
+            Text("Usage recorded")
+                .font(.system(size: 9))
+                .foregroundColor(.green)
+        }
     }
     
     @ViewBuilder
     private var detailedContent: some View {
         VStack(alignment: .leading, spacing: 6) {
-            // Header with cost and today indicator
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(day.costString)
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(.primary)
-                    
-                    Text(day.dateString)
-                        .font(.system(size: 11))
-                        .foregroundColor(.secondary)
-                }
-                
-                Spacer()
-                
-                if day.isToday {
-                    VStack(spacing: 2) {
-                        Image(systemName: "calendar.badge.clock")
-                            .font(.system(size: 12))
-                            .foregroundColor(.blue)
-                        Text("Today")
-                            .font(.system(size: 8, weight: .medium))
-                            .foregroundColor(.blue)
-                    }
-                }
-            }
-            
-            // Divider
-            Rectangle()
-                .fill(Color.gray.opacity(0.3))
-                .frame(height: 0.5)
-            
-            // Statistics
-            VStack(alignment: .leading, spacing: 3) {
-                if !day.isEmpty {
-                    HStack {
-                        Text("Activity Level:")
-                            .font(.system(size: 9))
-                            .foregroundColor(.secondary)
-                        
-                        Spacer()
-                        
-                        Text(activityLevelText)
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundColor(activityLevelColor)
-                    }
-                    
-                    HStack {
-                        Text("Intensity:")
-                            .font(.system(size: 9))
-                            .foregroundColor(.secondary)
-                        
-                        Spacer()
-                        
-                        Text("\(Int(day.intensity * 100))%")
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundColor(.primary)
-                    }
-                } else {
-                    HStack {
-                        Image(systemName: "moon.zzz")
-                            .font(.system(size: 10))
-                            .foregroundColor(.gray)
-                        
-                        Text("No activity recorded")
-                            .font(.system(size: 9))
-                            .foregroundColor(.gray)
-                    }
-                }
-                
-                // Day of year info
-                Text("Day \(day.dayOfYear) of year")
-                    .font(.system(size: 8))
-                    .foregroundColor(.secondary)
-            }
+            detailedHeader
+            detailedDivider
+            detailedStatistics
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+    }
+
+    // MARK: - Detailed Content Components
+
+    @ViewBuilder
+    private var detailedHeader: some View {
+        HStack {
+            detailedCostAndDate
+            Spacer()
+            if day.isToday {
+                detailedTodayBadge
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var detailedCostAndDate: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(day.costString)
+                .font(.system(size: 13, weight: .bold))
+                .foregroundColor(.primary)
+
+            Text(day.dateString)
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+        }
+    }
+
+    @ViewBuilder
+    private var detailedTodayBadge: some View {
+        VStack(spacing: 2) {
+            Image(systemName: "calendar.badge.clock")
+                .font(.system(size: 12))
+                .foregroundColor(.blue)
+            Text("Today")
+                .font(.system(size: 8, weight: .medium))
+                .foregroundColor(.blue)
+        }
+    }
+
+    private var detailedDivider: some View {
+        Rectangle()
+            .fill(Color.gray.opacity(0.3))
+            .frame(height: 0.5)
+    }
+
+    @ViewBuilder
+    private var detailedStatistics: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            if !day.isEmpty {
+                activityLevelRow
+                intensityRow
+            } else {
+                noActivityRow
+            }
+            dayOfYearLabel
+        }
+    }
+
+    @ViewBuilder
+    private var activityLevelRow: some View {
+        HStack {
+            Text("Activity Level:")
+                .font(.system(size: 9))
+                .foregroundColor(.secondary)
+
+            Spacer()
+
+            Text(activityLevel.text)
+                .font(.system(size: 9, weight: .medium))
+                .foregroundColor(activityLevel.color)
+        }
+    }
+
+    @ViewBuilder
+    private var intensityRow: some View {
+        HStack {
+            Text("Intensity:")
+                .font(.system(size: 9))
+                .foregroundColor(.secondary)
+
+            Spacer()
+
+            Text("\(Int(day.intensity * 100))%")
+                .font(.system(size: 9, weight: .medium))
+                .foregroundColor(.primary)
+        }
+    }
+
+    @ViewBuilder
+    private var noActivityRow: some View {
+        HStack {
+            Image(systemName: "moon.zzz")
+                .font(.system(size: 10))
+                .foregroundColor(.gray)
+
+            Text("No activity recorded")
+                .font(.system(size: 9))
+                .foregroundColor(.gray)
+        }
+    }
+
+    private var dayOfYearLabel: some View {
+        Text("Day \(day.dayOfYear) of year")
+            .font(.system(size: 8))
+            .foregroundColor(.secondary)
     }
     
     @ViewBuilder
@@ -274,91 +412,18 @@ public struct HeatmapTooltip: View {
     }
     
     // MARK: - Computed Properties
-    
+
     private var calculatedOffset: CGSize {
-        switch positioning {
-        case .automatic:
-            return calculateSmartOffset()
-        case .fixed:
-            return CGSize(width: 10, height: -30)
-        case .adaptive:
-            return calculateAdaptiveOffset()
-        }
-    }
-    
-    private var activityLevelText: String {
-        switch day.intensity {
-        case 0:
-            return "None"
-        case 0..<0.25:
-            return "Low"
-        case 0.25..<0.5:
-            return "Medium"
-        case 0.5..<0.75:
-            return "High"
-        default:
-            return "Very High"
-        }
-    }
-    
-    private var activityLevelColor: Color {
-        switch day.intensity {
-        case 0:
-            return .gray
-        case 0..<0.25:
-            return .green.opacity(0.7)
-        case 0.25..<0.5:
-            return .green
-        case 0.5..<0.75:
-            return .orange
-        default:
-            return .red
-        }
-    }
-    
-    // MARK: - Positioning Calculations
-    
-    private func calculateSmartOffset() -> CGSize {
-        // Estimate tooltip size based on content
-        let estimatedSize = estimateTooltipSize()
-        
-        // Calculate preferred position (above and to the right)
-        var offsetX: CGFloat = 10
-        var offsetY: CGFloat = -estimatedSize.height - 10
-        
-        // Adjust if tooltip would go off-screen
-        if position.x + offsetX + estimatedSize.width > screenBounds.maxX {
-            offsetX = -estimatedSize.width - 10 // Move to left
-        }
-        
-        if position.y + offsetY < screenBounds.minY {
-            offsetY = 10 // Move below cursor
-        }
-        
-        return CGSize(width: offsetX, height: offsetY)
-    }
-    
-    private func calculateAdaptiveOffset() -> CGSize {
-        let estimatedSize = estimateTooltipSize()
-        
-        // Center tooltip relative to cursor
-        return CGSize(
-            width: -estimatedSize.width / 2,
-            height: -estimatedSize.height - 15
+        TooltipPositioning.offset(
+            for: positioning,
+            position: position,
+            screenBounds: screenBounds,
+            style: style
         )
     }
-    
-    private func estimateTooltipSize() -> CGSize {
-        switch style {
-        case .minimal:
-            return CGSize(width: 100, height: 35)
-        case .standard:
-            return CGSize(width: 140, height: 50)
-        case .detailed:
-            return CGSize(width: 180, height: 85)
-        case .custom:
-            return CGSize(width: 150, height: 60) // Default estimate
-        }
+
+    private var activityLevel: ActivityLevel {
+        ActivityLevel(intensity: day.intensity)
     }
 }
 
