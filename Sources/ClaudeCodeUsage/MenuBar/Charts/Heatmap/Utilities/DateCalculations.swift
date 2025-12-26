@@ -112,20 +112,35 @@ public final class HeatmapDateCalculator {
     ) -> (start: Date, end: Date) {
         let end = calendar.startOfDay(for: endDate)
         let initialStart = calendar.date(byAdding: .day, value: -(numberOfDays - 1), to: end)!
-        
-        // Find the week start for the initial start date
-        let weekStartDate = weekStart(for: initialStart)
-        
-        // If the week start is before our initial start date, we have a partial first week
-        // In that case, move to the next complete week
-        let adjustedStart: Date
-        if weekStartDate < initialStart {
-            adjustedStart = calendar.date(byAdding: .weekOfYear, value: 1, to: weekStartDate)!
+
+        // Avoid showing current month on both left and right sides
+        // If start month == end month, advance to the first day of next month
+        let startMonth = calendar.component(.month, from: initialStart)
+        let endMonth = calendar.component(.month, from: end)
+        let adjustedInitialStart: Date
+        if startMonth == endMonth {
+            // Move to first day of next month
+            var components = calendar.dateComponents([.year, .month], from: initialStart)
+            components.month! += 1
+            components.day = 1
+            adjustedInitialStart = calendar.date(from: components)!
         } else {
-            adjustedStart = weekStartDate
+            adjustedInitialStart = initialStart
         }
-        
-        return (start: adjustedStart, end: end)
+
+        // Find the week start for the adjusted start date
+        let weekStartDate = weekStart(for: adjustedInitialStart)
+
+        // If the week start is before our adjusted start date, we have a partial first week
+        // In that case, move to the next complete week
+        let finalStart: Date
+        if weekStartDate < adjustedInitialStart {
+            finalStart = calendar.date(byAdding: .weekOfYear, value: 1, to: weekStartDate)!
+        } else {
+            finalStart = weekStartDate
+        }
+
+        return (start: finalStart, end: end)
     }
     
     /// Finds the Sunday of the week containing the given date

@@ -28,18 +28,19 @@ struct HeatmapViewModelBehaviorTests {
     
     // MARK: - Dataset Generation
     
-    @Test("Should generate 52-53 weeks of data for rolling year")
+    @Test("Should generate approximately a year of weeks")
     func generatesFullYearDataset() async {
         // Given
         let stats = createMockStats(daysWithUsage: 365)
-        
+
         // When
         await sut.updateStats(stats)
-        
+
         // Then
         #expect(sut.dataset != nil)
-        // A rolling year can have 52 or 53 weeks depending on week boundaries
-        #expect(sut.dataset?.weeks.count == 52 || sut.dataset?.weeks.count == 53)
+        // Range is adjusted to avoid current month at both ends, so ~48-53 weeks
+        let weekCount = sut.dataset?.weeks.count ?? 0
+        #expect(weekCount >= 48 && weekCount <= 53)
         #expect(sut.error == nil)
         #expect(sut.isLoading == false)
     }
@@ -188,7 +189,7 @@ struct HeatmapViewModelBehaviorTests {
     
     @Test("Should calculate summary statistics correctly")
     func calculatesSummaryStats() async {
-        // Given
+        // Given - Use recent dates that are within the rolling 365-day window
         let stats = UsageStats(
             totalCost: 500,
             totalTokens: 5000,
@@ -199,18 +200,18 @@ struct HeatmapViewModelBehaviorTests {
             totalSessions: 25,
             byModel: [],
             byDate: [
-                DailyUsage(date: "2025-01-01", totalCost: 100, totalTokens: 1000, modelsUsed: ["claude-3"]),
-                DailyUsage(date: "2025-01-02", totalCost: 0, totalTokens: 0, modelsUsed: []),
-                DailyUsage(date: "2025-01-03", totalCost: 200, totalTokens: 2000, modelsUsed: ["claude-3"]),
-                DailyUsage(date: "2025-01-04", totalCost: 150, totalTokens: 1500, modelsUsed: ["claude-3"]),
-                DailyUsage(date: "2025-01-05", totalCost: 50, totalTokens: 500, modelsUsed: ["claude-3"]),
+                DailyUsage(date: "2025-12-20", totalCost: 100, totalTokens: 1000, modelsUsed: ["claude-3"]),
+                DailyUsage(date: "2025-12-21", totalCost: 0, totalTokens: 0, modelsUsed: []),
+                DailyUsage(date: "2025-12-22", totalCost: 200, totalTokens: 2000, modelsUsed: ["claude-3"]),
+                DailyUsage(date: "2025-12-23", totalCost: 150, totalTokens: 1500, modelsUsed: ["claude-3"]),
+                DailyUsage(date: "2025-12-24", totalCost: 50, totalTokens: 500, modelsUsed: ["claude-3"]),
             ],
             byProject: []
         )
-        
+
         // When
         await sut.updateStats(stats)
-        
+
         // Then
         let summary = sut.summaryStats
         #expect(summary != nil)
