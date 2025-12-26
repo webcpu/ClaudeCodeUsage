@@ -7,7 +7,7 @@
 
 import Foundation
 import Testing
-@testable import UsageDashboardApp
+@testable import ClaudeCodeUsage
 
 @Suite("Memory Monitor Tests")
 struct MemoryMonitorTests {

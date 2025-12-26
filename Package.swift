@@ -12,19 +12,12 @@ let package = Package(
         .watchOS(.v10)
     ],
     products: [
-        // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
             name: "ClaudeCodeUsageKit",
             targets: ["ClaudeCodeUsageKit"]),
         .executable(
-            name: "UsageDashboardCLI",
-            targets: ["UsageDashboardCLI"]),
-        .executable(
-            name: "UsageDashboardApp",
-            targets: ["UsageDashboardApp"]),
-        .executable(
-            name: "SimpleCLI",
-            targets: ["SimpleCLI"])
+            name: "ClaudeCodeUsage",
+            targets: ["ClaudeCodeUsage"])
     ],
     dependencies: [
         // Dependencies declare other packages that this package depends on.
@@ -38,36 +31,28 @@ let package = Package(
             dependencies: [],
             path: "Sources/ClaudeCodeUsageKit"),
         .executableTarget(
-            name: "UsageDashboardCLI",
-            dependencies: ["ClaudeCodeUsageKit"],
-            path: "Sources/UsageDashboardCLI"),
-        .executableTarget(
-            name: "UsageDashboardApp",
+            name: "ClaudeCodeUsage",
             dependencies: [
                 "ClaudeCodeUsageKit",
                 .product(name: "ClaudeLiveMonitorLib", package: "ClaudeLiveMonitor")
             ],
-            path: "Sources/UsageDashboardApp"),
-        .executableTarget(
-            name: "SimpleCLI",
-            dependencies: ["ClaudeCodeUsageKit"],
-            path: "Sources/SimpleCLI"),
+            path: "Sources/ClaudeCodeUsage"),
         .testTarget(
             name: "ClaudeCodeUsageKitTests",
             dependencies: ["ClaudeCodeUsageKit"],
-            path: "Tests/ClaudeCodeUsageTests",
+            path: "Tests/ClaudeCodeUsageKitTests",
             swiftSettings: [
                 .unsafeFlags(["-enable-testing"]),
                 .define("ENABLE_CODE_COVERAGE", .when(configuration: .debug))
             ]),
         .testTarget(
-            name: "UsageDashboardAppTests",
+            name: "ClaudeCodeUsageTests",
             dependencies: [
-                "UsageDashboardApp",
+                "ClaudeCodeUsage",
                 "ClaudeCodeUsageKit",
                 .product(name: "ClaudeLiveMonitorLib", package: "ClaudeLiveMonitor")
             ],
-            path: "Tests/UsageDashboardAppTests",
+            path: "Tests/ClaudeCodeUsageTests",
             swiftSettings: [
                 .unsafeFlags(["-enable-testing"]),
                 .define("ENABLE_CODE_COVERAGE", .when(configuration: .debug))

@@ -7,7 +7,7 @@
 import Testing
 import Foundation
 @testable import ClaudeCodeUsageKit
-@testable import UsageDashboardApp
+@testable import ClaudeCodeUsage
 
 @Suite("Deduplication Concurrency Tests", .serialized)
 struct DeduplicationConcurrencyTest {

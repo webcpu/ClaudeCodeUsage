@@ -6,7 +6,7 @@
 import Testing
 import Foundation
 @testable import ClaudeLiveMonitorLib
-@testable import UsageDashboardApp
+@testable import ClaudeCodeUsage
 
 // MARK: - Main Test Suite
 

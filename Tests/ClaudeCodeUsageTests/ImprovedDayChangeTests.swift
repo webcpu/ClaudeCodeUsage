@@ -5,7 +5,7 @@
 
 import Testing
 import Foundation
-@testable import UsageDashboardApp
+@testable import ClaudeCodeUsage
 @testable import ClaudeCodeUsageKit
 // Import specific types to avoid UsageEntry conflict
 import struct ClaudeLiveMonitorLib.SessionBlock

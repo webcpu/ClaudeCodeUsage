@@ -7,7 +7,7 @@
 import Testing
 import Foundation
 @testable import ClaudeCodeUsageKit
-@testable import UsageDashboardApp
+@testable import ClaudeCodeUsage
 
 // MARK: - User Story: Yearly Cost Heatmap Visualization
 

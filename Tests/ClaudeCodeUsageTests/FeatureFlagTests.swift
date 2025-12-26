@@ -6,7 +6,7 @@
 
 import Testing
 import Foundation
-@testable import UsageDashboardApp
+@testable import ClaudeCodeUsage
 
 /// Separate test suite for feature flag tests that need serial execution
 /// These tests modify UserDefaults which is a shared resource

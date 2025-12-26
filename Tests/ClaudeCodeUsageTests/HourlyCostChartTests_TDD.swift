@@ -6,7 +6,7 @@
 import Testing
 import Foundation
 @testable import ClaudeCodeUsageKit
-@testable import UsageDashboardApp
+@testable import ClaudeCodeUsage
 
 // MARK: - User Story: Display Hourly Cost Breakdown
 
