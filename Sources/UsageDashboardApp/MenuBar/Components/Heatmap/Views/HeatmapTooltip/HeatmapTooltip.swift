@@ -5,105 +5,13 @@
 
 import SwiftUI
 
-// MARK: - Activity Level (Pure Data)
-
-/// Activity level classification based on intensity
-private enum ActivityLevel {
-    case none, low, medium, high, veryHigh
-
-    init(intensity: Double) {
-        switch intensity {
-        case 0: self = .none
-        case ..<0.25: self = .low
-        case ..<0.5: self = .medium
-        case ..<0.75: self = .high
-        default: self = .veryHigh
-        }
-    }
-
-    var text: String {
-        switch self {
-        case .none: "None"
-        case .low: "Low"
-        case .medium: "Medium"
-        case .high: "High"
-        case .veryHigh: "Very High"
-        }
-    }
-
-    var color: Color {
-        switch self {
-        case .none: .gray
-        case .low: .green.opacity(0.7)
-        case .medium: .green
-        case .high: .orange
-        case .veryHigh: .red
-        }
-    }
-}
-
-// MARK: - Tooltip Positioning (Pure Functions)
-
-private enum TooltipPositioning {
-
-    static func offset(
-        for strategy: HeatmapTooltip.PositioningStrategy,
-        position: CGPoint,
-        screenBounds: CGRect,
-        style: HeatmapTooltip.TooltipStyle
-    ) -> CGSize {
-        switch strategy {
-        case .automatic:
-            smartOffset(position: position, screenBounds: screenBounds, style: style)
-        case .fixed:
-            CGSize(width: 10, height: -30)
-        case .adaptive:
-            adaptiveOffset(style: style)
-        }
-    }
-
-    private static func smartOffset(
-        position: CGPoint,
-        screenBounds: CGRect,
-        style: HeatmapTooltip.TooltipStyle
-    ) -> CGSize {
-        let size = estimatedSize(for: style)
-        let preferredX: CGFloat = 10
-        let preferredY: CGFloat = -size.height - 10
-
-        let adjustedX = position.x + preferredX + size.width > screenBounds.maxX
-            ? -size.width - 10
-            : preferredX
-
-        let adjustedY = position.y + preferredY < screenBounds.minY
-            ? 10
-            : preferredY
-
-        return CGSize(width: adjustedX, height: adjustedY)
-    }
-
-    private static func adaptiveOffset(style: HeatmapTooltip.TooltipStyle) -> CGSize {
-        let size = estimatedSize(for: style)
-        return CGSize(width: -size.width / 2, height: -size.height - 15)
-    }
-
-    static func estimatedSize(for style: HeatmapTooltip.TooltipStyle) -> CGSize {
-        switch style {
-        case .minimal: CGSize(width: 100, height: 35)
-        case .standard: CGSize(width: 140, height: 50)
-        case .detailed: CGSize(width: 180, height: 85)
-        case .custom: CGSize(width: 150, height: 60)
-        }
-    }
-}
-
 // MARK: - Heatmap Tooltip
 
 /// Customizable tooltip for displaying heatmap day information
 public struct HeatmapTooltip: View {
-    
+
     // MARK: - Configuration
-    
+
     /// Tooltip content style
     public enum TooltipStyle {
         case minimal      // Cost and date only
@@ -111,39 +19,39 @@ public struct HeatmapTooltip: View {
         case detailed     // Cost, date, and additional statistics
         case custom       // Fully customizable content
     }
-    
+
     /// Tooltip positioning strategy
     public enum PositioningStrategy {
         case automatic    // Smart positioning based on screen bounds
         case fixed        // Fixed offset from cursor
         case adaptive     // Adapts to content size
     }
-    
+
     // MARK: - Properties
-    
+
     /// Day data to display
     let day: HeatmapDay
-    
+
     /// Tooltip position on screen
     let position: CGPoint
-    
+
     /// Display style
     let style: TooltipStyle
-    
+
     /// Positioning strategy
     let positioning: PositioningStrategy
-    
+
     /// Custom content builder (for .custom style)
     let customContent: ((HeatmapDay) -> AnyView)?
-    
+
     /// Screen bounds for smart positioning
     let screenBounds: CGRect
-    
+
     /// Configuration settings
     private let configuration: TooltipConfiguration
-    
+
     // MARK: - Initialization
-    
+
     /// Initialize tooltip with day data
     /// - Parameters:
     ///   - day: Day to display information for
@@ -170,9 +78,9 @@ public struct HeatmapTooltip: View {
         self.configuration = configuration
         self.customContent = customContent
     }
-    
+
     // MARK: - Body
-    
+
     public var body: some View {
         tooltipContent
             .background(tooltipBackground)
@@ -188,9 +96,9 @@ public struct HeatmapTooltip: View {
             .scaleEffect(configuration.scale)
             .animation(configuration.animation, value: day.id)
     }
-    
-    // MARK: - Tooltip Content
-    
+
+    // MARK: - Tooltip Content (Mid Level)
+
     @ViewBuilder
     private var tooltipContent: some View {
         switch style {
@@ -204,16 +112,16 @@ public struct HeatmapTooltip: View {
             customContentView
         }
     }
-    
-    // MARK: - Content Variants
-    
+
+    // MARK: - Content Variants (Mid Level)
+
     @ViewBuilder
     private var minimalContent: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(day.costString)
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundColor(.primary)
-            
+
             Text(day.dateString)
                 .font(.system(size: 10))
                 .foregroundColor(.secondary)
@@ -221,7 +129,7 @@ public struct HeatmapTooltip: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
     }
-    
+
     @ViewBuilder
     private var standardContent: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -233,7 +141,27 @@ public struct HeatmapTooltip: View {
         .padding(.vertical, 6)
     }
 
-    // MARK: - Standard Content Components
+    @ViewBuilder
+    private var detailedContent: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            detailedHeader
+            detailedDivider
+            detailedStatistics
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+    }
+
+    @ViewBuilder
+    private var customContentView: some View {
+        if let customContent = customContent {
+            customContent(day)
+        } else {
+            standardContent
+        }
+    }
+
+    // MARK: - Standard Content Components (Low Level)
 
     @ViewBuilder
     private var standardPrimaryRow: some View {
@@ -276,19 +204,8 @@ public struct HeatmapTooltip: View {
                 .foregroundColor(.green)
         }
     }
-    
-    @ViewBuilder
-    private var detailedContent: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            detailedHeader
-            detailedDivider
-            detailedStatistics
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-    }
 
-    // MARK: - Detailed Content Components
+    // MARK: - Detailed Content Components (Low Level)
 
     @ViewBuilder
     private var detailedHeader: some View {
@@ -393,24 +310,15 @@ public struct HeatmapTooltip: View {
             .font(.system(size: 8))
             .foregroundColor(.secondary)
     }
-    
-    @ViewBuilder
-    private var customContentView: some View {
-        if let customContent = customContent {
-            customContent(day)
-        } else {
-            standardContent
-        }
-    }
-    
+
     // MARK: - Background
-    
+
     @ViewBuilder
     private var tooltipBackground: some View {
         Rectangle()
             .fill(configuration.backgroundMaterial)
     }
-    
+
     // MARK: - Computed Properties
 
     private var calculatedOffset: CGSize {
@@ -427,161 +335,6 @@ public struct HeatmapTooltip: View {
     }
 }
 
-// MARK: - Tooltip Configuration
-
-/// Configuration for tooltip appearance and behavior
-public struct TooltipConfiguration {
-    
-    /// Background material
-    public let backgroundMaterial: Material
-    
-    /// Corner radius
-    public let cornerRadius: CGFloat
-    
-    /// Shadow properties
-    public let shadowColor: Color
-    public let shadowRadius: CGFloat
-    public let shadowOffset: CGSize
-    
-    /// Opacity
-    public let opacity: Double
-    
-    /// Scale
-    public let scale: CGFloat
-    
-    /// Animation
-    public let animation: Animation?
-    
-    /// Default configuration
-    public static let `default` = TooltipConfiguration(
-        backgroundMaterial: .regularMaterial,
-        cornerRadius: 8,
-        shadowColor: .black.opacity(0.15),
-        shadowRadius: 6,
-        shadowOffset: CGSize(width: 0, height: 2),
-        opacity: 1.0,
-        scale: 1.0,
-        animation: .easeInOut(duration: 0.2)
-    )
-    
-    /// Minimal configuration without shadows or animations
-    public static let minimal = TooltipConfiguration(
-        backgroundMaterial: .thinMaterial,
-        cornerRadius: 4,
-        shadowColor: .clear,
-        shadowRadius: 0,
-        shadowOffset: .zero,
-        opacity: 0.95,
-        scale: 1.0,
-        animation: nil
-    )
-    
-    /// Enhanced configuration with prominent styling
-    public static let enhanced = TooltipConfiguration(
-        backgroundMaterial: .thickMaterial,
-        cornerRadius: 12,
-        shadowColor: .black.opacity(0.25),
-        shadowRadius: 10,
-        shadowOffset: CGSize(width: 0, height: 4),
-        opacity: 1.0,
-        scale: 1.05,
-        animation: .spring(response: 0.4, dampingFraction: 0.8)
-    )
-}
-
-// MARK: - Tooltip Builder
-
-/// Builder for creating customized tooltips
-public struct HeatmapTooltipBuilder {
-    private var day: HeatmapDay
-    private var position: CGPoint
-    private var style: HeatmapTooltip.TooltipStyle = .standard
-    private var positioning: HeatmapTooltip.PositioningStrategy = .automatic
-    private var screenBounds: CGRect = NSScreen.main?.frame ?? .zero
-    private var configuration: TooltipConfiguration = .default
-    private var customContent: ((HeatmapDay) -> AnyView)?
-    
-    public init(day: HeatmapDay, position: CGPoint) {
-        self.day = day
-        self.position = position
-    }
-    
-    public func style(_ tooltipStyle: HeatmapTooltip.TooltipStyle) -> Self {
-        var builder = self
-        builder.style = tooltipStyle
-        return builder
-    }
-    
-    public func positioning(_ strategy: HeatmapTooltip.PositioningStrategy) -> Self {
-        var builder = self
-        builder.positioning = strategy
-        return builder
-    }
-    
-    public func screenBounds(_ bounds: CGRect) -> Self {
-        var builder = self
-        builder.screenBounds = bounds
-        return builder
-    }
-    
-    public func configuration(_ config: TooltipConfiguration) -> Self {
-        var builder = self
-        builder.configuration = config
-        return builder
-    }
-    
-    public func customContent(_ content: @escaping (HeatmapDay) -> AnyView) -> Self {
-        var builder = self
-        builder.customContent = content
-        return builder
-    }
-    
-    public func build() -> HeatmapTooltip {
-        return HeatmapTooltip(
-            day: day,
-            position: position,
-            style: style,
-            positioning: positioning,
-            screenBounds: screenBounds,
-            configuration: configuration,
-            customContent: customContent
-        )
-    }
-}
-
-// MARK: - Convenience Extensions
-
-public extension HeatmapTooltip {
-    
-    /// Create a quick tooltip with minimal styling
-    /// - Parameters:
-    ///   - day: Day data
-    ///   - position: Position on screen
-    /// - Returns: Minimal tooltip
-    static func quick(day: HeatmapDay, position: CGPoint) -> HeatmapTooltip {
-        return HeatmapTooltip(
-            day: day,
-            position: position,
-            style: .minimal,
-            configuration: .minimal
-        )
-    }
-    
-    /// Create a rich tooltip with detailed information
-    /// - Parameters:
-    ///   - day: Day data
-    ///   - position: Position on screen
-    /// - Returns: Detailed tooltip
-    static func rich(day: HeatmapDay, position: CGPoint) -> HeatmapTooltip {
-        return HeatmapTooltip(
-            day: day,
-            position: position,
-            style: .detailed,
-            configuration: .enhanced
-        )
-    }
-}
-
 // MARK: - Preview
 
 #if DEBUG
@@ -595,14 +348,14 @@ struct HeatmapTooltip_Previews: PreviewProvider {
             dayOfWeek: 3,
             maxCost: 25.0
         )
-        
+
         VStack(spacing: 30) {
             // Minimal tooltip
             HeatmapTooltip.quick(day: sampleDay, position: .zero)
-            
+
             // Standard tooltip
             HeatmapTooltip(day: sampleDay, position: .zero, style: .standard)
-            
+
             // Detailed tooltip
             HeatmapTooltip.rich(day: sampleDay, position: .zero)
         }
