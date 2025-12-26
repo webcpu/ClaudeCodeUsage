@@ -148,15 +148,22 @@ final class UsageStore {
     private var hasInitialized = false
 
     // MARK: - Initialization
-    init(container: DependencyContainer = ProductionContainer.shared,
-         dateProvider: DateProviding = SystemDateProvider()) {
-        self.usageDataService = container.usageDataService
-        self.sessionMonitorService = container.sessionMonitorService
-        self.configurationService = container.configurationService
+    init(
+        usageDataService: UsageDataService? = nil,
+        sessionMonitorService: SessionMonitorService? = nil,
+        configurationService: ConfigurationService? = nil,
+        dateProvider: DateProviding = SystemDateProvider()
+    ) {
+        let config = configurationService ?? DefaultConfigurationService()
+        self.configurationService = config
+        self.usageDataService = usageDataService
+            ?? DefaultUsageDataService(configuration: config.configuration)
+        self.sessionMonitorService = sessionMonitorService
+            ?? DefaultSessionMonitorService(configuration: config.configuration)
         self.dateProvider = dateProvider
         self.lastRefreshTime = dateProvider.now
         self.chartDataService = ChartDataService(dateProvider: dateProvider)
-        self.dailyCostThreshold = container.configurationService.configuration.dailyCostThreshold
+        self.dailyCostThreshold = config.configuration.dailyCostThreshold
 
         // Setup memory cleanup observer
         memoryCleanupObserver = NotificationCenter.default.addObserver(
