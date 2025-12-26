@@ -61,12 +61,14 @@ public actor UsageRepository {
         let filesToProcess = try collectJSONLFiles(from: projectsPath)
         let sortedFiles = sortFilesByTimestamp(filesToProcess)
         
-        // Use batch processing for very large datasets
+        // Process files in parallel (batch only for very large datasets to manage memory)
         let entries: [UsageEntry]
-        if sortedFiles.count > 100 {
-            entries = try await processFilesInBatches(sortedFiles, batchSize: 20, deduplication: deduplication)
+        if sortedFiles.count > 500 {
+            // Only batch for extremely large datasets
+            entries = await processFilesInBatches(sortedFiles, batchSize: 100, deduplication: deduplication)
         } else {
-            entries = try await processFiles(sortedFiles, deduplication: deduplication)
+            // Direct parallel processing for typical usage
+            entries = await processFiles(sortedFiles, deduplication: deduplication)
         }
         
         #if DEBUG
@@ -99,7 +101,7 @@ public actor UsageRepository {
         
         let filesToProcess = try collectJSONLFiles(from: projectsPath)
         let sortedFiles = sortFilesByTimestamp(filesToProcess)
-        var entries = try await processFiles(sortedFiles, deduplication: deduplication)
+        var entries = await processFiles(sortedFiles, deduplication: deduplication)
         
         // Sort by timestamp (newest first)
         entries.sort { $0.timestamp > $1.timestamp }
@@ -109,15 +111,58 @@ public actor UsageRepository {
         }
         return entries
     }
-    
+
+    /// Get today's usage entries only - much faster than loading all entries
+    /// Filters files by modification date before processing
+    public func getTodayUsageEntries() async throws -> [UsageEntry] {
+        let projectsPath = basePath + "/projects"
+
+        guard fileSystem.fileExists(atPath: projectsPath) else {
+            return []
+        }
+
+        let deduplication = HashBasedDeduplication()
+        let allFiles = try collectJSONLFiles(from: projectsPath)
+
+        // Filter to only files modified today (use file mod date as proxy)
+        let calendar = Calendar.current
+        let todayStart = calendar.startOfDay(for: Date())
+        let formatter = ISO8601DateFormatter()  // Reuse single formatter
+        let todayFiles = allFiles.filter { file in
+            if let date = formatter.date(from: file.earliestTimestamp) {
+                return date >= todayStart
+            }
+            return false
+        }
+
+        #if DEBUG
+        print("[UsageRepository] Today's files: \(todayFiles.count) of \(allFiles.count) total")
+        #endif
+
+        let entries = await processFiles(todayFiles, deduplication: deduplication)
+        return entries
+    }
+
+    /// Get today's stats only - fast path for initial load
+    public func getTodayUsageStats() async throws -> UsageStats {
+        let entries = try await getTodayUsageEntries()
+        let sessionCount = Set(entries.compactMap { $0.sessionId }).count
+        return aggregator.aggregateStatistics(from: entries, sessionCount: sessionCount)
+    }
+
     // MARK: - Private Methods
     
     private func collectJSONLFiles(from projectsPath: String) throws -> [(path: String, projectDir: String, earliestTimestamp: String)] {
         var filesToProcess: [(path: String, projectDir: String, earliestTimestamp: String)] = []
-        
+
         let projectDirs = try fileSystem.contentsOfDirectory(atPath: projectsPath)
-        
+
         for projectDir in projectDirs {
+            // Skip non-Claude-Code directories (e.g., RPLY app sessions from temp folders)
+            if shouldSkipDirectory(projectDir) {
+                continue
+            }
+
             let projectPath = projectsPath + "/" + projectDir
             
             let files: [String]
@@ -150,41 +195,41 @@ public actor UsageRepository {
         return files.sorted { $0.earliestTimestamp < $1.earliestTimestamp }
     }
     
-    private func processFiles(_ files: [(path: String, projectDir: String, earliestTimestamp: String)], deduplication: DeduplicationStrategy) async throws -> [UsageEntry] {
+    private func processFiles(_ files: [(path: String, projectDir: String, earliestTimestamp: String)], deduplication: DeduplicationStrategy) async -> [UsageEntry] {
         // Use parallel processing for better performance with large datasets
         if files.count > 5 {
-            return try await processFilesInParallel(files, deduplication: deduplication)
+            return await processFilesInParallel(files, deduplication: deduplication)
         } else {
-            return try processFilesSequentially(files, deduplication: deduplication)
+            return processFilesSequentially(files, deduplication: deduplication)
         }
     }
     
-    private func processFilesSequentially(_ files: [(path: String, projectDir: String, earliestTimestamp: String)], deduplication: DeduplicationStrategy) throws -> [UsageEntry] {
+    private func processFilesSequentially(_ files: [(path: String, projectDir: String, earliestTimestamp: String)], deduplication: DeduplicationStrategy) -> [UsageEntry] {
         var allEntries: [UsageEntry] = []
-        
+
         for (filePath, projectDir, _) in files {
-            let entries = try processJSONLFile(at: filePath, projectDir: projectDir, deduplication: deduplication)
+            let entries = processJSONLFile(at: filePath, projectDir: projectDir, deduplication: deduplication)
             allEntries.append(contentsOf: entries)
         }
-        
+
         return allEntries
     }
     
-    private func processFilesInParallel(_ files: [(path: String, projectDir: String, earliestTimestamp: String)], deduplication: DeduplicationStrategy) async throws -> [UsageEntry] {
+    private func processFilesInParallel(_ files: [(path: String, projectDir: String, earliestTimestamp: String)], deduplication: DeduplicationStrategy) async -> [UsageEntry] {
         // Use structured concurrency for thread-safe parallel processing
-        return try await withThrowingTaskGroup(of: [UsageEntry].self) { group in
+        return await withTaskGroup(of: [UsageEntry].self) { group in
             for (filePath, projectDir, _) in files {
                 group.addTask {
-                    try await self.processJSONLFile(
+                    await self.processJSONLFile(
                         at: filePath,
                         projectDir: projectDir,
                         deduplication: deduplication
                     )
                 }
             }
-            
+
             var allEntries: [UsageEntry] = []
-            for try await entries in group {
+            for await entries in group {
                 allEntries.append(contentsOf: entries)
             }
             return allEntries
@@ -193,111 +238,150 @@ public actor UsageRepository {
     
     
     /// Process files in batches to manage memory for very large datasets
-    private func processFilesInBatches(_ files: [(path: String, projectDir: String, earliestTimestamp: String)], batchSize: Int, deduplication: DeduplicationStrategy) async throws -> [UsageEntry] {
+    private func processFilesInBatches(_ files: [(path: String, projectDir: String, earliestTimestamp: String)], batchSize: Int, deduplication: DeduplicationStrategy) async -> [UsageEntry] {
         var allEntries: [UsageEntry] = []
         let totalBatches = (files.count + batchSize - 1) / batchSize
-        
-        #if DEBUG
-        print("[UsageRepository] Processing \(files.count) files in \(totalBatches) batches of \(batchSize)")
-        #endif
-        
+
         for batchIndex in 0..<totalBatches {
             let startIndex = batchIndex * batchSize
             let endIndex = min(startIndex + batchSize, files.count)
             let batch = Array(files[startIndex..<endIndex])
-            
-            #if DEBUG
-            print("[UsageRepository] Processing batch \(batchIndex + 1)/\(totalBatches) with \(batch.count) files")
-            #endif
-            
+
             // Process batch in parallel
-            let batchEntries = try await processFilesInParallel(batch, deduplication: deduplication)
+            let batchEntries = await processFilesInParallel(batch, deduplication: deduplication)
             allEntries.append(contentsOf: batchEntries)
-            
-            // Allow other operations to proceed between batches
-            await Task.yield()
         }
-        
+
         return allEntries
     }
     
-    private func processJSONLFile(at path: String, projectDir: String, deduplication: DeduplicationStrategy) throws -> [UsageEntry] {
-        let content = try fileSystem.readFile(atPath: path)
-        let lines = content.components(separatedBy: .newlines).filter { !$0.isEmpty }
-        
-        var entries: [UsageEntry] = []
+    private func processJSONLFile(at path: String, projectDir: String, deduplication: DeduplicationStrategy) -> [UsageEntry] {
+        guard let fileData = try? Data(contentsOf: URL(fileURLWithPath: path)) else {
+            return []
+        }
+
         let decodedProjectPath = pathDecoder.decode(projectDir)
-        
-        for line in lines {
-            guard let data = line.data(using: .utf8) else {
-                logger.debug("Failed to convert line to data in file: \(path)")
+        var entries: [UsageEntry] = []
+
+        // Extract line ranges using memchr for SIMD-optimized scanning
+        let lineRanges = extractLineRanges(from: fileData)
+
+        for range in lineRanges {
+            let lineData = fileData[range]
+
+            // Quick validation: must be JSON object
+            guard lineData.count > 2,
+                  lineData.first == 0x7B,  // '{'
+                  lineData.last == 0x7D    // '}'
+            else { continue }
+
+            guard let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any] else {
                 continue
             }
-            
-            let json: [String: Any]
-            do {
-                guard let parsedJson = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                    logger.debug("Invalid JSON format in file: \(path)")
-                    continue
-                }
-                json = parsedJson
-            } catch {
-                logger.debug("Failed to parse JSON in file \(path): \(error.localizedDescription)")
-                continue
-            }
-            
-            // Check deduplication
+
             let messageId = parser.extractMessageId(from: json)
             let requestId = parser.extractRequestId(from: json)
-            
+
             guard deduplication.shouldInclude(messageId: messageId, requestId: requestId) else {
                 continue
             }
-            
-            // Parse entry
-            do {
-                if let entry = try parser.parseJSONLLine(line, projectPath: decodedProjectPath) {
-                    entries.append(entry)
-                }
-            } catch {
-                logger.debug("Failed to parse entry in file \(path): \(error.localizedDescription)")
-                // Continue processing other entries
+
+            if let entry = createEntry(from: json, projectPath: decodedProjectPath) {
+                entries.append(entry)
             }
         }
-        
+
         return entries
+    }
+
+    /// Extract line ranges using memchr for SIMD-optimized byte scanning
+    private func extractLineRanges(from data: Data) -> [Range<Data.Index>] {
+        var ranges: [Range<Data.Index>] = []
+        let count = data.count
+        guard count > 0 else { return ranges }
+
+        // Convert to [UInt8] to use Array's cleaner withUnsafeBufferPointer
+        let bytes = [UInt8](data)
+        bytes.withUnsafeBufferPointer { buffer in
+            guard let ptr = buffer.baseAddress else { return }
+            var offset = 0
+
+            while offset < count {
+                let remaining = count - offset
+                let lineEnd: Int
+
+                if let found = memchr(ptr + offset, 0x0A, remaining) {
+                    lineEnd = UnsafePointer(found.assumingMemoryBound(to: UInt8.self)) - ptr
+                } else {
+                    lineEnd = count
+                }
+
+                if lineEnd > offset {
+                    ranges.append(offset..<lineEnd)
+                }
+                offset = lineEnd + 1
+            }
+        }
+
+        return ranges
+    }
+
+    /// Create UsageEntry from pre-parsed JSON - avoids double parsing
+    private func createEntry(from json: [String: Any], projectPath: String) -> UsageEntry? {
+        guard let message = json["message"] as? [String: Any],
+              let usage = message["usage"] as? [String: Any] else {
+            return nil
+        }
+
+        let model = message["model"] as? String ?? "unknown"
+        let inputTokens = usage["input_tokens"] as? Int ?? 0
+        let outputTokens = usage["output_tokens"] as? Int ?? 0
+        let cacheWriteTokens = usage["cache_creation_input_tokens"] as? Int ?? 0
+        let cacheReadTokens = usage["cache_read_input_tokens"] as? Int ?? 0
+
+        // Skip entries without meaningful token usage
+        if inputTokens == 0 && outputTokens == 0 && cacheWriteTokens == 0 && cacheReadTokens == 0 {
+            return nil
+        }
+
+        // Calculate cost if not provided
+        var cost = json["costUSD"] as? Double ?? 0.0
+        if cost == 0.0 && (inputTokens > 0 || outputTokens > 0) {
+            if let pricing = ModelPricing.pricing(for: model) {
+                cost = pricing.calculateCost(
+                    inputTokens: inputTokens,
+                    outputTokens: outputTokens,
+                    cacheWriteTokens: cacheWriteTokens,
+                    cacheReadTokens: cacheReadTokens
+                )
+            }
+        }
+
+        let timestamp = json["timestamp"] as? String ?? ""
+
+        return UsageEntry(
+            project: projectPath,
+            timestamp: timestamp,
+            model: model,
+            inputTokens: inputTokens,
+            outputTokens: outputTokens,
+            cacheWriteTokens: cacheWriteTokens,
+            cacheReadTokens: cacheReadTokens,
+            cost: cost,
+            sessionId: json["sessionId"] as? String
+        )
     }
     
     private func getEarliestTimestamp(from path: String) -> String? {
-        let content: String
-        do {
-            content = try fileSystem.readFile(atPath: path)
-        } catch {
-            logger.debug("Failed to read file \(path) for timestamp: \(error.localizedDescription)")
-            return nil
+        // Use file modification date for fast sorting - no file content reading needed
+        // This is much faster than reading file contents and still provides good ordering
+        if let attributes = try? FileManager.default.attributesOfItem(atPath: path),
+           let modDate = attributes[.modificationDate] as? Date {
+            let formatter = ISO8601DateFormatter()
+            return formatter.string(from: modDate)
         }
-        
-        let lines = content.components(separatedBy: .newlines)
-        var earliestTimestamp: String?
-        
-        for line in lines {
-            guard !line.isEmpty,
-                  let data = line.data(using: .utf8),
-                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let timestamp = parser.extractTimestamp(from: json) else {
-                continue
-            }
-            
-            if let current = earliestTimestamp {
-                if timestamp < current {
-                    earliestTimestamp = timestamp
-                }
-            } else {
-                earliestTimestamp = timestamp
-            }
-        }
-        
-        return earliestTimestamp
+        // Default to current time for mock/test paths - ensures files are still processed
+        return ISO8601DateFormatter().string(from: Date())
     }
     
     private func countUniqueSessions(from files: [(path: String, projectDir: String, earliestTimestamp: String)]) -> Int {
@@ -314,7 +398,28 @@ public actor UsageRepository {
         
         return sessionIds.count
     }
-    
+
+    /// Check if a directory should be skipped (non-Claude-Code data)
+    /// Filters out RPLY app sessions and other non-usage directories
+    private func shouldSkipDirectory(_ directoryName: String) -> Bool {
+        // Skip temp folder sessions (RPLY app stores sessions in /private/var/folders/...)
+        if directoryName.hasPrefix("-private-var-folders-") {
+            return true
+        }
+
+        // Skip directories containing claude-kit-sessions (RPLY app session marker)
+        if directoryName.contains("claude-kit-sessions") {
+            return true
+        }
+
+        // Skip hidden directories
+        if directoryName.hasPrefix(".") {
+            return true
+        }
+
+        return false
+    }
+
     private func createEmptyStats() -> UsageStats {
         return UsageStats(
             totalCost: 0,

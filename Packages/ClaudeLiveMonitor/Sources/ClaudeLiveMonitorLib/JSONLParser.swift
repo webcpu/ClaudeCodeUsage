@@ -27,28 +27,30 @@ struct JSONLUsageData: Codable {
 
 public struct JSONLParser {
     private let dateFormatter: ISO8601DateFormatter
-    
+    private let decoder: JSONDecoder
+
     public init() {
         self.dateFormatter = ISO8601DateFormatter()
         self.dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        self.decoder = JSONDecoder()
     }
-    
+
     public func parseFile(at path: String, processedHashes: inout Set<String>) -> [UsageEntry] {
         var entries: [UsageEntry] = []
-        
-        guard let content = try? String(contentsOfFile: path, encoding: .utf8) else {
+
+        guard let fileData = try? Data(contentsOf: URL(fileURLWithPath: path)) else {
             return entries
         }
-        
-        for line in content.split(separator: "\n") {
-            guard !line.isEmpty,
-                  let data = line.data(using: .utf8) else {
-                continue
-            }
-            
+
+        // Use memchr for SIMD-optimized line scanning
+        let lineRanges = extractLineRanges(from: fileData)
+
+        for range in lineRanges {
+            let lineData = fileData[range]
+            guard !lineData.isEmpty else { continue }
+
             do {
-                let decoder = JSONDecoder()
-                let usageData = try decoder.decode(JSONLUsageData.self, from: data)
+                let usageData = try decoder.decode(JSONLUsageData.self, from: lineData)
                 
                 // Only process assistant messages with usage data
                 guard let message = usageData.message,
@@ -113,5 +115,36 @@ public struct JSONLParser {
         }
         
         return entries
+    }
+
+    /// Extract line ranges using memchr for SIMD-optimized byte scanning
+    private func extractLineRanges(from data: Data) -> [Range<Data.Index>] {
+        var ranges: [Range<Data.Index>] = []
+        let count = data.count
+        guard count > 0 else { return ranges }
+
+        let bytes = [UInt8](data)
+        bytes.withUnsafeBufferPointer { buffer in
+            guard let ptr = buffer.baseAddress else { return }
+            var offset = 0
+
+            while offset < count {
+                let remaining = count - offset
+                let lineEnd: Int
+
+                if let found = memchr(ptr + offset, 0x0A, remaining) {
+                    lineEnd = UnsafePointer(found.assumingMemoryBound(to: UInt8.self)) - ptr
+                } else {
+                    lineEnd = count
+                }
+
+                if lineEnd > offset {
+                    ranges.append(offset..<lineEnd)
+                }
+                offset = lineEnd + 1
+            }
+        }
+
+        return ranges
     }
 }
