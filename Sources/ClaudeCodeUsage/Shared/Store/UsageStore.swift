@@ -38,9 +38,7 @@ final class UsageStore {
     var estimatedDailySessions: Int = 0
     var todayEntries: [UsageEntry] = []
     var lastRefreshTime: Date
-
-    // Chart data service
-    var chartDataService: ChartDataService
+    var todayHourlyCosts: [Double] = []
 
     // MARK: - Computed Properties
     var isLoading: Bool {
@@ -96,8 +94,8 @@ final class UsageStore {
         lastRefreshTime
     }
 
-    // MARK: - Dependencies (Services)
-    private let usageDataService: UsageDataService
+    // MARK: - Dependencies
+    private let client: ClaudeUsageClient
     let sessionMonitorService: SessionMonitorService
     private let configurationService: ConfigurationService
     private let dateProvider: DateProviding
@@ -115,20 +113,20 @@ final class UsageStore {
 
     // MARK: - Initialization
     init(
-        usageDataService: UsageDataService? = nil,
+        client: ClaudeUsageClient? = nil,
         sessionMonitorService: SessionMonitorService? = nil,
         configurationService: ConfigurationService? = nil,
         dateProvider: DateProviding = SystemDateProvider()
     ) {
         let config = configurationService ?? DefaultConfigurationService()
         self.configurationService = config
-        self.usageDataService = usageDataService
-            ?? DefaultUsageDataService(configuration: config.configuration)
+        self.client = client ?? ClaudeUsageClient(
+            dataSource: .localFiles(basePath: config.configuration.basePath)
+        )
         self.sessionMonitorService = sessionMonitorService
             ?? DefaultSessionMonitorService(configuration: config.configuration)
         self.dateProvider = dateProvider
         self.lastRefreshTime = dateProvider.now
-        self.chartDataService = ChartDataService(dateProvider: dateProvider)
         self.dailyCostThreshold = config.configuration.dailyCostThreshold
 
         // Setup memory cleanup observer
@@ -194,13 +192,15 @@ final class UsageStore {
             // PHASE 1: Load today's data + session info (FAST)
             let phase1Start = dateProvider.now
 
-            async let todayDataLoading = usageDataService.loadTodayEntriesAndStats()
+            async let todayEntriesLoading = client.getTodayUsageEntries()
+            async let todayStatsLoading = client.getTodayUsageStats()
             async let sessionLoading = sessionMonitorService.getActiveSession()
             async let burnRateLoading = sessionMonitorService.getBurnRate()
             async let tokenLimitLoading = sessionMonitorService.getAutoTokenLimit()
 
-            let ((todaysEntries, todayStats), session, burnRate, autoTokenLimit) = await (
-                try todayDataLoading,
+            let (todaysEntries, todayStats, session, burnRate, autoTokenLimit) = await (
+                try todayEntriesLoading,
+                try todayStatsLoading,
                 sessionLoading,
                 burnRateLoading,
                 tokenLimitLoading
@@ -220,7 +220,7 @@ final class UsageStore {
 
             // PHASE 2: Load full historical data
             let phase2Start = dateProvider.now
-            let (_, fullStats) = try await usageDataService.loadEntriesAndStats()
+            let fullStats = try await client.getUsageStats()
 
             #if DEBUG
             let phase2Time = dateProvider.now.timeIntervalSince(phase2Start)
@@ -231,7 +231,7 @@ final class UsageStore {
             self.state = .loaded(fullStats)
 
             // Update chart data
-            await updateChartData()
+            updateChartData()
 
             let totalTime = dateProvider.now.timeIntervalSince(loadStartTime)
             #if DEBUG
@@ -255,15 +255,12 @@ final class UsageStore {
     }
 
     // MARK: - Chart Data
-    func updateChartData() async {
-        await chartDataService.loadHourlyCostsFromEntries(todayEntries)
+    private func updateChartData() {
+        todayHourlyCosts = UsageAnalytics.todayHourlyCosts(from: todayEntries, referenceDate: dateProvider.now)
 
         #if DEBUG
-        if stats != nil {
-            let cost = todaysCostValue
-            let chartTotal = chartDataService.todayHourlyCosts.reduce(0, +)
-            print("[UsageStore] Chart sync - Today's cost: $\(String(format: "%.2f", cost)), Chart total: $\(String(format: "%.2f", chartTotal))")
-        }
+        let chartTotal = todayHourlyCosts.reduce(0, +)
+        print("[UsageStore] Chart: $\(String(format: "%.2f", chartTotal)) from \(todayEntries.count) entries")
         #endif
     }
 
