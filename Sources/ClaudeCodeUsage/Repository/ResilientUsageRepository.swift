@@ -73,7 +73,7 @@ public actor ResilientUsageRepository {
         logger.info("Processing \(sortedFiles.count) files for statistics")
         
         // Process files concurrently
-        let entries = try await processFilesConcurrently(sortedFiles)
+        let entries = await processFilesConcurrently(sortedFiles)
         
         logger.info("Loaded \(entries.count) entries from \(sortedFiles.count) files")
         
@@ -97,7 +97,7 @@ public actor ResilientUsageRepository {
         
         let filesToProcess = try await collectJSONLFiles(from: projectsPath)
         let sortedFiles = sortFilesByTimestamp(filesToProcess)
-        var entries = try await processFilesConcurrently(sortedFiles)
+        var entries = await processFilesConcurrently(sortedFiles)
         
         // Sort by timestamp (newest first)
         entries.sort { $0.timestamp > $1.timestamp }
@@ -112,8 +112,13 @@ public actor ResilientUsageRepository {
         var filesToProcess: [(path: String, projectDir: String, earliestTimestamp: String)] = []
         
         let projectDirs = try await fileSystem.contentsOfDirectory(atPath: projectsPath)
-        
+
         for projectDir in projectDirs {
+            // Skip non-Claude-Code directories (e.g., RPLY app sessions)
+            if Self.shouldSkipDirectory(projectDir) {
+                continue
+            }
+
             let projectPath = projectsPath + "/" + projectDir
             
             let files: [String]
@@ -142,47 +147,61 @@ public actor ResilientUsageRepository {
         return filesToProcess
     }
     
-    private func processFilesConcurrently(_ files: [(path: String, projectDir: String, earliestTimestamp: String)]) async throws -> [UsageEntry] {
-        try await withThrowingTaskGroup(of: [UsageEntry].self) { group in
+    private func processFilesConcurrently(_ files: [(path: String, projectDir: String, earliestTimestamp: String)]) async -> [UsageEntry] {
+        await withTaskGroup(of: [UsageEntry].self) { group in
             for (filePath, projectDir, _) in files {
                 group.addTask {
-                    try await self.processJSONLFile(
+                    await self.processJSONLFile(
                         at: filePath,
                         projectDir: projectDir
                     )
                 }
             }
-            
+
             var allEntries: [UsageEntry] = []
-            for try await entries in group {
+            for await entries in group {
                 allEntries.append(contentsOf: entries)
             }
             return allEntries
         }
     }
     
-    private func processJSONLFile(at path: String, projectDir: String) async throws -> [UsageEntry] {
-        let content = try await fileSystem.readFile(atPath: path)
+    private func processJSONLFile(at path: String, projectDir: String) async -> [UsageEntry] {
+        // Resilient file read: if file fails (e.g., being written to), skip it
+        let content: String
+        do {
+            content = try await fileSystem.readFile(atPath: path)
+        } catch {
+            logger.warning("Skipping file \(path): \(error.localizedDescription)")
+            return []
+        }
         let lines = content.components(separatedBy: .newlines).filter { !$0.isEmpty }
         
         var entries: [UsageEntry] = []
         let decodedProjectPath = pathDecoder.decode(projectDir)
         
         for line in lines {
-            guard let data = line.data(using: .utf8) else {
-                logger.debug("Failed to convert line to data in file: \(path)")
-                continue
+            // Skip obviously incomplete lines (truncated during file write)
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard trimmed.hasPrefix("{") && trimmed.hasSuffix("}") else {
+                continue  // Silently skip incomplete JSON lines
             }
-            
+
+            guard let data = line.data(using: .utf8) else {
+                continue  // Silently skip encoding issues
+            }
+
             let json: [String: Any]
             do {
                 guard let parsedJson = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                    logger.debug("Invalid JSON format in file: \(path)")
-                    continue
+                    continue  // Silently skip non-object JSON
                 }
                 json = parsedJson
             } catch {
-                logger.debug("Failed to parse JSON in file \(path): \(error.localizedDescription)")
+                // Only log if it looks complete but still fails (rare corruption)
+                #if DEBUG
+                logger.debug("Unexpected JSON parse error in \(path): \(error.localizedDescription)")
+                #endif
                 continue
             }
             
@@ -209,35 +228,15 @@ public actor ResilientUsageRepository {
     }
     
     private func getEarliestTimestamp(from path: String) async -> String? {
-        let content: String
-        do {
-            content = try await fileSystem.readFile(atPath: path)
-        } catch {
-            logger.debug("Failed to read file \(path) for timestamp: \(error.localizedDescription)")
-            return nil
+        // Use file modification date for fast sorting - no file content reading needed
+        // This is much faster than reading file contents and still provides good ordering
+        if let attributes = try? FileManager.default.attributesOfItem(atPath: path),
+           let modDate = attributes[.modificationDate] as? Date {
+            let formatter = ISO8601DateFormatter()
+            return formatter.string(from: modDate)
         }
-        
-        let lines = content.components(separatedBy: .newlines)
-        var earliestTimestamp: String?
-        
-        for line in lines {
-            guard !line.isEmpty,
-                  let data = line.data(using: .utf8),
-                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let timestamp = parser.extractTimestamp(from: json) else {
-                continue
-            }
-            
-            if let current = earliestTimestamp {
-                if timestamp < current {
-                    earliestTimestamp = timestamp
-                }
-            } else {
-                earliestTimestamp = timestamp
-            }
-        }
-        
-        return earliestTimestamp
+        // Default to current time for mock/test paths - ensures files are still processed
+        return ISO8601DateFormatter().string(from: Date())
     }
     
     private func sortFilesByTimestamp(_ files: [(path: String, projectDir: String, earliestTimestamp: String)]) -> [(path: String, projectDir: String, earliestTimestamp: String)] {
@@ -258,7 +257,28 @@ public actor ResilientUsageRepository {
         
         return sessionIds.count
     }
-    
+
+    /// Check if a directory should be skipped (non-Claude-Code data)
+    /// Filters out RPLY app sessions and other non-usage directories
+    private static func shouldSkipDirectory(_ directoryName: String) -> Bool {
+        // Skip temp folder sessions (RPLY app stores sessions in /private/var/folders/...)
+        if directoryName.hasPrefix("-private-var-folders-") {
+            return true
+        }
+
+        // Skip directories containing claude-kit-sessions (RPLY app session marker)
+        if directoryName.contains("claude-kit-sessions") {
+            return true
+        }
+
+        // Skip hidden directories
+        if directoryName.hasPrefix(".") {
+            return true
+        }
+
+        return false
+    }
+
     private func createEmptyStats() -> UsageStats {
         return UsageStats(
             totalCost: 0,
@@ -295,5 +315,9 @@ private struct AsyncFileSystemAdapter: AsyncFileSystemProtocol {
     
     func readFile(atPath path: String) async throws -> String {
         try fileSystem.readFile(atPath: path)
+    }
+    
+    func readFirstLine(atPath path: String) async throws -> String? {
+        try fileSystem.readFirstLine(atPath: path)
     }
 }

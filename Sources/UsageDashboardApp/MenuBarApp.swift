@@ -133,7 +133,8 @@ final class UsageDataModel {
     }
     
     func startRefreshTimer() {
-        viewModel.startAutoRefresh()
+        // Don't perform initial load - assume data was just loaded by initializeIfNeeded
+        viewModel.startAutoRefresh(performInitialLoad: false)
     }
     
     func stopRefreshTimer() {
@@ -141,12 +142,25 @@ final class UsageDataModel {
     }
     
     func handleAppBecameActive() {
-        Task {
-            await viewModel.refresh()
-            // Sync chart data after refresh
-            await updateChartData()
+        #if DEBUG
+        print("[UsageDataModel] handleAppBecameActive() called")
+        #endif
+        // Only refresh if we haven't loaded recently (within last 2 seconds)
+        let timeSinceLastRefresh = dateProvider.now.timeIntervalSince(lastRefreshTime)
+        #if DEBUG
+        print("[UsageDataModel] Time since last refresh: \(timeSinceLastRefresh)s")
+        #endif
+        if timeSinceLastRefresh > 2.0 {
+            // Update refresh time immediately to prevent duplicate calls
+            lastRefreshTime = dateProvider.now
+            Task {
+                await viewModel.refresh()
+                // Sync chart data after refresh
+                await updateChartData()
+            }
         }
-        viewModel.startAutoRefresh()
+        // Don't perform initial load - we may have just refreshed above
+        viewModel.startAutoRefresh(performInitialLoad: false)
     }
     
     func handleAppResignActive() {
@@ -154,10 +168,22 @@ final class UsageDataModel {
     }
     
     func handleWindowFocus() {
-        Task {
-            await viewModel.refresh()
-            // Sync chart data after refresh
-            await updateChartData()
+        #if DEBUG
+        print("[UsageDataModel] handleWindowFocus() called")
+        #endif
+        // Only refresh if we haven't loaded recently (within last 2 seconds)
+        let timeSinceLastRefresh = dateProvider.now.timeIntervalSince(lastRefreshTime)
+        #if DEBUG
+        print("[UsageDataModel] Time since last refresh: \(timeSinceLastRefresh)s")
+        #endif
+        if timeSinceLastRefresh > 2.0 {
+            // Update refresh time immediately to prevent duplicate calls
+            lastRefreshTime = dateProvider.now
+            Task {
+                await viewModel.refresh()
+                // Sync chart data after refresh
+                await updateChartData()
+            }
         }
     }
     

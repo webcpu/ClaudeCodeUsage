@@ -152,7 +152,10 @@ final class AppState {
         guard !hasInitialized else { return }
         hasInitialized = true
         
-        await dataModel.loadData()
+        // Only load data if not already loaded
+        if !dataModel.hasInitiallyLoaded {
+            await dataModel.loadData()
+        }
         dataModel.startRefreshTimer()
     }
 }

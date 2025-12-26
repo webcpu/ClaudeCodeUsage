@@ -39,18 +39,36 @@ public actor AsyncUsageRepository: UsageRepositoryProtocol {
     // MARK: - Public API
     
     public func getUsageStats() async throws -> UsageStats {
+        let startTime = Date()
         let files = try await discoverFiles()
+        
+        #if DEBUG
+        print("[AsyncUsageRepository] Discovered \(files.count) files in \(String(format: "%.3f", Date().timeIntervalSince(startTime)))s")
+        #endif
         
         if files.isEmpty {
             return createEmptyStats()
         }
         
         // Process files as async stream
+        let processingStart = Date()
         let deduplication = HashBasedDeduplication()
-        let entries = try await processFilesAsStream(files, deduplication: deduplication)
+        let entries = await processFilesAsStream(files, deduplication: deduplication)
+        
+        #if DEBUG
+        print("[AsyncUsageRepository] Processed \(entries.count) entries in \(String(format: "%.3f", Date().timeIntervalSince(processingStart)))s")
+        #endif
         
         // Aggregate statistics
-        return aggregateStats(from: entries, sessionCount: countUniqueSessions(from: files))
+        let aggregateStart = Date()
+        let stats = aggregateStats(from: entries, sessionCount: countUniqueSessions(from: files))
+        
+        #if DEBUG
+        let totalDuration = Date().timeIntervalSince(startTime)
+        print("[AsyncUsageRepository] getUsageStats total: \(String(format: "%.3f", totalDuration))s (aggregate: \(String(format: "%.3f", Date().timeIntervalSince(aggregateStart)))s)")
+        #endif
+        
+        return stats
     }
     
     public func loadEntriesForDate(_ date: Date) async throws -> [UsageEntry] {
@@ -66,22 +84,33 @@ public actor AsyncUsageRepository: UsageRepositoryProtocol {
     }
     
     public func getUsageEntries(limit: Int? = nil) async throws -> [UsageEntry] {
+        let startTime = Date()
         let files = try await discoverFiles()
+        
+        #if DEBUG
+        print("[AsyncUsageRepository] getUsageEntries: Discovered \(files.count) files in \(String(format: "%.3f", Date().timeIntervalSince(startTime)))s")
+        #endif
         
         if files.isEmpty {
             return []
         }
         
+        let processingStart = Date()
         let deduplication = HashBasedDeduplication()
         var entries: [UsageEntry] = []
         
         // Stream processing with optional limit
-        for try await entry in createFileProcessingStream(files, deduplication: deduplication) {
+        for await entry in createFileProcessingStream(files, deduplication: deduplication) {
             entries.append(entry)
             if let limit = limit, entries.count >= limit {
                 break
             }
         }
+        
+        #if DEBUG
+        let totalDuration = Date().timeIntervalSince(startTime)
+        print("[AsyncUsageRepository] getUsageEntries total: \(String(format: "%.3f", totalDuration))s - \(entries.count) entries (processing: \(String(format: "%.3f", Date().timeIntervalSince(processingStart)))s)")
+        #endif
         
         return entries
     }
@@ -92,50 +121,46 @@ public actor AsyncUsageRepository: UsageRepositoryProtocol {
     private func createFileProcessingStream(
         _ files: [(path: String, projectDir: String, earliestTimestamp: String)],
         deduplication: DeduplicationStrategy
-    ) -> AsyncThrowingStream<UsageEntry, Error> {
-        AsyncThrowingStream { continuation in
+    ) -> AsyncStream<UsageEntry> {
+        AsyncStream { continuation in
             // Use structured concurrency with proper cancellation handling
             let task = Task {
                 await withTaskCancellationHandler {
-                    do {
-                        try await withThrowingTaskGroup(of: [UsageEntry].self) { group in
-                            var activeTaskCount = 0
-                            var fileIterator = files.makeIterator()
-                            
-                            // Process files with controlled concurrency
-                            repeat {
-                                // Check for cancellation
-                                try Task.checkCancellation()
-                                
-                                if let file = fileIterator.next(), activeTaskCount < maxConcurrency {
-                                    group.addTask {
-                                        try await self.processJSONLFile(
-                                            at: file.path,
-                                            projectDir: file.projectDir,
-                                            deduplication: deduplication
-                                        )
-                                    }
-                                    activeTaskCount += 1
+                    await withTaskGroup(of: [UsageEntry].self) { group in
+                        var activeTaskCount = 0
+                        var fileIterator = files.makeIterator()
+
+                        // Process files with controlled concurrency
+                        repeat {
+                            // Check for cancellation
+                            if Task.isCancelled { break }
+
+                            if let file = fileIterator.next(), activeTaskCount < maxConcurrency {
+                                group.addTask {
+                                    await self.processJSONLFile(
+                                        at: file.path,
+                                        projectDir: file.projectDir,
+                                        deduplication: deduplication
+                                    )
                                 }
-                                
-                                if let entries = try await group.next() {
-                                    activeTaskCount -= 1
-                                    for entry in entries {
-                                        continuation.yield(entry)
-                                    }
+                                activeTaskCount += 1
+                            }
+
+                            if let entries = await group.next() {
+                                activeTaskCount -= 1
+                                for entry in entries {
+                                    continuation.yield(entry)
                                 }
-                            } while activeTaskCount > 0
-                        }
-                        continuation.finish()
-                    } catch {
-                        continuation.finish(throwing: error)
+                            }
+                        } while activeTaskCount > 0
                     }
+                    continuation.finish()
                 } onCancel: {
                     // Clean up on cancellation
-                    continuation.finish(throwing: CancellationError())
+                    continuation.finish()
                 }
             }
-            
+
             // Register termination handler to cancel task
             continuation.onTermination = { @Sendable _ in
                 task.cancel()
@@ -147,19 +172,28 @@ public actor AsyncUsageRepository: UsageRepositoryProtocol {
     private func processFilesAsStream(
         _ files: [(path: String, projectDir: String, earliestTimestamp: String)],
         deduplication: DeduplicationStrategy
-    ) async throws -> [UsageEntry] {
+    ) async -> [UsageEntry] {
         var allEntries: [UsageEntry] = []
-        
-        try await withThrowingTaskGroup(of: [UsageEntry].self) { group in
+
+        #if DEBUG
+        print("[AsyncRepository] Processing \(files.count) files with maxConcurrency: \(maxConcurrency)")
+        let streamStart = Date()
+        #endif
+
+        await withTaskGroup(of: [UsageEntry].self) { group in
             // Limit concurrent operations
             let batchSize = min(maxConcurrency, files.count)
             var fileIndex = 0
-            
+
+            #if DEBUG
+            print("[AsyncRepository] Initial batch size: \(batchSize)")
+            #endif
+
             // Start initial batch
             for _ in 0..<batchSize where fileIndex < files.count {
                 let file = files[fileIndex]
                 group.addTask {
-                    try await self.processJSONLFile(
+                    await self.processJSONLFile(
                         at: file.path,
                         projectDir: file.projectDir,
                         deduplication: deduplication
@@ -167,16 +201,16 @@ public actor AsyncUsageRepository: UsageRepositoryProtocol {
                 }
                 fileIndex += 1
             }
-            
+
             // Process results and add new tasks
-            for try await entries in group {
+            for await entries in group {
                 allEntries.append(contentsOf: entries)
-                
+
                 // Add next file if available
                 if fileIndex < files.count {
                     let file = files[fileIndex]
                     group.addTask {
-                        try await self.processJSONLFile(
+                        await self.processJSONLFile(
                             at: file.path,
                             projectDir: file.projectDir,
                             deduplication: deduplication
@@ -186,7 +220,12 @@ public actor AsyncUsageRepository: UsageRepositoryProtocol {
                 }
             }
         }
-        
+
+        #if DEBUG
+        let streamTime = Date().timeIntervalSince(streamStart)
+        print("[AsyncRepository] Processed all files in \(String(format: "%.3f", streamTime))s - total entries: \(allEntries.count)")
+        #endif
+
         return allEntries
     }
     
@@ -195,22 +234,50 @@ public actor AsyncUsageRepository: UsageRepositoryProtocol {
         at path: String,
         projectDir: String,
         deduplication: DeduplicationStrategy
-    ) async throws -> [UsageEntry] {
-        let content = try await fileSystem.readFile(atPath: path)
+    ) async -> [UsageEntry] {
+        #if DEBUG
+        let fileStart = Date()
+        #endif
+
+        // Resilient file read: if file fails (e.g., being written to), skip it
+        let content: String
+        do {
+            content = try await fileSystem.readFile(atPath: path)
+        } catch {
+            #if DEBUG
+            print("[AsyncRepository] Skipping file \(path): \(error.localizedDescription)")
+            #endif
+            return []
+        }
+        
+        #if DEBUG
+        let readTime = Date().timeIntervalSince(fileStart)
+        #endif
+        
         let lines = content.components(separatedBy: .newlines).filter { !$0.isEmpty }
         
         var entries: [UsageEntry] = []
         let decodedProjectPath = pathDecoder.decode(projectDir)
         
+        #if DEBUG
+        let parseStart = Date()
+        #endif
+        
         for line in lines {
+            // Skip obviously incomplete lines (truncated during file write)
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard trimmed.hasPrefix("{") && trimmed.hasSuffix("}") else {
+                continue
+            }
+
             guard let data = line.data(using: .utf8),
                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
                 continue
             }
             
-            // Check deduplication - extract IDs directly from JSON
-            let messageId = json["id"] as? String
-            let requestId = json["requestId"] as? String
+            // Check deduplication
+            let messageId = parser.extractMessageId(from: json)
+            let requestId = parser.extractRequestId(from: json)
             
             guard deduplication.shouldInclude(messageId: messageId, requestId: requestId) else {
                 continue
@@ -221,6 +288,15 @@ public actor AsyncUsageRepository: UsageRepositoryProtocol {
                 entries.append(entry)
             }
         }
+        
+        #if DEBUG
+        let parseTime = Date().timeIntervalSince(parseStart)
+        let totalTime = Date().timeIntervalSince(fileStart)
+        if totalTime > 0.1 {  // Only log slow files
+            let fileName = URL(fileURLWithPath: path).lastPathComponent
+            print("[AsyncRepository] Slow file: \(fileName) - read: \(String(format: "%.3f", readTime))s, parse: \(String(format: "%.3f", parseTime))s, lines: \(lines.count), entries: \(entries.count)")
+        }
+        #endif
         
         return entries
     }
@@ -240,6 +316,11 @@ public actor AsyncUsageRepository: UsageRepositoryProtocol {
         // Use TaskGroup for concurrent directory scanning
         try await withThrowingTaskGroup(of: [(path: String, projectDir: String, earliestTimestamp: String)].self) { group in
             for projectDir in projectDirs {
+                // Skip non-Claude-Code directories (e.g., RPLY app sessions)
+                if Self.shouldSkipDirectory(projectDir) {
+                    continue
+                }
+
                 group.addTask {
                     let projectPath = "\(projectsPath)/\(projectDir)"
                     let projectFiles = try await self.fileSystem.contentsOfDirectory(atPath: projectPath)
@@ -265,31 +346,15 @@ public actor AsyncUsageRepository: UsageRepositoryProtocol {
     }
     
     private func getEarliestTimestamp(from path: String) async -> String? {
-        guard let content = try? await fileSystem.readFile(atPath: path) else {
-            return nil
+        // Use file modification date for fast sorting - no file content reading needed
+        // This is much faster than reading file contents and still provides good ordering
+        if let attributes = try? FileManager.default.attributesOfItem(atPath: path),
+           let modDate = attributes[.modificationDate] as? Date {
+            let formatter = ISO8601DateFormatter()
+            return formatter.string(from: modDate)
         }
-        
-        let lines = content.components(separatedBy: .newlines)
-        var earliestTimestamp: String?
-        
-        for line in lines {
-            guard !line.isEmpty,
-                  let data = line.data(using: .utf8),
-                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let timestamp = json["timestamp"] as? String else {
-                continue
-            }
-            
-            if let current = earliestTimestamp {
-                if timestamp < current {
-                    earliestTimestamp = timestamp
-                }
-            } else {
-                earliestTimestamp = timestamp
-            }
-        }
-        
-        return earliestTimestamp
+        // Default to current time for mock/test paths - ensures files are still processed
+        return ISO8601DateFormatter().string(from: Date())
     }
     
     // MARK: - Statistics Aggregation
@@ -311,7 +376,28 @@ public actor AsyncUsageRepository: UsageRepositoryProtocol {
         
         return sessionIds.count
     }
-    
+
+    /// Check if a directory should be skipped (non-Claude-Code data)
+    /// Filters out RPLY app sessions and other non-usage directories
+    private static func shouldSkipDirectory(_ directoryName: String) -> Bool {
+        // Skip temp folder sessions (RPLY app stores sessions in /private/var/folders/...)
+        if directoryName.hasPrefix("-private-var-folders-") {
+            return true
+        }
+
+        // Skip directories containing claude-kit-sessions (RPLY app session marker)
+        if directoryName.contains("claude-kit-sessions") {
+            return true
+        }
+
+        // Skip hidden directories
+        if directoryName.hasPrefix(".") {
+            return true
+        }
+
+        return false
+    }
+
     private func createEmptyStats() -> UsageStats {
         return UsageStats(
             totalCost: 0,

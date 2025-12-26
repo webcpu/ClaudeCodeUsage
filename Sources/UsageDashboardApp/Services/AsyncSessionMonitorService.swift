@@ -74,7 +74,7 @@ final class HybridSessionMonitorService: SessionMonitorService {
         }
     }
     
-    func getActiveSession() -> SessionBlock? {
+    func getActiveSession() async -> SessionBlock? {
         if let asyncService = asyncService {
             // Use async service in sync context with timeout to prevent deadlock
             let semaphore = DispatchSemaphore(value: 0)
@@ -93,11 +93,11 @@ final class HybridSessionMonitorService: SessionMonitorService {
             }
             return result
         } else {
-            return syncService?.getActiveSession()
+            return await syncService?.getActiveSession()
         }
     }
     
-    func getBurnRate() -> BurnRate? {
+    func getBurnRate() async -> BurnRate? {
         if let asyncService = asyncService {
             // Use async service in sync context with timeout to prevent deadlock
             let semaphore = DispatchSemaphore(value: 0)
@@ -116,11 +116,11 @@ final class HybridSessionMonitorService: SessionMonitorService {
             }
             return result
         } else {
-            return syncService?.getBurnRate()
+            return await syncService?.getBurnRate()
         }
     }
     
-    func getAutoTokenLimit() -> Int? {
+    func getAutoTokenLimit() async -> Int? {
         if let asyncService = asyncService {
             // Use async service in sync context with timeout to prevent deadlock
             let semaphore = DispatchSemaphore(value: 0)
@@ -139,7 +139,7 @@ final class HybridSessionMonitorService: SessionMonitorService {
             }
             return result
         } else {
-            return syncService?.getAutoTokenLimit()
+            return await syncService?.getAutoTokenLimit()
         }
     }
 }
@@ -155,9 +155,9 @@ final class MonitoredSessionService: SessionMonitorService {
         self.performanceMetrics = metrics
     }
     
-    func getActiveSession() -> SessionBlock? {
+    func getActiveSession() async -> SessionBlock? {
         let start = Date()
-        let result = wrapped.getActiveSession()
+        let result = await wrapped.getActiveSession()
         let duration = Date().timeIntervalSince(start)
         
         Task {
@@ -176,9 +176,9 @@ final class MonitoredSessionService: SessionMonitorService {
         return result
     }
     
-    func getBurnRate() -> BurnRate? {
+    func getBurnRate() async -> BurnRate? {
         let start = Date()
-        let result = wrapped.getBurnRate()
+        let result = await wrapped.getBurnRate()
         let duration = Date().timeIntervalSince(start)
         
         Task {
@@ -197,9 +197,9 @@ final class MonitoredSessionService: SessionMonitorService {
         return result
     }
     
-    func getAutoTokenLimit() -> Int? {
+    func getAutoTokenLimit() async -> Int? {
         let start = Date()
-        let result = wrapped.getAutoTokenLimit()
+        let result = await wrapped.getAutoTokenLimit()
         let duration = Date().timeIntervalSince(start)
         
         Task {

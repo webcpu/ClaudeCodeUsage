@@ -82,7 +82,7 @@ struct CLI {
 
 // MARK: - Main
 
-func main() {
+func main() async {
     // Parse command line arguments
     let (tokenLimit, refreshInterval, sessionDuration, shouldExit) = CLI.parseArguments()
     
@@ -132,7 +132,7 @@ func main() {
     // Determine effective token limit
     var effectiveLimit = tokenLimit
     if effectiveLimit == nil {
-        effectiveLimit = monitor.getAutoTokenLimit()
+        effectiveLimit = await monitor.getAutoTokenLimit()
         if let limit = effectiveLimit {
             print("\u{001B}[33mUsing max tokens from previous sessions: \(limit)\u{001B}[0m")
         }
@@ -153,10 +153,13 @@ func main() {
     
     // Main loop
     while true {
-        renderer.render()
-        Thread.sleep(forTimeInterval: refreshInterval)
+        await renderer.render()
+        try? await Task.sleep(nanoseconds: UInt64(refreshInterval * 1_000_000_000))
     }
 }
 
-// Run the main function
-main()
+// Run the async main function
+Task {
+    await main()
+}
+RunLoop.main.run()

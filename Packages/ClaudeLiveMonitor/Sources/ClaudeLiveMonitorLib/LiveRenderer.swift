@@ -11,13 +11,14 @@ public class LiveRenderer {
         self.tokenLimit = tokenLimit
     }
     
-    public func render() {
-        guard let block = monitor.getActiveBlock() else {
+    public func render() async {
+        guard let block = await monitor.getActiveBlock() else {
             print("No active session found.")
             return
         }
         
-        let effectiveLimit = tokenLimit ?? monitor.getAutoTokenLimit() ?? 0
+        let autoLimit = await monitor.getAutoTokenLimit()
+        let effectiveLimit = tokenLimit ?? autoLimit ?? 0
         
         // Clear screen and move cursor to top
         print("\u{001B}[2J\u{001B}[H", terminator: "")

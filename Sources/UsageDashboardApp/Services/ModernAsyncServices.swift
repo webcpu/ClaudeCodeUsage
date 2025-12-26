@@ -255,6 +255,7 @@ public actor PerformanceMonitoringActor: AsyncSessionMonitorServiceProtocol {
 // MARK: - Modern Feature Flag Based Service
 
 /// Modern implementation that switches based on feature flags without semaphores
+@MainActor
 public final class ModernHybridSessionMonitor: SessionMonitorService {
     private let service: SessionMonitorService
     
@@ -269,15 +270,15 @@ public final class ModernHybridSessionMonitor: SessionMonitorService {
         }
     }
     
-    public func getActiveSession() -> SessionBlock? {
-        service.getActiveSession()
+    public func getActiveSession() async -> SessionBlock? {
+        await service.getActiveSession()
     }
     
-    public func getBurnRate() -> BurnRate? {
-        service.getBurnRate()
+    public func getBurnRate() async -> BurnRate? {
+        await service.getBurnRate()
     }
     
-    public func getAutoTokenLimit() -> Int? {
-        service.getAutoTokenLimit()
+    public func getAutoTokenLimit() async -> Int? {
+        await service.getAutoTokenLimit()
     }
 }

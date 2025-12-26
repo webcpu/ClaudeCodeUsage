@@ -171,4 +171,31 @@ public class RetryableFileSystem: FileSystemProtocol {
             try self.fileSystem.readFile(atPath: path)
         }
     }
+    
+    public func readFirstLine(atPath path: String) throws -> String? {
+        // Use synchronous wrapper since protocol doesn't support async
+        let semaphore = DispatchSemaphore(value: 0)
+        var result: Result<String?, Error>!
+        
+        Task {
+            do {
+                let content = try await retryExecutor.execute {
+                    try self.fileSystem.readFirstLine(atPath: path)
+                }
+                result = .success(content)
+            } catch {
+                result = .failure(error)
+            }
+            semaphore.signal()
+        }
+        
+        semaphore.wait()
+        
+        switch result! {
+        case .success(let content):
+            return content
+        case .failure(let error):
+            throw error
+        }
+    }
 }

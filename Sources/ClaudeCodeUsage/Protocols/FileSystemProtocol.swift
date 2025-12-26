@@ -38,6 +38,9 @@ public protocol FileSystemProtocol {
     
     /// Read file contents as string
     func readFile(atPath path: String) throws -> String
+    
+    /// Read only the first line of a file (optimized for large files)
+    func readFirstLine(atPath path: String) throws -> String?
 }
 
 /// Default implementation using FileManager
@@ -58,6 +61,28 @@ public struct FileSystemService: FileSystemProtocol {
     
     public func readFile(atPath path: String) throws -> String {
         return try String(contentsOfFile: path, encoding: .utf8)
+    }
+    
+    public func readFirstLine(atPath path: String) throws -> String? {
+        // Optimized: Use stream reading to get just the first line
+        guard let fileHandle = FileHandle(forReadingAtPath: path) else {
+            throw FileSystemError.directoryNotFound
+        }
+        defer { fileHandle.closeFile() }
+        
+        // Read up to 4KB to find the first line (should be more than enough)
+        let data = fileHandle.readData(ofLength: 4096)
+        guard let content = String(data: data, encoding: .utf8) else {
+            return nil
+        }
+        
+        // Find first newline and return the line
+        if let newlineRange = content.range(of: "\n") {
+            return String(content[..<newlineRange.lowerBound])
+        }
+        
+        // If no newline found, return the entire content (single line file)
+        return content.isEmpty ? nil : content
     }
 }
 
@@ -106,5 +131,18 @@ public final class MockFileSystem: FileSystemProtocol {
             throw FileSystemError.directoryNotFound
         }
         return content
+    }
+    
+    public func readFirstLine(atPath path: String) throws -> String? {
+        guard let content = files[path] else {
+            throw FileSystemError.directoryNotFound
+        }
+        
+        // Find first newline and return the line
+        if let newlineIndex = content.firstIndex(of: "\n") {
+            return String(content[..<newlineIndex])
+        }
+        
+        return content.isEmpty ? nil : content
     }
 }

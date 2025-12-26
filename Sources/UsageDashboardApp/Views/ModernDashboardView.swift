@@ -68,7 +68,8 @@ struct ModernDashboardView: View {
             await viewModel.loadData()
         }
         .onAppear {
-            viewModel.startAutoRefresh()
+            // Don't perform initial load since we already load in .task
+            viewModel.startAutoRefresh(performInitialLoad: false)
         }
         .onDisappear {
             viewModel.stopAutoRefresh()
@@ -354,14 +355,14 @@ struct SessionsContent: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            if let session = viewModel.sessionMonitorService.getActiveSession() {
+            if let session = viewModel.activeSession {
                 ActiveSessionCard(session: session)
             } else {
                 Text("No active session")
                     .foregroundStyle(.secondary)
             }
             
-            if let burnRate = viewModel.sessionMonitorService.getBurnRate() {
+            if let burnRate = viewModel.burnRate {
                 BurnRateCard(burnRate: burnRate)
             }
         }

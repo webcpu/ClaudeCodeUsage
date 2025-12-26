@@ -61,23 +61,24 @@ public struct HeatmapGrid: View {
     }
     
     // MARK: - Body
-    
+
     public var body: some View {
         VStack(spacing: 8) {
-            // Month labels header
-            if configuration.showMonthLabels {
-                monthLabelsHeader
-            }
-            
-            // Main grid with day labels
+            // Main grid with day labels (month labels now scroll with grid)
             HStack(alignment: .top, spacing: 2) {
                 // Day of week labels
                 if configuration.showDayLabels {
-                    dayLabelsColumn
+                    VStack(spacing: 0) {
+                        // Spacer for month labels row
+                        if configuration.showMonthLabels {
+                            Spacer().frame(height: 20)
+                        }
+                        dayLabelsColumn
+                    }
                 }
-                
-                // Calendar grid
-                scrollableGrid
+
+                // Calendar grid with month labels
+                scrollableGridWithMonthLabels
             }
         }
     }
@@ -152,15 +153,59 @@ public struct HeatmapGrid: View {
         }
     }
     
-    // MARK: - Scrollable Grid
-    
+    // MARK: - Scrollable Grid with Month Labels
+
+    @ViewBuilder
+    private var scrollableGridWithMonthLabels: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            VStack(spacing: 8) {
+                // Month labels inside scroll view so they scroll with content
+                if configuration.showMonthLabels {
+                    scrollableMonthLabels
+                }
+
+                // Grid content with hover overlay
+                ZStack {
+                    gridContent
+
+                    if configuration.enableTooltips {
+                        hoverOverlay
+                    }
+                }
+            }
+        }
+        .accessibilityElement(children: accessibility.groupAccessibilityElements ? .contain : .ignore)
+        .accessibilityLabel("Heatmap grid showing daily usage over time")
+    }
+
+    // MARK: - Scrollable Month Labels
+
+    @ViewBuilder
+    private var scrollableMonthLabels: some View {
+        ZStack(alignment: .topLeading) {
+            Rectangle()
+                .fill(Color.clear)
+                .frame(width: totalGridWidth, height: 20)
+
+            ForEach(dataset.monthLabels) { month in
+                Text(month.name)
+                    .font(configuration.monthLabelFont)
+                    .foregroundColor(.secondary)
+                    .accessibilityLabel(accessibility.enableAccessibilityLabels ? month.fullName : "")
+                    .offset(x: monthLabelOffset(for: month), y: 0)
+            }
+        }
+    }
+
+    // MARK: - Legacy Scrollable Grid (kept for reference)
+
     @ViewBuilder
     private var scrollableGrid: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             ZStack {
                 // Grid content
                 gridContent
-                
+
                 // Hover overlay (performance-critical)
                 if configuration.enableTooltips {
                     hoverOverlay

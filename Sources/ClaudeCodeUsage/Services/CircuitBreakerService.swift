@@ -185,6 +185,12 @@ public actor AsyncCircuitBreakerFileSystem: AsyncFileSystemProtocol {
             try await self.fileSystem.readFile(atPath: path)
         }
     }
+    
+    public func readFirstLine(atPath path: String) async throws -> String? {
+        try await circuitBreaker.execute {
+            try await self.fileSystem.readFirstLine(atPath: path)
+        }
+    }
 }
 
 /// Legacy file system with circuit breaker protection (deprecated)
@@ -212,5 +218,10 @@ public class CircuitBreakerFileSystem: FileSystemProtocol {
     public func readFile(atPath path: String) throws -> String {
         // Passthrough without circuit breaker protection  
         return try fileSystem.readFile(atPath: path)
+    }
+    
+    public func readFirstLine(atPath path: String) throws -> String? {
+        // Passthrough without circuit breaker protection
+        return try fileSystem.readFirstLine(atPath: path)
     }
 }
