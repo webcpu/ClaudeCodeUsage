@@ -9,7 +9,7 @@
 import SwiftUI
 import Foundation
 
-// MARK: - Heatmap Configuration
+// MARK: - Configuration Struct
 
 /// Configuration settings for heatmap appearance and behavior
 public struct HeatmapConfiguration: Equatable {
@@ -165,13 +165,14 @@ public struct HeatmapConfiguration: Equatable {
     
     /// Array of day labels based on configuration
     public var dayLabels: [String] {
-        if showDayLabels {
-            return ["", "Mon", "", "Wed", "", "Fri", ""]
-        } else {
-            return Array(repeating: "", count: 7)
-        }
+        showDayLabels ? DayLabelsConstants.withLabels : DayLabelsConstants.empty
     }
 }
+
+// MARK: - Preset Configurations
+
+// Preset configurations (default, compact, performanceOptimized) are defined
+// as static properties within HeatmapConfiguration above.
 
 // MARK: - Color Themes
 
@@ -313,44 +314,41 @@ public struct HeatmapAccessibility: Equatable {
 // MARK: - Validation
 
 public extension HeatmapConfiguration {
-    
+
     /// Validates the configuration and returns any issues
     func validate() -> [String] {
-        var issues: [String] = []
-        
-        if squareSize <= 0 {
-            issues.append("Square size must be greater than 0")
-        }
-        
-        if spacing < 0 {
-            issues.append("Spacing cannot be negative")
-        }
-        
-        if cornerRadius < 0 {
-            issues.append("Corner radius cannot be negative")
-        }
-        
-        if tooltipDelay < 0 {
-            issues.append("Tooltip delay cannot be negative")
-        }
-        
-        if animationDuration < 0 {
-            issues.append("Animation duration cannot be negative")
-        }
-        
-        if hoverScale <= 0 {
-            issues.append("Hover scale must be greater than 0")
-        }
-        
-        if todayHighlightWidth < 0 {
-            issues.append("Today highlight width cannot be negative")
-        }
-        
-        return issues
+        ValidationRules.validate(self)
     }
-    
+
     /// Whether the configuration is valid
     var isValid: Bool {
         validate().isEmpty
+    }
+}
+
+// MARK: - Private Implementation Details
+
+/// Day label constants for week display
+private enum DayLabelsConstants {
+    static let withLabels = ["", "Mon", "", "Wed", "", "Fri", ""]
+    static let empty = Array(repeating: "", count: 7)
+}
+
+/// Validation rules for configuration parameters
+private enum ValidationRules {
+    /// All validation rules as closures that return optional error message
+    static let rules: [(HeatmapConfiguration) -> String?] = [
+        { $0.squareSize <= 0 ? "Square size must be greater than 0" : nil },
+        { $0.spacing < 0 ? "Spacing cannot be negative" : nil },
+        { $0.cornerRadius < 0 ? "Corner radius cannot be negative" : nil },
+        { $0.tooltipDelay < 0 ? "Tooltip delay cannot be negative" : nil },
+        { $0.animationDuration < 0 ? "Animation duration cannot be negative" : nil },
+        { $0.hoverScale <= 0 ? "Hover scale must be greater than 0" : nil },
+        { $0.todayHighlightWidth < 0 ? "Today highlight width cannot be negative" : nil }
+    ]
+
+    /// Validate configuration and return all errors
+    static func validate(_ config: HeatmapConfiguration) -> [String] {
+        rules.compactMap { $0(config) }
     }
 }
