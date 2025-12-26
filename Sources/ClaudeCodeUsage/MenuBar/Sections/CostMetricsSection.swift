@@ -68,8 +68,6 @@ struct CostMetricsSection: View {
             // Swift Charts-based hourly cost chart
             if !store.chartDataService.todayHourlyCosts.isEmpty {
                 HourlyCostChartSimple(hourlyData: store.chartDataService.todayHourlyCosts)
-            } else if !store.chartDataService.detailedHourlyData.isEmpty {
-                HourlyCostChartSimple(from: store.chartDataService.detailedHourlyData)
             }
         }
         .padding(.vertical, MenuBarTheme.Layout.verticalPadding)

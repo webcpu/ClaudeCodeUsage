@@ -157,22 +157,6 @@ struct HourlyCostChartSimple: View {
     }
 }
 
-// MARK: - Integration Helper
-extension HourlyCostChartSimple {
-    init(from detailedData: [HourlyChartData]) {
-        // Aggregate costs by hour
-        var hourlyCosts = Array(repeating: 0.0, count: 24)
-        
-        for data in detailedData {
-            if data.hour >= 0 && data.hour < 24 {
-                hourlyCosts[data.hour] += data.cost
-            }
-        }
-        
-        self.hourlyData = hourlyCosts
-    }
-}
-
 // MARK: - Preview
 struct HourlyCostChartSimple_Previews: PreviewProvider {
     static var previews: some View {
