@@ -38,13 +38,15 @@ public struct AppConfiguration {
 protocol UsageDataService {
     func loadStats() async throws -> UsageStats
     func loadEntries() async throws -> [UsageEntry]
+    func loadEntriesAndStats() async throws -> (entries: [UsageEntry], stats: UsageStats)
+    func loadTodayEntriesAndStats() async throws -> (entries: [UsageEntry], stats: UsageStats)
     func getDateRange() -> (start: Date, end: Date)
 }
 
 protocol SessionMonitorService {
-    func getActiveSession() -> SessionBlock?
-    func getBurnRate() -> BurnRate?
-    func getAutoTokenLimit() -> Int?
+    func getActiveSession() async -> SessionBlock?
+    func getBurnRate() async -> BurnRate?
+    func getAutoTokenLimit() async -> Int?
 }
 
 protocol ConfigurationService {
@@ -63,24 +65,81 @@ final class DefaultUsageDataService: UsageDataService {
     }
     
     func loadStats() async throws -> UsageStats {
+        let startTime = Date()
         let range = getDateRange()
-        return try await client.getUsageByDateRange(
+        let result = try await client.getUsageByDateRange(
             startDate: range.start,
             endDate: range.end
         )
+        #if DEBUG
+        let duration = Date().timeIntervalSince(startTime)
+        print("[UsageDataService] loadStats completed in \(String(format: "%.3f", duration))s")
+        #endif
+        return result
     }
     
     func loadEntries() async throws -> [UsageEntry] {
-        return try await client.getUsageDetails()
+        let startTime = Date()
+        let result = try await client.getUsageDetails()
+        #if DEBUG
+        let duration = Date().timeIntervalSince(startTime)
+        print("[UsageDataService] loadEntries completed in \(String(format: "%.3f", duration))s - \(result.count) entries")
+        #endif
+        return result
     }
-    
+
+    /// Load entries once and calculate stats from them - avoids reading files twice
+    func loadEntriesAndStats() async throws -> (entries: [UsageEntry], stats: UsageStats) {
+        let startTime = Date()
+        let entries = try await client.getUsageDetails()
+
+        #if DEBUG
+        let entriesTime = Date().timeIntervalSince(startTime)
+        print("[UsageDataService] loadEntriesAndStats - entries loaded in \(String(format: "%.3f", entriesTime))s - \(entries.count) entries")
+        #endif
+
+        // Calculate stats from entries using StatisticsAggregator
+        let aggregator = StatisticsAggregator()
+        let sessionCount = Set(entries.compactMap { $0.sessionId }).count
+        let stats = aggregator.aggregateStatistics(from: entries, sessionCount: sessionCount)
+
+        #if DEBUG
+        let totalTime = Date().timeIntervalSince(startTime)
+        print("[UsageDataService] loadEntriesAndStats completed in \(String(format: "%.3f", totalTime))s")
+        #endif
+
+        return (entries, stats)
+    }
+
     func getDateRange() -> (start: Date, end: Date) {
         TimeRange.allTime.dateRange
+    }
+
+    /// Load only today's entries and stats - fast path for initial display
+    func loadTodayEntriesAndStats() async throws -> (entries: [UsageEntry], stats: UsageStats) {
+        let startTime = Date()
+        let entries = try await client.getTodayUsageEntries()
+
+        let aggregator = StatisticsAggregator()
+        let sessionCount = Set(entries.compactMap { $0.sessionId }).count
+        let stats = aggregator.aggregateStatistics(from: entries, sessionCount: sessionCount)
+
+        #if DEBUG
+        let duration = Date().timeIntervalSince(startTime)
+        print("[UsageDataService] loadTodayEntriesAndStats completed in \(String(format: "%.3f", duration))s - \(entries.count) entries")
+        #endif
+
+        return (entries, stats)
     }
 }
 
 final class DefaultSessionMonitorService: SessionMonitorService {
     private let monitor: LiveMonitor
+    
+    // Cache for session data with short TTL
+    private var cachedSession: (session: SessionBlock?, timestamp: Date)?
+    private var cachedTokenLimit: (limit: Int?, timestamp: Date)?
+    private let cacheTTL: TimeInterval = 2.0 // 2 second cache
     
     init(configuration: AppConfiguration) {
         let config = LiveMonitorConfig(
@@ -93,16 +152,64 @@ final class DefaultSessionMonitorService: SessionMonitorService {
         self.monitor = LiveMonitor(config: config)
     }
     
-    func getActiveSession() -> SessionBlock? {
-        monitor.getActiveBlock()
+    func getActiveSession() async -> SessionBlock? {
+        let startTime = Date()
+        
+        // Check cache first
+        if let cached = cachedSession,
+           Date().timeIntervalSince(cached.timestamp) < cacheTTL {
+            #if DEBUG
+            print("[SessionMonitorService] getActiveSession returned from cache (age: \(String(format: "%.3f", Date().timeIntervalSince(cached.timestamp)))s)")
+            #endif
+            return cached.session
+        }
+        
+        // Load fresh data
+        let result = await monitor.getActiveBlock()
+        
+        // Update cache
+        cachedSession = (result, Date())
+        
+        #if DEBUG
+        let duration = Date().timeIntervalSince(startTime)
+        print("[SessionMonitorService] getActiveSession completed in \(String(format: "%.3f", duration))s - session: \(result != nil ? "found" : "none")")
+        #endif
+        return result
     }
     
-    func getBurnRate() -> BurnRate? {
-        getActiveSession()?.burnRate
+    func getBurnRate() async -> BurnRate? {
+        let startTime = Date()
+        let result = await getActiveSession()?.burnRate
+        #if DEBUG
+        let duration = Date().timeIntervalSince(startTime)
+        print("[SessionMonitorService] getBurnRate completed in \(String(format: "%.3f", duration))s")
+        #endif
+        return result
     }
     
-    func getAutoTokenLimit() -> Int? {
-        monitor.getAutoTokenLimit()
+    func getAutoTokenLimit() async -> Int? {
+        let startTime = Date()
+        
+        // Check cache first
+        if let cached = cachedTokenLimit,
+           Date().timeIntervalSince(cached.timestamp) < cacheTTL {
+            #if DEBUG
+            print("[SessionMonitorService] getAutoTokenLimit returned from cache (age: \(String(format: "%.3f", Date().timeIntervalSince(cached.timestamp)))s)")
+            #endif
+            return cached.limit
+        }
+        
+        // Load fresh data
+        let result = await monitor.getAutoTokenLimit()
+        
+        // Update cache
+        cachedTokenLimit = (result, Date())
+        
+        #if DEBUG
+        let duration = Date().timeIntervalSince(startTime)
+        print("[SessionMonitorService] getAutoTokenLimit completed in \(String(format: "%.3f", duration))s - limit: \(result ?? 0)")
+        #endif
+        return result
     }
 }
 
@@ -127,6 +234,7 @@ protocol DependencyContainer {
     var performanceMetrics: PerformanceMetricsProtocol { get }
 }
 
+@MainActor
 final class ProductionContainer: DependencyContainer {
     lazy var usageDataService: UsageDataService = {
         DefaultUsageDataService(configuration: configurationService.configuration)
@@ -196,7 +304,22 @@ public final class MockUsageDataService: UsageDataService {
         }
         return mockEntries
     }
-    
+
+    public func loadEntriesAndStats() async throws -> (entries: [UsageEntry], stats: UsageStats) {
+        if shouldThrow {
+            throw NSError(domain: "MockError", code: 1)
+        }
+        guard let stats = mockStats else {
+            throw NSError(domain: "MockError", code: 2, userInfo: [NSLocalizedDescriptionKey: "No mock stats provided"])
+        }
+        return (mockEntries, stats)
+    }
+
+    public func loadTodayEntriesAndStats() async throws -> (entries: [UsageEntry], stats: UsageStats) {
+        // Same as loadEntriesAndStats for mock - returns all mock data
+        return try await loadEntriesAndStats()
+    }
+
     public func getDateRange() -> (start: Date, end: Date) {
         TimeRange.allTime.dateRange
     }

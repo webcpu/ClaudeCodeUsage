@@ -59,6 +59,9 @@ actor UsageStateManager {
 final class UsageViewModel {
     // Memory cleanup support
     private var memoryCleanupObserver: NSObjectProtocol?
+    // Deduplication tracking
+    private var isCurrentlyLoading = false
+    private var lastLoadStartTime: Date?
     // Observable properties for UI binding
     var state: ViewState = .loading
     var activeSession: SessionBlock?
@@ -158,108 +161,133 @@ final class UsageViewModel {
     }
     
     // MARK: - Public Methods
+    @MainActor
     func loadData() async {
+        // Deduplication: Check if already loading
+        if isCurrentlyLoading {
+            #if DEBUG
+            print("[UsageViewModel] loadData() SKIPPED - already loading")
+            #endif
+            return
+        }
+        
+        // Deduplication: Check if loaded very recently (within 0.5 seconds)
+        if let lastTime = lastLoadStartTime,
+           dateProvider.now.timeIntervalSince(lastTime) < 0.5 {
+            #if DEBUG
+            print("[UsageViewModel] loadData() SKIPPED - loaded \(dateProvider.now.timeIntervalSince(lastTime))s ago")
+            #endif
+            return
+        }
+        
+        // Mark as loading and record time
+        isCurrentlyLoading = true
+        lastLoadStartTime = dateProvider.now
+        defer { isCurrentlyLoading = false }
+        
         let loadStartTime = dateProvider.now
         #if DEBUG
         print("[UsageViewModel] loadData() called at \(dateProvider.now)")
         #endif
         
-        await stateManager.cancelCurrentLoad()
+        //await stateManager.cancelCurrentLoad()
         
-        let task = Task {
-            do {
-                // Use structured concurrency to load data in parallel
-                async let statsLoading = usageDataService.loadStats()
-                async let entriesLoading = usageDataService.loadEntries()  // Also load raw entries
-                async let sessionLoading = sessionMonitorService.getActiveSession()
-                async let burnRateLoading = sessionMonitorService.getBurnRate()
-                async let tokenLimitLoading = sessionMonitorService.getAutoTokenLimit()
-                
-                // Await all results concurrently
-                let (stats, entries, session, burnRate, autoTokenLimit) = try await (
-                    statsLoading,
-                    entriesLoading,
-                    sessionLoading,
-                    burnRateLoading,
-                    tokenLimitLoading
-                )
-                
-                // Filter for today's entries using same logic as chart
-                let calendar = Calendar.current
-                let today = dateProvider.startOfDay(for: dateProvider.now)
-                let todaysEntries = entries.filter { entry in
-                    guard let date = entry.date else { return false }
-                    return calendar.isDate(date, inSameDayAs: today)
-                }
-                
-                // Log performance metrics
-                let loadDuration = dateProvider.now.timeIntervalSince(loadStartTime)
-                if loadDuration > 1.0 {
-                    performanceLogger.warning("Slow data load: \(String(format: "%.2f", loadDuration))s | entries=\(stats.byDate.count)")
-                } else {
-                    performanceLogger.debug("Data loaded in \(String(format: "%.2f", loadDuration))s | entries=\(stats.byDate.count)")
-                }
-                
-                #if DEBUG
-                print("[UsageViewModel] Stats loaded: totalCost=\(stats.totalCost), entries=\(stats.byDate.count)")
-                print("[UsageViewModel] Today's entries: \(todaysEntries.count) entries")
-                let todaysCostFromEntries = todaysEntries.reduce(0.0) { $0 + $1.cost }
-                print("[UsageViewModel] Today's cost from entries: $\(String(format: "%.2f", todaysCostFromEntries))")
-                
-                // Also log what stats.byDate says for today
-                let formatter = DateFormatter()
-                formatter.dateFormat = "yyyy-MM-dd"
-                let todayString = formatter.string(from: dateProvider.now)
-                if let todayFromStats = stats.byDate.first(where: { $0.date == todayString }) {
-                    print("[UsageViewModel] Today's cost from stats: $\(String(format: "%.2f", todayFromStats.totalCost))")
-                }
-                #endif
-                
-                // Update state manager
-                await stateManager.updateStats(stats)
-                await stateManager.updateSession(session)
-                
-                // Update all published properties atomically on MainActor
-                await MainActor.run {
-                    self.state = .loaded(stats)
-                    self.activeSession = session
-                    self.burnRate = burnRate
-                    self.autoTokenLimit = autoTokenLimit
-                    self.todayEntries = todaysEntries  // Store today's entries
-                    
-                    updateCalculatedProperties(stats: stats)
-                }
-                
-                // Notify that data has been loaded (for chart sync)
-                if let onDataLoaded = self.onDataLoaded {
-                    await onDataLoaded()
-                }
-                
-            } catch {
-                #if DEBUG
-                print("[UsageViewModel] Error loading data: \(error)")
-                #endif
-                
-                await MainActor.run {
-                    self.state = .error(error)
-                }
+        do {
+            // ═══════════════════════════════════════════════════════════════
+            // PHASE 1: Load today's data + session info (FAST - ~0.5s)
+            // Shows today's cost immediately while historical data loads
+            // ═══════════════════════════════════════════════════════════════
+            let phase1Start = dateProvider.now
+
+            async let todayDataLoading = usageDataService.loadTodayEntriesAndStats()
+            async let sessionLoading = sessionMonitorService.getActiveSession()
+            async let burnRateLoading = sessionMonitorService.getBurnRate()
+            async let tokenLimitLoading = sessionMonitorService.getAutoTokenLimit()
+
+            let ((todaysEntries, todayStats), session, burnRate, autoTokenLimit) = await (
+                try todayDataLoading,
+                sessionLoading,
+                burnRateLoading,
+                tokenLimitLoading
+            )
+
+            #if DEBUG
+            let phase1Time = dateProvider.now.timeIntervalSince(phase1Start)
+            print("[UsageViewModel] Phase 1 (today) completed in: \(String(format: "%.3f", phase1Time))s")
+            print("[UsageViewModel] Today's entries: \(todaysEntries.count), cost: $\(String(format: "%.2f", todaysEntries.reduce(0.0) { $0 + $1.cost }))")
+            #endif
+
+            // Update UI immediately with today's data
+            await MainActor.run {
+                self.activeSession = session
+                self.burnRate = burnRate
+                self.autoTokenLimit = autoTokenLimit
+                self.todayEntries = todaysEntries
+                updateCalculatedProperties(stats: todayStats)
+            }
+
+            // ═══════════════════════════════════════════════════════════════
+            // PHASE 2: Load full historical data (for charts)
+            // ═══════════════════════════════════════════════════════════════
+            let phase2Start = dateProvider.now
+            let (allEntries, fullStats) = try await usageDataService.loadEntriesAndStats()
+
+            #if DEBUG
+            let phase2Time = dateProvider.now.timeIntervalSince(phase2Start)
+            print("[UsageViewModel] Phase 2 (full) completed in: \(String(format: "%.3f", phase2Time))s")
+            print("[UsageViewModel] Total entries: \(allEntries.count), days: \(fullStats.byDate.count)")
+            #endif
+
+            // Update state manager with full stats
+            await stateManager.updateStats(fullStats)
+            await stateManager.updateSession(session)
+
+            // Update UI with full historical data
+            await MainActor.run {
+                self.state = .loaded(fullStats)
+            }
+
+            // Notify chart to update with full data
+            if let onDataLoaded = self.onDataLoaded {
+                await onDataLoaded()
+            }
+
+            let totalTime = dateProvider.now.timeIntervalSince(loadStartTime)
+            #if DEBUG
+            print("[UsageViewModel] Total load time: \(String(format: "%.3f", totalTime))s")
+            #endif
+
+            if totalTime > 2.0 {
+                performanceLogger.warning("Slow data load: \(String(format: "%.2f", totalTime))s")
+            }
+
+        } catch {
+            #if DEBUG
+            print("[UsageViewModel] Error loading data: \(error)")
+            #endif
+
+            await MainActor.run {
+                self.state = .error(error)
             }
         }
         
-        await stateManager.setLoadTask(task)
+        //await stateManager.setLoadTask(task)
         // IMPORTANT: Wait for the task to complete before returning
-        await task.value
+        //await task.value
     }
     
-    func startAutoRefresh() {
+    func startAutoRefresh(performInitialLoad: Bool = false) {
         stopAutoRefresh()
         
         // Start regular refresh using async/await
         let interval = configurationService.configuration.refreshInterval
         
         timerTask = Task { @MainActor in
-            // Initial load
-            await loadData()
+            // Optionally perform initial load (default: false to prevent duplicate loads)
+            // When called after AppState.initializeIfNeeded(), data is already loaded
+            if performInitialLoad {
+                await loadData()
+            }
             
             // Use a clock for more precise timing
             var nextFireTime = ContinuousClock.now + .seconds(interval)
