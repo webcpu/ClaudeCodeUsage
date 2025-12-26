@@ -193,35 +193,3 @@ public actor AsyncCircuitBreakerFileSystem: AsyncFileSystemProtocol {
     }
 }
 
-/// Legacy file system with circuit breaker protection (deprecated)
-/// Migrate to AsyncCircuitBreakerFileSystem for better performance
-/// This synchronous wrapper passthrough without circuit breaker protection
-@available(*, deprecated, message: "Use AsyncCircuitBreakerFileSystem - sync circuit breaker no longer supported")
-public class CircuitBreakerFileSystem: FileSystemProtocol {
-    private let fileSystem: FileSystemProtocol
-    
-    public init(fileSystem: FileSystemProtocol, configuration: CircuitBreakerConfiguration = .default) {
-        self.fileSystem = fileSystem
-        // Configuration ignored - no sync circuit breaker available
-        print("[Warning] CircuitBreakerFileSystem is deprecated. Circuit breaker protection not applied to sync operations.")
-    }
-    
-    public func fileExists(atPath path: String) -> Bool {
-        fileSystem.fileExists(atPath: path)
-    }
-    
-    public func contentsOfDirectory(atPath path: String) throws -> [String] {
-        // Passthrough without circuit breaker protection
-        return try fileSystem.contentsOfDirectory(atPath: path)
-    }
-    
-    public func readFile(atPath path: String) throws -> String {
-        // Passthrough without circuit breaker protection  
-        return try fileSystem.readFile(atPath: path)
-    }
-    
-    public func readFirstLine(atPath path: String) throws -> String? {
-        // Passthrough without circuit breaker protection
-        return try fileSystem.readFirstLine(atPath: path)
-    }
-}
