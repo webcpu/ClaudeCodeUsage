@@ -35,6 +35,14 @@ private struct FileMetadata {
     let path: String
     let projectDir: String
     let earliestTimestamp: String
+    let modificationDate: Date
+}
+
+// MARK: - Entry Cache
+
+private struct CachedFile {
+    let modificationDate: Date
+    let entries: [UsageEntry]
 }
 
 // MARK: - Public Types
@@ -49,8 +57,15 @@ public enum SortOrder: String, Sendable {
 
 /// Repository for accessing and processing usage data.
 /// Uses actor isolation for thread safety.
+/// Implements file-level caching based on modification time for optimal performance.
 public actor UsageRepository {
     public let basePath: String
+
+    /// Cache of parsed entries by file path, keyed on modification date
+    private var fileCache: [String: CachedFile] = [:]
+
+    /// Persistent deduplication state across loads
+    private var globalDeduplication = Deduplication()
 
     /// Shared instance using default path
     public static let shared = UsageRepository()
@@ -58,6 +73,12 @@ public actor UsageRepository {
     /// Initialize with base path (defaults to ~/.claude)
     public init(basePath: String = NSHomeDirectory() + "/.claude") {
         self.basePath = basePath
+    }
+
+    /// Clear cache (useful for testing or memory pressure)
+    public func clearCache() {
+        fileCache.removeAll()
+        globalDeduplication = Deduplication()
     }
 
     // MARK: - Public API
@@ -143,24 +164,48 @@ public actor UsageRepository {
     // MARK: - File Discovery
 
     private func discoverFiles(in projectsPath: String) throws -> [FileMetadata] {
-        try FileManager.default.contentsOfDirectory(atPath: projectsPath)
+        let todayStart = Calendar.current.startOfDay(for: Date())
+
+        return try FileManager.default.contentsOfDirectory(atPath: projectsPath)
             .filter { !DirectoryFilter.shouldSkip($0) }
             .flatMap { projectDir in
-                jsonlFiles(in: projectsPath + "/" + projectDir, projectDir: projectDir)
+                jsonlFiles(in: projectsPath + "/" + projectDir, projectDir: projectDir, todayStart: todayStart)
             }
             .sorted { $0.earliestTimestamp < $1.earliestTimestamp }
     }
 
-    private func jsonlFiles(in projectPath: String, projectDir: String) -> [FileMetadata] {
+    private func jsonlFiles(in projectPath: String, projectDir: String, todayStart: Date) -> [FileMetadata] {
         (try? FileManager.default.contentsOfDirectory(atPath: projectPath))
             .map { files in
                 files
                     .filter { $0.hasSuffix(".jsonl") }
                     .compactMap { file -> FileMetadata? in
                         let filePath = projectPath + "/" + file
-                        return FileTimestamp.earliest(from: filePath).map {
-                            FileMetadata(path: filePath, projectDir: projectDir, earliestTimestamp: $0)
+
+                        // Fast path: use cached metadata for old files (immutable)
+                        if let cached = fileCache[filePath] {
+                            let isOldFile = cached.modificationDate < todayStart
+                            if isOldFile {
+                                // Old files are immutable - skip filesystem read
+                                return FileMetadata(
+                                    path: filePath,
+                                    projectDir: projectDir,
+                                    earliestTimestamp: ISO8601DateFormatter().string(from: cached.modificationDate),
+                                    modificationDate: cached.modificationDate
+                                )
+                            }
                         }
+
+                        // Slow path: read fresh attributes for new or today's files
+                        guard let (timestamp, modDate) = FileTimestamp.extract(from: filePath) else {
+                            return nil
+                        }
+                        return FileMetadata(
+                            path: filePath,
+                            projectDir: projectDir,
+                            earliestTimestamp: timestamp,
+                            modificationDate: modDate
+                        )
                     }
             } ?? []
     }
@@ -176,15 +221,34 @@ public actor UsageRepository {
     // MARK: - Entry Loading
 
     private func loadEntries(from files: [FileMetadata]) async -> [UsageEntry] {
-        let deduplication = Deduplication()
+        // Partition files into cached (unchanged) and dirty (new or modified)
+        var cachedEntries: [UsageEntry] = []
+        var dirtyFiles: [FileMetadata] = []
 
-        if files.count > Threshold.batchProcessing {
-            return await loadEntriesInBatches(from: files, deduplication: deduplication)
-        } else if files.count > Threshold.parallelProcessing {
-            return await loadEntriesInParallel(from: files, deduplication: deduplication)
-        } else {
-            return loadEntriesSequentially(from: files, deduplication: deduplication)
+        for file in files {
+            if let cached = fileCache[file.path],
+               cached.modificationDate == file.modificationDate {
+                // File unchanged - use cached entries
+                cachedEntries.append(contentsOf: cached.entries)
+            } else {
+                // File is new or modified - needs parsing
+                dirtyFiles.append(file)
+            }
         }
+
+        // Only parse dirty files
+        let newEntries: [UsageEntry]
+        if dirtyFiles.count > Threshold.batchProcessing {
+            newEntries = await loadEntriesInBatches(from: dirtyFiles, deduplication: globalDeduplication)
+        } else if dirtyFiles.count > Threshold.parallelProcessing {
+            newEntries = await loadEntriesInParallel(from: dirtyFiles, deduplication: globalDeduplication)
+        } else {
+            newEntries = loadEntriesSequentially(from: dirtyFiles, deduplication: globalDeduplication)
+        }
+
+        logger.debug("Cache: \(files.count - dirtyFiles.count) cached, \(dirtyFiles.count) loaded")
+
+        return cachedEntries + newEntries
     }
 
     private func loadEntriesSequentially(
@@ -226,7 +290,7 @@ public actor UsageRepository {
         }
 
         let projectPath = PathDecoder.decode(file.projectDir)
-        return LineScanner.extractRanges(from: fileData)
+        let entries = LineScanner.extractRanges(from: fileData)
             .compactMap { range -> UsageEntry? in
                 let lineData = fileData[range]
                 guard JSONValidator.isValidObject(lineData),
@@ -236,6 +300,14 @@ public actor UsageRepository {
                 }
                 return EntryParser.parse(json, projectPath: projectPath)
             }
+
+        // Cache parsed entries for future use
+        fileCache[file.path] = CachedFile(
+            modificationDate: file.modificationDate,
+            entries: entries
+        )
+
+        return entries
     }
 
     // MARK: - Session Counting
@@ -269,12 +341,13 @@ private enum PathDecoder {
 }
 
 private enum FileTimestamp {
-    static func earliest(from path: String) -> String? {
-        if let attributes = try? FileManager.default.attributesOfItem(atPath: path),
-           let modDate = attributes[.modificationDate] as? Date {
-            return ISO8601DateFormatter().string(from: modDate)
+    /// Extract both timestamp string and modification date from file
+    static func extract(from path: String) -> (timestamp: String, modificationDate: Date)? {
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: path),
+              let modDate = attributes[.modificationDate] as? Date else {
+            return nil
         }
-        return ISO8601DateFormatter().string(from: Date())
+        return (ISO8601DateFormatter().string(from: modDate), modDate)
     }
 }
 
