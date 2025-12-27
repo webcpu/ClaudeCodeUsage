@@ -16,7 +16,7 @@ struct ClaudeCodeUsageApp: App {
 
     var body: some Scene {
         Window("Usage Dashboard", id: "main") {
-            RootCoordinatorView(settingsService: settingsService)
+            DashboardView(settingsService: settingsService)
                 .environment(store)
                 .onAppear {
                     if !hasAppeared {

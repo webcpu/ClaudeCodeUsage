@@ -1,12 +1,12 @@
 //
-//  OverviewScreen.swift
-//  Overview dashboard screen
+//  OverviewView.swift
+//  Overview dashboard view
 //
 
 import SwiftUI
 import ClaudeCodeUsageKit
 
-struct OverviewScreen: View {
+struct OverviewView: View {
     @Environment(UsageStore.self) private var store
 
     var body: some View {

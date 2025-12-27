@@ -1,12 +1,12 @@
 //
-//  AnalyticsScreen.swift
-//  Analytics and insights screen
+//  AnalyticsView.swift
+//  Analytics and insights view
 //
 
 import SwiftUI
 import ClaudeCodeUsageKit
 
-struct AnalyticsScreen: View {
+struct AnalyticsView: View {
     @Environment(UsageStore.self) private var store
 
     var body: some View {

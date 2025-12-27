@@ -1,12 +1,12 @@
 //
-//  ModelsScreen.swift
-//  Model usage breakdown screen
+//  ModelsView.swift
+//  Model usage breakdown view
 //
 
 import SwiftUI
 import ClaudeCodeUsageKit
 
-struct ModelsScreen: View {
+struct ModelsView: View {
     @Environment(UsageStore.self) private var store
 
     var body: some View {

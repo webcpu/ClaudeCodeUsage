@@ -1,13 +1,13 @@
 //
-//  RootCoordinatorView.swift
-//  Navigation coordinator for the main window
+//  DashboardView.swift
+//  Main dashboard with sidebar navigation
 //
 
 import SwiftUI
 import ClaudeCodeUsageKit
 
 // MARK: - Navigation Destination
-enum NavigationDestination: Hashable {
+enum DashboardDestination: Hashable {
     case overview
     case models
     case dailyUsage
@@ -15,14 +15,14 @@ enum NavigationDestination: Hashable {
     case liveMetrics
 }
 
-// MARK: - Root Coordinator View
-struct RootCoordinatorView: View {
+// MARK: - Dashboard View
+struct DashboardView: View {
     @Environment(UsageStore.self) private var store
-    @State private var selectedDestination: NavigationDestination? = .overview
+    @State private var selectedDestination: DashboardDestination? = .overview
     let settingsService: AppSettingsService
 
     var body: some View {
-        ModernNavigationView(
+        DashboardNavigationView(
             selectedDestination: $selectedDestination,
             store: store,
             settingsService: settingsService
@@ -30,17 +30,17 @@ struct RootCoordinatorView: View {
     }
 }
 
-// MARK: - Modern Navigation
-struct ModernNavigationView: View {
-    @Binding var selectedDestination: NavigationDestination?
+// MARK: - Dashboard Navigation
+private struct DashboardNavigationView: View {
+    @Binding var selectedDestination: DashboardDestination?
     let store: UsageStore
     let settingsService: AppSettingsService
 
     var body: some View {
         NavigationSplitView {
-            NavigationSidebar(selectedDestination: $selectedDestination)
+            DashboardSidebar(selectedDestination: $selectedDestination)
         } detail: {
-            NavigationDetailView(
+            DashboardDetailView(
                 destination: selectedDestination ?? .overview,
                 store: store,
                 settingsService: settingsService
@@ -54,30 +54,29 @@ struct ModernNavigationView: View {
     }
 }
 
+// MARK: - Dashboard Sidebar
+private struct DashboardSidebar: View {
+    @Binding var selectedDestination: DashboardDestination?
 
-// MARK: - Navigation Sidebar
-struct NavigationSidebar: View {
-    @Binding var selectedDestination: NavigationDestination?
-    
     var body: some View {
         List(selection: $selectedDestination) {
-            NavigationLink(value: NavigationDestination.overview) {
+            NavigationLink(value: DashboardDestination.overview) {
                 Label("Overview", systemImage: "chart.line.uptrend.xyaxis")
             }
-            
-            NavigationLink(value: NavigationDestination.models) {
+
+            NavigationLink(value: DashboardDestination.models) {
                 Label("Models", systemImage: "cpu")
             }
-            
-            NavigationLink(value: NavigationDestination.dailyUsage) {
+
+            NavigationLink(value: DashboardDestination.dailyUsage) {
                 Label("Daily Usage", systemImage: "calendar")
             }
-            
-            NavigationLink(value: NavigationDestination.analytics) {
+
+            NavigationLink(value: DashboardDestination.analytics) {
                 Label("Analytics", systemImage: "chart.bar.xaxis")
             }
-            
-            NavigationLink(value: NavigationDestination.liveMetrics) {
+
+            NavigationLink(value: DashboardDestination.liveMetrics) {
                 Label("Live Metrics", systemImage: "arrow.triangle.2.circlepath")
             }
         }
@@ -87,25 +86,25 @@ struct NavigationSidebar: View {
     }
 }
 
-// MARK: - Navigation Detail View
-struct NavigationDetailView: View {
-    let destination: NavigationDestination
+// MARK: - Dashboard Detail View
+private struct DashboardDetailView: View {
+    let destination: DashboardDestination
     let store: UsageStore
     let settingsService: AppSettingsService
 
     var body: some View {
         switch destination {
         case .overview:
-            OverviewScreen()
+            OverviewView()
                 .environment(store)
         case .models:
-            ModelsScreen()
+            ModelsView()
                 .environment(store)
         case .dailyUsage:
-            DailyUsageScreen()
+            DailyUsageView()
                 .environment(store)
         case .analytics:
-            AnalyticsScreen()
+            AnalyticsView()
                 .environment(store)
         case .liveMetrics:
             MenuBarContentView(settingsService: settingsService, viewMode: .liveMetrics)

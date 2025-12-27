@@ -1,12 +1,12 @@
 //
-//  DailyUsageScreen.swift
-//  Daily usage breakdown screen
+//  DailyUsageView.swift
+//  Daily usage breakdown view
 //
 
 import SwiftUI
 import ClaudeCodeUsageKit
 
-struct DailyUsageScreen: View {
+struct DailyUsageView: View {
     @Environment(UsageStore.self) private var store
 
     var body: some View {
