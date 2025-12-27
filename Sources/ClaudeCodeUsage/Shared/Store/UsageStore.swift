@@ -16,7 +16,8 @@ private let performanceLogger = Logger(subsystem: "com.claudecodeusage", categor
 
 enum ViewState {
     case loading
-    case loaded(UsageStats)
+    case loadedToday(UsageStats)  // Today's data loaded, history loading
+    case loaded(UsageStats)       // All data loaded
     case error(Error)
 }
 
@@ -50,9 +51,16 @@ final class UsageStore {
         return false
     }
 
-    var hasInitiallyLoaded: Bool {
-        if case .loaded = state { return true }
+    var isLoadingHistory: Bool {
+        if case .loadedToday = state { return true }
         return false
+    }
+
+    var hasInitiallyLoaded: Bool {
+        switch state {
+        case .loadedToday, .loaded: return true
+        default: return false
+        }
     }
 
     var lastError: Error? {
@@ -66,8 +74,10 @@ final class UsageStore {
     }
 
     var stats: UsageStats? {
-        if case .loaded(let stats) = state { return stats }
-        return nil
+        switch state {
+        case .loadedToday(let stats), .loaded(let stats): return stats
+        default: return nil
+        }
     }
 
     var todaysCostValue: Double {
@@ -159,8 +169,15 @@ final class UsageStore {
         let loadStartTime = dateProvider.now
 
         do {
-            let result = try await dataLoader.loadAll()
-            applyLoadResult(result)
+            // Phase 1: Load today's data immediately (fast ~0.3s)
+            let todayResult = try await dataLoader.loadToday()
+            applyTodayResult(todayResult)
+
+            performanceLogger.info("Today's data loaded in \(String(format: "%.2f", self.dateProvider.now.timeIntervalSince(loadStartTime)))s")
+
+            // Phase 2: Load historical data (slower ~2-4s, but UI already showing)
+            let historyResult = try await dataLoader.loadHistory()
+            applyHistoryResult(historyResult)
 
             logPerformance(startTime: loadStartTime)
         } catch {
@@ -195,6 +212,26 @@ final class UsageStore {
     }
 
     // MARK: - State Updates
+
+    /// Apply today's data immediately - enables fast UI display
+    private func applyTodayResult(_ result: TodayLoadResult) {
+        activeSession = result.session
+        burnRate = result.burnRate
+        autoTokenLimit = result.autoTokenLimit
+        todayEntries = result.todayEntries
+        state = .loadedToday(result.todayStats)
+
+        updateCalculatedProperties(stats: result.todayStats)
+        updateChartData()
+    }
+
+    /// Apply historical data - updates full stats
+    private func applyHistoryResult(_ result: FullLoadResult) {
+        state = .loaded(result.fullStats)
+
+        // Update threshold based on full historical data
+        updateDailyCostThreshold(stats: result.fullStats)
+    }
 
     private func applyLoadResult(_ result: UsageLoadResult) {
         activeSession = result.session

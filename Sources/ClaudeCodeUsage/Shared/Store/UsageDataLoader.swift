@@ -8,8 +8,23 @@ import ClaudeCodeUsageKit
 import struct ClaudeLiveMonitorLib.SessionBlock
 import struct ClaudeLiveMonitorLib.BurnRate
 
-// MARK: - Load Result
+// MARK: - Load Results
 
+/// Fast result from Phase 1 - today's data only
+struct TodayLoadResult {
+    let todayEntries: [UsageEntry]
+    let todayStats: UsageStats
+    let session: SessionBlock?
+    let burnRate: BurnRate?
+    let autoTokenLimit: Int?
+}
+
+/// Complete result including historical data
+struct FullLoadResult {
+    let fullStats: UsageStats
+}
+
+/// Combined result for backward compatibility
 struct UsageLoadResult {
     let todayEntries: [UsageEntry]
     let todayStats: UsageStats
@@ -30,8 +45,8 @@ actor UsageDataLoader {
         self.sessionMonitorService = sessionMonitorService
     }
 
-    func loadAll() async throws -> UsageLoadResult {
-        // Phase 1: Load today's data + session info (fast, concurrent)
+    /// Load today's data only - fast path for immediate UI display
+    func loadToday() async throws -> TodayLoadResult {
         async let todayEntriesTask = repository.getTodayUsageEntries()
         async let todayStatsTask = repository.getTodayUsageStats()
         async let sessionTask = sessionMonitorService.getActiveSession()
@@ -46,16 +61,33 @@ actor UsageDataLoader {
             tokenLimitTask
         )
 
-        // Phase 2: Load full historical data
-        let fullStats = try await repository.getUsageStats()
-
-        return UsageLoadResult(
+        return TodayLoadResult(
             todayEntries: todayEntries,
             todayStats: todayStats,
-            fullStats: fullStats,
             session: session,
             burnRate: burnRate,
             autoTokenLimit: tokenLimit
+        )
+    }
+
+    /// Load full historical data - slower path for complete stats
+    func loadHistory() async throws -> FullLoadResult {
+        let fullStats = try await repository.getUsageStats()
+        return FullLoadResult(fullStats: fullStats)
+    }
+
+    /// Load all data at once (backward compatible)
+    func loadAll() async throws -> UsageLoadResult {
+        let today = try await loadToday()
+        let history = try await loadHistory()
+
+        return UsageLoadResult(
+            todayEntries: today.todayEntries,
+            todayStats: today.todayStats,
+            fullStats: history.fullStats,
+            session: today.session,
+            burnRate: today.burnRate,
+            autoTokenLimit: today.autoTokenLimit
         )
     }
 }
