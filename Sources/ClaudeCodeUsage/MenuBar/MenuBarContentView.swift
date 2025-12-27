@@ -27,103 +27,106 @@ struct MenuBarContentView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Live Session Section
-            if let session = store.activeSession, session.isActive {
-                SectionHeader(
-                    title: "Live Session",
-                    icon: "dot.radiowaves.left.and.right",
-                    color: MenuBarTheme.Colors.Sections.liveSession,
-                    badge: "ACTIVE"
-                )
-                
-                SessionMetricsSection()
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 4)
-                
-                sectionDivider
-                    .padding(.horizontal, 12)
-            }
-            
-            // Usage Section
+            liveSessionSection
+            usageSection
+            costSection
+            systemSection
+            actionsSection
+        }
+        .frame(width: MenuBarTheme.Layout.menuBarWidth)
+        .background(MenuBarTheme.Colors.UI.background)
+        .focusable()
+        .onKeyPress { handleKeyPress($0) }
+    }
+
+    // MARK: - Sections
+
+    @ViewBuilder
+    private var liveSessionSection: some View {
+        if let session = store.activeSession, session.isActive {
+            SectionHeader(
+                title: "Live Session",
+                icon: "dot.radiowaves.left.and.right",
+                color: MenuBarTheme.Colors.Sections.liveSession,
+                badge: "ACTIVE"
+            )
+            SessionMetricsSection()
+                .padding(.horizontal, 12)
+                .padding(.vertical, 4)
+            sectionDivider
+                .padding(.horizontal, 12)
+        }
+    }
+
+    private var usageSection: some View {
+        Group {
             SectionHeader(
                 title: "Usage",
                 icon: "chart.bar.fill",
                 color: MenuBarTheme.Colors.Sections.usage,
                 badge: nil
             )
-            
             UsageMetricsSection()
                 .padding(.horizontal, 12)
                 .padding(.vertical, 4)
-            
             sectionDivider
                 .padding(.horizontal, 12)
-            
-            // Cost Section
+        }
+    }
+
+    private var costSection: some View {
+        Group {
             SectionHeader(
                 title: "Cost",
                 icon: "dollarsign.circle.fill",
                 color: MenuBarTheme.Colors.Sections.cost,
                 badge: nil
             )
-            
             CostMetricsSection()
                 .padding(.horizontal, 12)
                 .padding(.vertical, 4)
-            
             sectionDivider
                 .padding(.horizontal, 12)
-            
-            // Memory Monitor Section
+        }
+    }
+
+    private var systemSection: some View {
+        Group {
             SectionHeader(
                 title: "System",
                 icon: "memorychip",
                 color: MenuBarTheme.Colors.Sections.system,
                 badge: nil
             )
-            
             MemoryMonitorView()
                 .padding(.horizontal, 12)
                 .padding(.vertical, 4)
-            
             largeDivider
                 .padding(.horizontal, 12)
-            
-            // Actions
-            ActionButtons(settingsService: settingsService, onRefresh: handleRefresh, viewMode: viewMode)
-                .padding(.horizontal, 12)
-                .padding(.bottom, 8)
         }
-        .frame(width: MenuBarTheme.Layout.menuBarWidth)
-        .background(MenuBarTheme.Colors.UI.background)
-        .focusable()
-        .onKeyPress { press in
-            // Handle keyboard shortcuts
-            switch press.key {
-            case .tab:
-                // Tab navigation
-                if press.modifiers.contains(.shift) {
-                    switchFocusPrevious()
-                } else {
-                    switchFocusNext()
-                }
-                return .handled
-            case .escape:
-                // Escape to close menu bar window
-                if viewMode == .menuBar {
-                    NSApp.hide(nil)
-                }
-                return .handled
-            case KeyEquivalent("r"):
-                // Cmd+R to refresh
-                if press.modifiers.contains(.command) {
-                    handleRefresh()
-                    return .handled
-                }
-                return .ignored
-            default:
-                return .ignored
-            }
+    }
+
+    private var actionsSection: some View {
+        ActionButtons(settingsService: settingsService, onRefresh: handleRefresh, viewMode: viewMode)
+            .padding(.horizontal, 12)
+            .padding(.bottom, 8)
+    }
+
+    // MARK: - Keyboard Handling
+
+    private func handleKeyPress(_ press: KeyPress) -> KeyPress.Result {
+        switch press.key {
+        case .tab:
+            press.modifiers.contains(.shift) ? switchFocusPrevious() : switchFocusNext()
+            return .handled
+        case .escape:
+            if viewMode == .menuBar { NSApp.hide(nil) }
+            return .handled
+        case KeyEquivalent("r") where press.modifiers.contains(.command):
+            handleRefresh()
+            return .handled
+        default:
+            return .ignored
         }
     }
     
