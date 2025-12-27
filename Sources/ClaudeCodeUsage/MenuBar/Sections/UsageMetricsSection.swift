@@ -13,22 +13,13 @@ struct UsageMetricsSection: View {
     var body: some View {
         VStack(spacing: MenuBarTheme.Layout.sectionSpacing) {
             if store.stats != nil {
-                // Token usage (moved from Session section)
-                if let session = store.activeSession,
-                   let tokenLimit = store.autoTokenLimit {
-                    let tokenPercentage = store.sessionTokenProgress * 100
-                    MetricRow(
-                        title: "Tokens",
-                        value: FormatterService.formatValueWithLimit(session.tokenCounts.total, limit: tokenLimit),
-                        subvalue: nil,
-                        percentage: tokenPercentage,
-                        segments: ColorService.sessionTokenSegments(),
-                        trendData: nil,
-                        showWarning: tokenPercentage >= 100
-                    )
+                // Token usage - show raw count only (no fake percentage)
+                // Claude's actual rate limit is not exposed in usage data
+                if let session = store.activeSession {
+                    TokenDisplay(tokens: session.tokenCounts.total)
                 }
-                
-                // Burn rate (moved from Session section)
+
+                // Burn rate
                 if let burnRate = store.burnRate {
                     burnRateView(burnRate)
                 }
@@ -57,13 +48,26 @@ struct UsageMetricsSection: View {
     }
 }
 
-//// Sessions
-//MetricRow(
-//    title: "Sessions",
-//    value: FormatterService.formatSessionCount(dataModel.todaySessionCount),
-//    subvalue: "Total: \(stats.totalSessions)",
-//    percentage: Double(dataModel.estimatedDailySessions) * 5, // Scale for visibility
-//    segments: ColorService.singleColorSegment(color: MenuBarTheme.Colors.Sections.usage),
-//    trendData: nil,
-//    showWarning: false
-//)
+// MARK: - Token Display (no fake percentage)
+
+private struct TokenDisplay: View {
+    let tokens: Int
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Tokens")
+                    .font(MenuBarTheme.Typography.metricTitle)
+                    .foregroundColor(MenuBarTheme.Colors.UI.secondaryText)
+            }
+
+            Spacer()
+
+            Text(FormatterService.formatTokenCount(tokens))
+                .font(MenuBarTheme.Typography.metricValue.weight(.medium))
+                .foregroundColor(MenuBarTheme.Colors.UI.primaryText)
+                .monospacedDigit()
+        }
+        .padding(.vertical, MenuBarTheme.Layout.verticalPadding)
+    }
+}
