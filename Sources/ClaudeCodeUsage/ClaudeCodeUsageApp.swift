@@ -7,6 +7,7 @@ import SwiftUI
 import Observation
 import ClaudeCodeUsageKit
 
+// MARK: - App Entry Point
 @main
 struct ClaudeCodeUsageApp: App {
     @State private var store = UsageStore()
@@ -19,21 +20,16 @@ struct ClaudeCodeUsageApp: App {
             MainView(settingsService: settingsService)
                 .environment(store)
                 .onAppear {
-                    if !hasAppeared {
-                        hasAppeared = true
-                        lifecycleManager.configure(with: store)
-                        Task {
-                            await store.initializeIfNeeded()
-                        }
-                    }
+                    guard !hasAppeared else { return }
+                    hasAppeared = true
+                    lifecycleManager.configure(with: store)
+                    Task { await store.initializeIfNeeded() }
                 }
         }
         .windowStyle(.automatic)
         .windowToolbarStyle(.unified)
         .defaultSize(width: 840, height: 600)
-        .commands {
-            AppCommands(settingsService: settingsService)
-        }
+        .commands { AppCommands(settingsService: settingsService) }
 
         MenuBarScene(store: store, settingsService: settingsService)
     }
@@ -64,30 +60,14 @@ struct MenuBarScene: Scene {
 struct MenuBarLabel: View {
     let store: UsageStore
 
-    private var menuBarIcon: String {
-        if let session = store.activeSession, session.isActive {
-            return "dollarsign.circle.fill"
-        } else if store.todaysCostValue > store.dailyCostThreshold {
-            return "exclamationmark.triangle.fill"
-        } else {
-            return "dollarsign.circle"
-        }
-    }
-
-    private var iconColor: Color {
-        if let session = store.activeSession, session.isActive {
-            return .green
-        } else if store.todaysCostValue > store.dailyCostThreshold {
-            return .orange
-        } else {
-            return .primary
-        }
+    private var appearance: MenuBarAppearance {
+        MenuBarAppearance.from(store: store)
     }
 
     var body: some View {
         HStack(spacing: 4) {
-            Image(systemName: menuBarIcon)
-                .foregroundColor(iconColor)
+            Image(systemName: appearance.icon)
+                .foregroundColor(appearance.color)
             Text(store.todaysCost)
                 .font(.system(.body, design: .monospaced))
         }
@@ -106,14 +86,7 @@ struct AppCommands: Commands {
         }
 
         CommandGroup(after: .appSettings) {
-            Toggle("Open at Login", isOn: Binding(
-                get: { settingsService.isOpenAtLoginEnabled },
-                set: { newValue in
-                    Task {
-                        _ = await settingsService.setOpenAtLogin(newValue)
-                    }
-                }
-            ))
+            OpenAtLoginToggle(settingsService: settingsService)
         }
 
         CommandMenu("View") {
@@ -125,10 +98,7 @@ struct AppCommands: Commands {
             Divider()
 
             Button("Show Main Window") {
-                NSApp.activate(ignoringOtherApps: true)
-                if let window = NSApp.windows.first(where: { $0.identifier?.rawValue == "main" }) {
-                    window.makeKeyAndOrderFront(nil)
-                }
+                WindowActions.showMainWindow()
             }
             .keyboardShortcut("1", modifiers: .command)
         }
@@ -143,9 +113,7 @@ struct MenuBarContextMenu: View {
     var body: some View {
         Group {
             Button("Refresh") {
-                Task {
-                    await store.loadData()
-                }
+                Task { await store.loadData() }
             }
 
             Divider()
@@ -160,20 +128,10 @@ struct MenuBarContextMenu: View {
             Divider()
 
             Button("Open Dashboard") {
-                NSApp.activate(ignoringOtherApps: true)
-                if let window = NSApp.windows.first(where: { $0.identifier?.rawValue == "main" }) {
-                    window.makeKeyAndOrderFront(nil)
-                }
+                WindowActions.showMainWindow()
             }
 
-            Toggle("Open at Login", isOn: Binding(
-                get: { settingsService.isOpenAtLoginEnabled },
-                set: { newValue in
-                    Task {
-                        _ = await settingsService.setOpenAtLogin(newValue)
-                    }
-                }
-            ))
+            OpenAtLoginToggle(settingsService: settingsService)
 
             Divider()
 
@@ -181,6 +139,53 @@ struct MenuBarContextMenu: View {
                 NSApplication.shared.terminate(nil)
             }
         }
+    }
+}
+
+// MARK: - Pure Transformations
+
+@MainActor
+private enum MenuBarAppearance {
+    case active
+    case warning
+    case normal
+
+    var icon: String {
+        switch self {
+        case .active: "dollarsign.circle.fill"
+        case .warning: "exclamationmark.triangle.fill"
+        case .normal: "dollarsign.circle"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .active: .green
+        case .warning: .orange
+        case .normal: .primary
+        }
+    }
+
+    static func from(store: UsageStore) -> MenuBarAppearance {
+        if let session = store.activeSession, session.isActive {
+            return .active
+        } else if store.todaysCostValue > store.dailyCostThreshold {
+            return .warning
+        } else {
+            return .normal
+        }
+    }
+}
+
+// MARK: - Infrastructure
+
+private enum WindowActions {
+    @MainActor
+    static func showMainWindow() {
+        NSApp.activate(ignoringOtherApps: true)
+        NSApp.windows
+            .first { $0.identifier?.rawValue == "main" }?
+            .makeKeyAndOrderFront(nil)
     }
 }
 
