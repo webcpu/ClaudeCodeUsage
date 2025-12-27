@@ -1,13 +1,13 @@
 //
-//  DashboardView.swift
-//  Main dashboard with sidebar navigation
+//  MainView.swift
+//  Main window with sidebar navigation
 //
 
 import SwiftUI
 import ClaudeCodeUsageKit
 
 // MARK: - Navigation Destination
-enum DashboardDestination: Hashable {
+enum Destination: Hashable {
     case overview
     case models
     case dailyUsage
@@ -15,14 +15,14 @@ enum DashboardDestination: Hashable {
     case liveMetrics
 }
 
-// MARK: - Dashboard View
-struct DashboardView: View {
+// MARK: - Main View
+struct MainView: View {
     @Environment(UsageStore.self) private var store
-    @State private var selectedDestination: DashboardDestination? = .overview
+    @State private var selectedDestination: Destination? = .overview
     let settingsService: AppSettingsService
 
     var body: some View {
-        DashboardNavigationView(
+        NavigationContent(
             selectedDestination: $selectedDestination,
             store: store,
             settingsService: settingsService
@@ -30,17 +30,17 @@ struct DashboardView: View {
     }
 }
 
-// MARK: - Dashboard Navigation
-private struct DashboardNavigationView: View {
-    @Binding var selectedDestination: DashboardDestination?
+// MARK: - Navigation Content
+private struct NavigationContent: View {
+    @Binding var selectedDestination: Destination?
     let store: UsageStore
     let settingsService: AppSettingsService
 
     var body: some View {
         NavigationSplitView {
-            DashboardSidebar(selectedDestination: $selectedDestination)
+            Sidebar(selectedDestination: $selectedDestination)
         } detail: {
-            DashboardDetailView(
+            DetailView(
                 destination: selectedDestination ?? .overview,
                 store: store,
                 settingsService: settingsService
@@ -54,29 +54,29 @@ private struct DashboardNavigationView: View {
     }
 }
 
-// MARK: - Dashboard Sidebar
-private struct DashboardSidebar: View {
-    @Binding var selectedDestination: DashboardDestination?
+// MARK: - Sidebar
+private struct Sidebar: View {
+    @Binding var selectedDestination: Destination?
 
     var body: some View {
         List(selection: $selectedDestination) {
-            NavigationLink(value: DashboardDestination.overview) {
+            NavigationLink(value: Destination.overview) {
                 Label("Overview", systemImage: "chart.line.uptrend.xyaxis")
             }
 
-            NavigationLink(value: DashboardDestination.models) {
+            NavigationLink(value: Destination.models) {
                 Label("Models", systemImage: "cpu")
             }
 
-            NavigationLink(value: DashboardDestination.dailyUsage) {
+            NavigationLink(value: Destination.dailyUsage) {
                 Label("Daily Usage", systemImage: "calendar")
             }
 
-            NavigationLink(value: DashboardDestination.analytics) {
+            NavigationLink(value: Destination.analytics) {
                 Label("Analytics", systemImage: "chart.bar.xaxis")
             }
 
-            NavigationLink(value: DashboardDestination.liveMetrics) {
+            NavigationLink(value: Destination.liveMetrics) {
                 Label("Live Metrics", systemImage: "arrow.triangle.2.circlepath")
             }
         }
@@ -86,9 +86,9 @@ private struct DashboardSidebar: View {
     }
 }
 
-// MARK: - Dashboard Detail View
-private struct DashboardDetailView: View {
-    let destination: DashboardDestination
+// MARK: - Detail View
+private struct DetailView: View {
+    let destination: Destination
     let store: UsageStore
     let settingsService: AppSettingsService
 
