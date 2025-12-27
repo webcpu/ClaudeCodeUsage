@@ -1,6 +1,6 @@
 //
 //  UsageStore.swift
-//  Single source of truth for usage data (View + Store + Service architecture)
+//  Observable state container for usage data
 //
 
 import SwiftUI
@@ -13,17 +13,20 @@ import OSLog
 private let performanceLogger = Logger(subsystem: "com.claudecodeusage", category: "StorePerformance")
 
 // MARK: - View State
+
 enum ViewState {
     case loading
     case loaded(UsageStats)
     case error(Error)
 }
 
-// MARK: - Usage Store (Single Source of Truth)
+// MARK: - Usage Store
+
 @Observable
 @MainActor
 final class UsageStore {
     // MARK: - Observable State
+
     var state: ViewState = .loading
     var activeSession: SessionBlock?
     var burnRate: BurnRate?
@@ -41,6 +44,7 @@ final class UsageStore {
     var todayHourlyCosts: [Double] = []
 
     // MARK: - Computed Properties
+
     var isLoading: Bool {
         if case .loading = state { return true }
         return false
@@ -62,9 +66,7 @@ final class UsageStore {
     }
 
     var stats: UsageStats? {
-        if case .loaded(let stats) = state {
-            return stats
-        }
+        if case .loaded(let stats) = state { return stats }
         return nil
     }
 
@@ -73,13 +75,8 @@ final class UsageStore {
     }
 
     var totalCost: String {
-        guard let stats = stats else { return "$0.00" }
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencySymbol = "$"
-        formatter.maximumFractionDigits = 2
-        formatter.minimumFractionDigits = 2
-        return formatter.string(from: NSNumber(value: stats.totalCost)) ?? "$0.00"
+        guard let stats else { return "$0.00" }
+        return FormatterService.formatCurrency(stats.totalCost)
     }
 
     var formattedTodaysCost: String? {
@@ -87,31 +84,27 @@ final class UsageStore {
     }
 
     var formattedTotalCost: String? {
-        stats?.totalCost != nil ? FormatterService.formatCurrency(stats!.totalCost) : nil
+        stats.map { FormatterService.formatCurrency($0.totalCost) } ?? nil
     }
 
-    var lastUpdateTime: Date? {
-        lastRefreshTime
-    }
+    var lastUpdateTime: Date? { lastRefreshTime }
 
     // MARK: - Dependencies
-    private let repository: UsageRepository
+
     let sessionMonitorService: SessionMonitorService
-    private let configurationService: ConfigurationService
+    private let dataLoader: UsageDataLoader
     private let dateProvider: DateProviding
+    private let refreshCoordinator: RefreshCoordinator
 
     // MARK: - Internal State
+
     private var memoryCleanupObserver: NSObjectProtocol?
     private var isCurrentlyLoading = false
     private var lastLoadStartTime: Date?
-    private var refreshTask: Task<Void, Never>?
-    private var timerTask: Task<Void, Never>?
-    private var dayChangeTask: Task<Void, Never>?
-    private var lastKnownDay: String = ""
-    private var dayChangeObserver: NSObjectProtocol?
     private var hasInitialized = false
 
     // MARK: - Initialization
+
     init(
         repository: UsageRepository? = nil,
         sessionMonitorService: SessionMonitorService? = nil,
@@ -119,32 +112,31 @@ final class UsageStore {
         dateProvider: DateProviding = SystemDateProvider()
     ) {
         let config = configurationService ?? DefaultConfigurationService()
-        self.configurationService = config
-        self.repository = repository ?? UsageRepository(basePath: config.configuration.basePath)
-        self.sessionMonitorService = sessionMonitorService
-            ?? DefaultSessionMonitorService(configuration: config.configuration)
+        let repo = repository ?? UsageRepository(basePath: config.configuration.basePath)
+        let sessionService = sessionMonitorService ?? DefaultSessionMonitorService(configuration: config.configuration)
+
+        self.sessionMonitorService = sessionService
+        self.dataLoader = UsageDataLoader(repository: repo, sessionMonitorService: sessionService)
         self.dateProvider = dateProvider
         self.lastRefreshTime = dateProvider.now
         self.dailyCostThreshold = config.configuration.dailyCostThreshold
 
-        // Setup memory cleanup observer
-        memoryCleanupObserver = NotificationCenter.default.addObserver(
-            forName: .performMemoryCleanup,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in
-                self?.performMemoryCleanup()
-            }
-        }
+        // Create coordinator synchronously (callback set after init)
+        self.refreshCoordinator = RefreshCoordinator(
+            dateProvider: dateProvider,
+            refreshInterval: config.configuration.refreshInterval
+        )
 
-        // Initialize last known day
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        self.lastKnownDay = formatter.string(from: dateProvider.now)
+        setupMemoryCleanupObserver()
+
+        // Set callback after all properties initialized (avoids capturing self before init)
+        refreshCoordinator.onRefresh = { [weak self] in
+            await self?.loadData()
+        }
     }
 
-    // MARK: - Initialization (called once at app start)
+    // MARK: - Public API
+
     func initializeIfNeeded() async {
         guard !hasInitialized else { return }
         hasInitialized = true
@@ -152,99 +144,27 @@ final class UsageStore {
         if !hasInitiallyLoaded {
             await loadData()
         }
-        startRefreshTimer()
+        refreshCoordinator.start()
     }
 
-    // MARK: - Data Loading
-    @MainActor
     func loadData() async {
-        // Deduplication: Check if already loading
-        if isCurrentlyLoading {
-            #if DEBUG
-            print("[UsageStore] loadData() SKIPPED - already loading")
-            #endif
-            return
-        }
+        guard !isCurrentlyLoading else { return }
+        guard !isLoadedRecently else { return }
 
-        // Deduplication: Check if loaded very recently (within 0.5 seconds)
-        if let lastTime = lastLoadStartTime,
-           dateProvider.now.timeIntervalSince(lastTime) < 0.5 {
-            #if DEBUG
-            print("[UsageStore] loadData() SKIPPED - loaded \(dateProvider.now.timeIntervalSince(lastTime))s ago")
-            #endif
-            return
-        }
-
-        // Mark as loading and record time
         isCurrentlyLoading = true
         lastLoadStartTime = dateProvider.now
         lastRefreshTime = dateProvider.now
         defer { isCurrentlyLoading = false }
 
         let loadStartTime = dateProvider.now
-        #if DEBUG
-        print("[UsageStore] loadData() called at \(dateProvider.now)")
-        #endif
 
         do {
-            // PHASE 1: Load today's data + session info (FAST)
-            let phase1Start = dateProvider.now
+            let result = try await dataLoader.loadAll()
+            applyLoadResult(result)
 
-            async let todayEntriesLoading = repository.getTodayUsageEntries()
-            async let todayStatsLoading = repository.getTodayUsageStats()
-            async let sessionLoading = sessionMonitorService.getActiveSession()
-            async let burnRateLoading = sessionMonitorService.getBurnRate()
-            async let tokenLimitLoading = sessionMonitorService.getAutoTokenLimit()
-
-            let (todaysEntries, todayStats, session, burnRate, autoTokenLimit) = await (
-                try todayEntriesLoading,
-                try todayStatsLoading,
-                sessionLoading,
-                burnRateLoading,
-                tokenLimitLoading
-            )
-
-            #if DEBUG
-            let phase1Time = dateProvider.now.timeIntervalSince(phase1Start)
-            print("[UsageStore] Phase 1 (today) completed in: \(String(format: "%.3f", phase1Time))s")
-            #endif
-
-            // Update UI immediately with today's data
-            self.activeSession = session
-            self.burnRate = burnRate
-            self.autoTokenLimit = autoTokenLimit
-            self.todayEntries = todaysEntries
-            updateCalculatedProperties(stats: todayStats)
-
-            // PHASE 2: Load full historical data
-            let phase2Start = dateProvider.now
-            let fullStats = try await repository.getUsageStats()
-
-            #if DEBUG
-            let phase2Time = dateProvider.now.timeIntervalSince(phase2Start)
-            print("[UsageStore] Phase 2 (full) completed in: \(String(format: "%.3f", phase2Time))s")
-            #endif
-
-            // Update UI with full historical data
-            self.state = .loaded(fullStats)
-
-            // Update chart data
-            updateChartData()
-
-            let totalTime = dateProvider.now.timeIntervalSince(loadStartTime)
-            #if DEBUG
-            print("[UsageStore] Total load time: \(String(format: "%.3f", totalTime))s")
-            #endif
-
-            if totalTime > 2.0 {
-                performanceLogger.warning("Slow data load: \(String(format: "%.2f", totalTime))s")
-            }
-
+            logPerformance(startTime: loadStartTime)
         } catch {
-            #if DEBUG
-            print("[UsageStore] Error loading data: \(error)")
-            #endif
-            self.state = .error(error)
+            state = .error(error)
         }
     }
 
@@ -252,133 +172,41 @@ final class UsageStore {
         await loadData()
     }
 
-    // MARK: - Chart Data
-    private func updateChartData() {
-        todayHourlyCosts = UsageAnalytics.todayHourlyCosts(from: todayEntries, referenceDate: dateProvider.now)
+    // MARK: - Lifecycle Delegation
 
-        #if DEBUG
-        let chartTotal = todayHourlyCosts.reduce(0, +)
-        print("[UsageStore] Chart: $\(String(format: "%.2f", chartTotal)) from \(todayEntries.count) entries")
-        #endif
-    }
-
-    // MARK: - Auto Refresh
-    func startRefreshTimer() {
-        stopRefreshTimer()
-
-        let interval = configurationService.configuration.refreshInterval
-
-        timerTask = Task { @MainActor in
-            var nextFireTime = ContinuousClock.now + .seconds(interval)
-
-            while !Task.isCancelled {
-                do {
-                    try await Task.sleep(until: nextFireTime, clock: .continuous)
-                    guard !Task.isCancelled else { break }
-                    await loadData()
-                    nextFireTime = nextFireTime + .seconds(interval)
-                } catch {
-                    break
-                }
-            }
-        }
-
-        startDayChangeMonitoring()
-    }
-
-    func stopRefreshTimer() {
-        timerTask?.cancel()
-        timerTask = nil
-        stopDayChangeMonitoring()
-    }
-
-    // MARK: - Lifecycle Events
     func handleAppBecameActive() {
-        #if DEBUG
-        print("[UsageStore] handleAppBecameActive() called")
-        #endif
-        let timeSinceLastRefresh = dateProvider.now.timeIntervalSince(lastRefreshTime)
-        if timeSinceLastRefresh > 2.0 {
-            lastRefreshTime = dateProvider.now
-            Task {
-                await refresh()
-            }
-        }
-        startRefreshTimer()
+        refreshCoordinator.handleAppBecameActive()
     }
 
     func handleAppResignActive() {
-        stopRefreshTimer()
+        refreshCoordinator.handleAppResignActive()
     }
 
     func handleWindowFocus() {
-        #if DEBUG
-        print("[UsageStore] handleWindowFocus() called")
-        #endif
-        let timeSinceLastRefresh = dateProvider.now.timeIntervalSince(lastRefreshTime)
-        if timeSinceLastRefresh > 2.0 {
-            lastRefreshTime = dateProvider.now
-            Task {
-                await refresh()
-            }
-        }
+        refreshCoordinator.handleWindowFocus()
     }
 
-    // MARK: - Day Change Detection
-    private func startDayChangeMonitoring() {
-        stopDayChangeMonitoring()
-
-        dayChangeObserver = NotificationCenter.default.addObserver(
-            forName: .NSCalendarDayChanged,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                guard let self = self else { return }
-
-                #if DEBUG
-                print("[UsageStore] Day changed detected")
-                #endif
-
-                let formatter = DateFormatter()
-                formatter.dateFormat = "yyyy-MM-dd"
-                self.lastKnownDay = formatter.string(from: dateProvider.now)
-
-                await self.loadData()
-            }
-        }
-
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(handleSignificantTimeChange),
-            name: NSNotification.Name.NSSystemClockDidChange,
-            object: nil
-        )
+    func startRefreshTimer() {
+        refreshCoordinator.start()
     }
 
-    private func stopDayChangeMonitoring() {
-        if let observer = dayChangeObserver {
-            NotificationCenter.default.removeObserver(observer)
-            dayChangeObserver = nil
-        }
-        dayChangeTask?.cancel()
-        dayChangeTask = nil
+    func stopRefreshTimer() {
+        refreshCoordinator.stop()
     }
 
-    @objc private func handleSignificantTimeChange() {
-        Task { @MainActor in
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyyy-MM-dd"
-            let currentDay = formatter.string(from: dateProvider.now)
+    // MARK: - State Updates
 
-            if currentDay != lastKnownDay {
-                lastKnownDay = currentDay
-                await loadData()
-            }
-        }
+    private func applyLoadResult(_ result: UsageLoadResult) {
+        activeSession = result.session
+        burnRate = result.burnRate
+        autoTokenLimit = result.autoTokenLimit
+        todayEntries = result.todayEntries
+        state = .loaded(result.fullStats)
+
+        updateCalculatedProperties(stats: result.todayStats)
+        updateChartData()
     }
 
-    // MARK: - Private Methods
     private func updateCalculatedProperties(stats: UsageStats) {
         let todayValue = todaysCostValue
         todaysCost = todayValue.asCurrency
@@ -387,26 +215,52 @@ final class UsageStore {
         todaySessionCount = activeSession != nil ? 1 : 0
         estimatedDailySessions = stats.byDate.isEmpty ? 0 : max(1, stats.totalSessions / stats.byDate.count)
 
-        if let session = activeSession {
-            let elapsed = dateProvider.now.timeIntervalSince(session.startTime)
-            let total = session.endTime.timeIntervalSince(session.startTime)
-            sessionTimeProgress = min(elapsed / total, 1.5)
+        updateSessionProgress()
+        updateDailyCostThreshold(stats: stats)
+    }
 
-            if let limit = autoTokenLimit, limit > 0 {
-                sessionTokenProgress = min(Double(session.tokenCounts.total) / Double(limit), 1.5)
-            }
-        } else {
+    private func updateSessionProgress() {
+        guard let session = activeSession else {
             sessionTimeProgress = 0
             sessionTokenProgress = 0
+            return
         }
 
-        if !stats.byDate.isEmpty {
-            let recentDays = stats.byDate.suffix(7)
-            let totalRecentCost = recentDays.reduce(0.0) { $0 + $1.totalCost }
-            averageDailyCost = totalRecentCost / Double(recentDays.count)
+        let elapsed = dateProvider.now.timeIntervalSince(session.startTime)
+        let total = session.endTime.timeIntervalSince(session.startTime)
+        sessionTimeProgress = min(elapsed / total, 1.5)
 
-            if averageDailyCost > 0 {
-                dailyCostThreshold = max(averageDailyCost * 1.5, 10.0)
+        if let limit = autoTokenLimit, limit > 0 {
+            sessionTokenProgress = min(Double(session.tokenCounts.total) / Double(limit), 1.5)
+        }
+    }
+
+    private func updateDailyCostThreshold(stats: UsageStats) {
+        guard !stats.byDate.isEmpty else { return }
+
+        let recentDays = stats.byDate.suffix(7)
+        let totalRecentCost = recentDays.reduce(0.0) { $0 + $1.totalCost }
+        averageDailyCost = totalRecentCost / Double(recentDays.count)
+
+        if averageDailyCost > 0 {
+            dailyCostThreshold = max(averageDailyCost * 1.5, 10.0)
+        }
+    }
+
+    private func updateChartData() {
+        todayHourlyCosts = UsageAnalytics.todayHourlyCosts(from: todayEntries, referenceDate: dateProvider.now)
+    }
+
+    // MARK: - Memory Management
+
+    private func setupMemoryCleanupObserver() {
+        memoryCleanupObserver = NotificationCenter.default.addObserver(
+            forName: .performMemoryCleanup,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.performMemoryCleanup()
             }
         }
     }
@@ -423,12 +277,24 @@ final class UsageStore {
         }
 
         if activeSession != nil {
-            Task {
-                await loadData()
-            }
+            Task { await loadData() }
         }
 
         performanceLogger.info("Memory cleanup completed")
+    }
+
+    // MARK: - Helpers
+
+    private var isLoadedRecently: Bool {
+        guard let lastTime = lastLoadStartTime else { return false }
+        return dateProvider.now.timeIntervalSince(lastTime) < 0.5
+    }
+
+    private func logPerformance(startTime: Date) {
+        let totalTime = dateProvider.now.timeIntervalSince(startTime)
+        if totalTime > 2.0 {
+            performanceLogger.warning("Slow data load: \(String(format: "%.2f", totalTime))s")
+        }
     }
 
     deinit {
@@ -436,7 +302,8 @@ final class UsageStore {
     }
 }
 
-// MARK: - Helper function for token formatting
+// MARK: - Token Formatting
+
 func formatTokenCount(_ count: Int) -> String {
     if count >= 1_000_000 {
         return String(format: "%.1fM", Double(count) / 1_000_000)
