@@ -71,14 +71,21 @@ private struct LoadedContent: View {
 private struct OverviewHeader: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Overview")
-                .font(.largeTitle)
-                .fontWeight(.bold)
-
-            Text("Your Claude Code usage at a glance")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+            titleView
+            subtitleView
         }
+    }
+
+    private var titleView: some View {
+        Text("Overview")
+            .font(.largeTitle)
+            .fontWeight(.bold)
+    }
+
+    private var subtitleView: some View {
+        Text("Your Claude Code usage at a glance")
+            .font(.subheadline)
+            .foregroundColor(.secondary)
     }
 }
 
@@ -106,11 +113,27 @@ private struct MetricsGrid: View {
 
     var body: some View {
         LazyVGrid(columns: columns, spacing: 16) {
-            MetricCard(title: "Total Cost", value: stats.totalCost.asCurrency, icon: "dollarsign.circle", color: .green)
-            MetricCard(title: "Total Sessions", value: "\(stats.totalSessions)", icon: "doc.text", color: .blue)
-            MetricCard(title: "Total Tokens", value: stats.totalTokens.abbreviated, icon: "number", color: .purple)
-            MetricCard(title: "Avg Cost/Session", value: stats.averageCostPerSession.asCurrency, icon: "chart.line.uptrend.xyaxis", color: .orange)
+            totalCostCard
+            totalSessionsCard
+            totalTokensCard
+            avgCostCard
         }
+    }
+
+    private var totalCostCard: some View {
+        MetricCard(title: "Total Cost", value: stats.totalCost.asCurrency, icon: "dollarsign.circle", color: .green)
+    }
+
+    private var totalSessionsCard: some View {
+        MetricCard(title: "Total Sessions", value: "\(stats.totalSessions)", icon: "doc.text", color: .blue)
+    }
+
+    private var totalTokensCard: some View {
+        MetricCard(title: "Total Tokens", value: stats.totalTokens.abbreviated, icon: "number", color: .purple)
+    }
+
+    private var avgCostCard: some View {
+        MetricCard(title: "Avg Cost/Session", value: stats.averageCostPerSession.asCurrency, icon: "chart.line.uptrend.xyaxis", color: .orange)
     }
 }
 
@@ -121,18 +144,25 @@ private struct CostBreakdownSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Cost Breakdown by Model")
-                .font(.headline)
-
-            VStack(spacing: 8) {
-                ForEach(UsageAnalytics.costBreakdown(from: stats), id: \.model) { item in
-                    CostBreakdownRow(item: item)
-                }
-            }
+            sectionTitle
+            breakdownList
         }
         .padding()
         .background(Color(NSColor.controlBackgroundColor))
         .cornerRadius(12)
+    }
+
+    private var sectionTitle: some View {
+        Text("Cost Breakdown by Model")
+            .font(.headline)
+    }
+
+    private var breakdownList: some View {
+        VStack(spacing: 8) {
+            ForEach(UsageAnalytics.costBreakdown(from: stats), id: \.model) { item in
+                CostBreakdownRow(item: item)
+            }
+        }
     }
 }
 
@@ -143,20 +173,29 @@ private struct CostBreakdownRow: View {
 
     var body: some View {
         HStack {
-            Text(ModelNameFormatter.format(item.model))
-                .font(.subheadline)
-
+            modelNameText
             Spacer()
-
-            Text(item.percentage.asPercentage)
-                .font(.caption)
-                .foregroundColor(.secondary)
-
-            Text(item.cost.asCurrency)
-                .font(.system(.body, design: .monospaced))
-                .frame(minWidth: 80, alignment: .trailing)
+            percentageText
+            costText
         }
         .padding(.vertical, 4)
+    }
+
+    private var modelNameText: some View {
+        Text(ModelNameFormatter.format(item.model))
+            .font(.subheadline)
+    }
+
+    private var percentageText: some View {
+        Text(item.percentage.asPercentage)
+            .font(.caption)
+            .foregroundColor(.secondary)
+    }
+
+    private var costText: some View {
+        Text(item.cost.asCurrency)
+            .font(.system(.body, design: .monospaced))
+            .frame(minWidth: 80, alignment: .trailing)
     }
 }
 
@@ -166,22 +205,25 @@ private enum ModelNameFormatter {
     /// Formats model ID to display name: "claude-opus-4-5-20251101" → "Claude Opus 4.5"
     static func format(_ model: String) -> String {
         let parts = model.lowercased().components(separatedBy: "-")
+        let family = extractFamily(from: parts)
+        let version = extractVersion(from: parts)
+        return buildDisplayName(family: family, version: version, fallback: model)
+    }
 
-        // Extract family (opus/sonnet/haiku)
-        let family = parts.first { ["opus", "sonnet", "haiku"].contains($0) }
+    private static func extractFamily(from parts: [String]) -> String? {
+        parts.first { ["opus", "sonnet", "haiku"].contains($0) }
+    }
 
-        // Extract version numbers (e.g., "4" and "5" from "claude-opus-4-5-...")
+    private static func extractVersion(from parts: [String]) -> String {
         let numbers = parts.compactMap { Int($0) }
-        let version = numbers.count >= 2
+        return numbers.count >= 2
             ? "\(numbers[0]).\(numbers[1])"
             : numbers.first.map { "\($0)" } ?? ""
+    }
 
-        if let family = family {
-            let capitalizedFamily = family.capitalized
-            return version.isEmpty ? "Claude \(capitalizedFamily)" : "Claude \(capitalizedFamily) \(version)"
-        }
-
-        // Fallback: return cleaned original
-        return model
+    private static func buildDisplayName(family: String?, version: String, fallback: String) -> String {
+        guard let family else { return fallback }
+        let name = "Claude \(family.capitalized)"
+        return version.isEmpty ? name : "\(name) \(version)"
     }
 }

@@ -69,14 +69,21 @@ private struct DailyUsageContent: View {
 private struct DailyUsageHeader: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Daily Usage")
-                .font(.largeTitle)
-                .fontWeight(.bold)
-
-            Text("Day-by-day breakdown of your usage")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+            titleView
+            subtitleView
         }
+    }
+
+    private var titleView: some View {
+        Text("Daily Usage")
+            .font(.largeTitle)
+            .fontWeight(.bold)
+    }
+
+    private var subtitleView: some View {
+        Text("Day-by-day breakdown of your usage")
+            .font(.subheadline)
+            .foregroundColor(.secondary)
     }
 }
 
@@ -133,18 +140,26 @@ private struct DateBadge: View {
 
     var body: some View {
         VStack(spacing: 4) {
-            Text(info.dayOfMonth)
-                .font(.title2)
-                .fontWeight(.bold)
-            Text(info.monthAbbreviation)
-                .font(.caption)
-                .textCase(.uppercase)
+            dayText
+            monthText
         }
         .frame(width: 50)
         .padding(.vertical, 8)
         .background(info.isToday ? Color.accentColor : Color.gray.opacity(0.2))
         .foregroundColor(info.isToday ? .white : .primary)
         .cornerRadius(8)
+    }
+
+    private var dayText: some View {
+        Text(info.dayOfMonth)
+            .font(.title2)
+            .fontWeight(.bold)
+    }
+
+    private var monthText: some View {
+        Text(info.monthAbbreviation)
+            .font(.caption)
+            .textCase(.uppercase)
     }
 }
 
@@ -154,17 +169,30 @@ private struct DateDetails: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text(info.dayOfWeek)
-                    .font(.headline)
-                if info.isToday {
-                    Badge(text: "TODAY", color: .accentColor)
-                }
-            }
-            Text("\(modelCount) model\(modelCount == 1 ? "" : "s") used")
-                .font(.caption)
-                .foregroundColor(.secondary)
+            titleRow
+            modelCountText
         }
+    }
+
+    private var titleRow: some View {
+        HStack {
+            Text(info.dayOfWeek)
+                .font(.headline)
+            todayBadge
+        }
+    }
+
+    @ViewBuilder
+    private var todayBadge: some View {
+        if info.isToday {
+            Badge(text: "TODAY", color: .accentColor)
+        }
+    }
+
+    private var modelCountText: some View {
+        Text("\(modelCount) model\(modelCount == 1 ? "" : "s") used")
+            .font(.caption)
+            .foregroundColor(.secondary)
     }
 }
 
@@ -174,13 +202,21 @@ private struct CostMetrics: View {
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 4) {
-            Text(cost.asCurrency)
-                .font(.system(.body, design: .monospaced))
-                .fontWeight(.semibold)
-            Text("\(tokens.abbreviated) tokens")
-                .font(.caption)
-                .foregroundColor(.secondary)
+            costText
+            tokenText
         }
+    }
+
+    private var costText: some View {
+        Text(cost.asCurrency)
+            .font(.system(.body, design: .monospaced))
+            .fontWeight(.semibold)
+    }
+
+    private var tokenText: some View {
+        Text("\(tokens.abbreviated) tokens")
+            .font(.caption)
+            .foregroundColor(.secondary)
     }
 }
 
