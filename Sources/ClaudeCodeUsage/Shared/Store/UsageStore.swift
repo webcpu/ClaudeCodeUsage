@@ -21,6 +21,115 @@ enum ViewState {
     case error(Error)
 }
 
+// MARK: - Computed State (All Derived Values)
+
+private struct ComputedState {
+    let cost: CostMetrics
+    let session: SessionMetrics
+    let counts: SessionCounts
+    let threshold: ThresholdMetrics
+
+    static func from(
+        entries: [UsageEntry],
+        session: SessionBlock?,
+        tokenLimit: Int?,
+        stats: UsageStats,
+        threshold: Double,
+        now: Date
+    ) -> ComputedState {
+        ComputedState(
+            cost: CostMetrics.from(entries: entries, threshold: threshold),
+            session: SessionMetrics.from(session: session, tokenLimit: tokenLimit, now: now),
+            counts: SessionCounts.from(hasActiveSession: session != nil, stats: stats),
+            threshold: ThresholdMetrics.from(stats: stats, currentThreshold: threshold)
+        )
+    }
+}
+
+// MARK: - Pure Computed Values
+
+private struct CostMetrics {
+    let formattedCost: String
+    let progress: Double
+
+    static func from(entries: [UsageEntry], threshold: Double) -> CostMetrics {
+        let totalCost = entries.reduce(0.0) { $0 + $1.cost }
+        return CostMetrics(
+            formattedCost: totalCost.asCurrency,
+            progress: min(totalCost / threshold, 1.5)
+        )
+    }
+}
+
+private struct SessionMetrics {
+    let timeProgress: Double
+    let tokenProgress: Double
+
+    static func from(session: SessionBlock?, tokenLimit: Int?, now: Date) -> SessionMetrics {
+        guard let session = session else {
+            return SessionMetrics(timeProgress: 0, tokenProgress: 0)
+        }
+        return SessionMetrics(
+            timeProgress: calculateTimeProgress(session: session, now: now),
+            tokenProgress: calculateTokenProgress(session: session, tokenLimit: tokenLimit)
+        )
+    }
+
+    private static func calculateTimeProgress(session: SessionBlock, now: Date) -> Double {
+        let elapsed = now.timeIntervalSince(session.startTime)
+        let total = session.endTime.timeIntervalSince(session.startTime)
+        return min(elapsed / total, 1.5)
+    }
+
+    private static func calculateTokenProgress(session: SessionBlock, tokenLimit: Int?) -> Double {
+        guard let limit = tokenLimit, limit > 0 else { return 0 }
+        return min(Double(session.tokenCounts.total) / Double(limit), 1.5)
+    }
+}
+
+private struct SessionCounts {
+    let todayCount: Int
+    let estimatedDaily: Int
+
+    static func from(hasActiveSession: Bool, stats: UsageStats) -> SessionCounts {
+        SessionCounts(
+            todayCount: hasActiveSession ? 1 : 0,
+            estimatedDaily: stats.byDate.isEmpty ? 0 : max(1, stats.totalSessions / stats.byDate.count)
+        )
+    }
+}
+
+private struct ThresholdMetrics {
+    let averageDailyCost: Double
+    let threshold: Double
+
+    static func from(stats: UsageStats, currentThreshold: Double) -> ThresholdMetrics {
+        guard !stats.byDate.isEmpty else {
+            return ThresholdMetrics(averageDailyCost: 0, threshold: currentThreshold)
+        }
+        let recentDays = stats.byDate.suffix(7)
+        let average = recentDays.reduce(0.0) { $0 + $1.totalCost } / Double(recentDays.count)
+        let newThreshold = average > 0 ? max(average * 1.5, 10.0) : currentThreshold
+        return ThresholdMetrics(averageDailyCost: average, threshold: newThreshold)
+    }
+}
+
+// MARK: - Pure Functions
+
+private func nextState(current: ViewState, todayStats: UsageStats) -> ViewState {
+    if case .loaded = current { return current }  // Don't regress during refresh
+    return .loadedToday(todayStats)
+}
+
+private func entriesForToday(_ entries: [UsageEntry], referenceDate: Date) -> [UsageEntry] {
+    let calendar = Calendar.current
+    let today = calendar.startOfDay(for: referenceDate)
+    return entries.filter { entry in
+        guard let date = entry.date else { return false }
+        return calendar.startOfDay(for: date) == today
+    }
+}
+
 // MARK: - Usage Store
 
 @Observable
@@ -178,31 +287,71 @@ final class UsageStore {
     }
 
     func loadData() async {
-        guard !isCurrentlyLoading else { return }
-        guard !isLoadedRecently else { return }
+        guard !isCurrentlyLoading, !isLoadedRecently else { return }
 
         isCurrentlyLoading = true
-        lastLoadStartTime = dateProvider.now
-        lastRefreshTime = dateProvider.now
         defer { isCurrentlyLoading = false }
 
-        let loadStartTime = dateProvider.now
+        let startTime = dateProvider.now
+        lastLoadStartTime = startTime
+        lastRefreshTime = startTime
 
         do {
-            // Phase 1: Load today's data immediately (fast ~0.3s)
+            // Phase 1: Load and apply today's data
             let todayResult = try await dataLoader.loadToday()
-            applyTodayResult(todayResult)
+            apply(todayResult)
 
-            performanceLogger.info("Today's data loaded in \(String(format: "%.2f", self.dateProvider.now.timeIntervalSince(loadStartTime)))s")
-
-            // Phase 2: Load historical data (slower ~2-4s, but UI already showing)
+            // Phase 2: Load and apply historical data
             let historyResult = try await dataLoader.loadHistory()
-            applyHistoryResult(historyResult)
+            apply(historyResult)
 
-            logPerformance(startTime: loadStartTime)
+            logPerformance(startTime: startTime)
         } catch {
             state = .error(error)
         }
+    }
+
+    // MARK: - State Application (Single Entry Points)
+
+    private func apply(_ result: TodayLoadResult) {
+        // Update raw state
+        activeSession = result.session
+        burnRate = result.burnRate
+        autoTokenLimit = result.autoTokenLimit
+        todayEntries = result.todayEntries
+        state = nextState(current: state, todayStats: result.todayStats)
+
+        // Derive and apply computed values
+        let computed = ComputedState.from(
+            entries: todayEntries,
+            session: activeSession,
+            tokenLimit: autoTokenLimit,
+            stats: result.todayStats,
+            threshold: dailyCostThreshold,
+            now: dateProvider.now
+        )
+        apply(computed)
+
+        todayHourlyCosts = UsageAnalytics.todayHourlyCosts(from: todayEntries, referenceDate: dateProvider.now)
+    }
+
+    private func apply(_ result: FullLoadResult) {
+        state = .loaded(result.fullStats)
+
+        let thresholdMetrics = ThresholdMetrics.from(stats: result.fullStats, currentThreshold: dailyCostThreshold)
+        averageDailyCost = thresholdMetrics.averageDailyCost
+        dailyCostThreshold = thresholdMetrics.threshold
+    }
+
+    private func apply(_ computed: ComputedState) {
+        todaysCost = computed.cost.formattedCost
+        todaysCostProgress = computed.cost.progress
+        sessionTimeProgress = computed.session.timeProgress
+        sessionTokenProgress = computed.session.tokenProgress
+        todaySessionCount = computed.counts.todayCount
+        estimatedDailySessions = computed.counts.estimatedDaily
+        averageDailyCost = computed.threshold.averageDailyCost
+        dailyCostThreshold = computed.threshold.threshold
     }
 
     func refresh() async {
@@ -231,90 +380,6 @@ final class UsageStore {
         refreshCoordinator.stop()
     }
 
-    // MARK: - State Updates
-
-    /// Apply today's data immediately - enables fast UI display
-    private func applyTodayResult(_ result: TodayLoadResult) {
-        activeSession = result.session
-        burnRate = result.burnRate
-        autoTokenLimit = result.autoTokenLimit
-        todayEntries = result.todayEntries
-
-        // Only transition to .loadedToday on first load (cold start)
-        // Don't regress from .loaded to .loadedToday during refresh
-        if case .loaded = state {
-            // Keep existing .loaded state - don't flicker
-        } else {
-            state = .loadedToday(result.todayStats)
-        }
-
-        updateCalculatedProperties(stats: result.todayStats)
-        updateChartData()
-    }
-
-    /// Apply historical data - updates full stats
-    private func applyHistoryResult(_ result: FullLoadResult) {
-        state = .loaded(result.fullStats)
-
-        // Update threshold based on full historical data
-        updateDailyCostThreshold(stats: result.fullStats)
-    }
-
-    private func applyLoadResult(_ result: UsageLoadResult) {
-        activeSession = result.session
-        burnRate = result.burnRate
-        autoTokenLimit = result.autoTokenLimit
-        todayEntries = result.todayEntries
-        state = .loaded(result.fullStats)
-
-        updateCalculatedProperties(stats: result.todayStats)
-        updateChartData()
-    }
-
-    private func updateCalculatedProperties(stats: UsageStats) {
-        let todayValue = todaysCostValue
-        todaysCost = todayValue.asCurrency
-        todaysCostProgress = min(todayValue / dailyCostThreshold, 1.5)
-
-        todaySessionCount = activeSession != nil ? 1 : 0
-        estimatedDailySessions = stats.byDate.isEmpty ? 0 : max(1, stats.totalSessions / stats.byDate.count)
-
-        updateSessionProgress()
-        updateDailyCostThreshold(stats: stats)
-    }
-
-    private func updateSessionProgress() {
-        guard let session = activeSession else {
-            sessionTimeProgress = 0
-            sessionTokenProgress = 0
-            return
-        }
-
-        let elapsed = dateProvider.now.timeIntervalSince(session.startTime)
-        let total = session.endTime.timeIntervalSince(session.startTime)
-        sessionTimeProgress = min(elapsed / total, 1.5)
-
-        if let limit = autoTokenLimit, limit > 0 {
-            sessionTokenProgress = min(Double(session.tokenCounts.total) / Double(limit), 1.5)
-        }
-    }
-
-    private func updateDailyCostThreshold(stats: UsageStats) {
-        guard !stats.byDate.isEmpty else { return }
-
-        let recentDays = stats.byDate.suffix(7)
-        let totalRecentCost = recentDays.reduce(0.0) { $0 + $1.totalCost }
-        averageDailyCost = totalRecentCost / Double(recentDays.count)
-
-        if averageDailyCost > 0 {
-            dailyCostThreshold = max(averageDailyCost * 1.5, 10.0)
-        }
-    }
-
-    private func updateChartData() {
-        todayHourlyCosts = UsageAnalytics.todayHourlyCosts(from: todayEntries, referenceDate: dateProvider.now)
-    }
-
     // MARK: - Memory Management
 
     private func setupMemoryCleanupObserver() {
@@ -332,13 +397,7 @@ final class UsageStore {
     private func performMemoryCleanup() {
         performanceLogger.info("Performing memory cleanup")
 
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: dateProvider.now)
-
-        todayEntries = todayEntries.filter { entry in
-            guard let date = entry.date else { return false }
-            return calendar.startOfDay(for: date) == today
-        }
+        todayEntries = entriesForToday(todayEntries, referenceDate: dateProvider.now)
 
         if activeSession != nil {
             Task { await loadData() }
