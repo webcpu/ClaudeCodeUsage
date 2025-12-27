@@ -12,22 +12,32 @@ struct EmptyStateView: View {
     
     var body: some View {
         VStack(spacing: 20) {
-            Image(systemName: icon)
-                .font(.system(size: 60))
-                .foregroundColor(.secondary)
-            
-            Text(title)
-                .font(.title2)
-                .fontWeight(.semibold)
-                .foregroundColor(.secondary)
-            
-            Text(message)
-                .font(.body)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 400)
+            iconView
+            titleView
+            messageView
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.top, 100)
+    }
+
+    private var iconView: some View {
+        Image(systemName: icon)
+            .font(.system(size: 60))
+            .foregroundColor(.secondary)
+    }
+
+    private var titleView: some View {
+        Text(title)
+            .font(.title2)
+            .fontWeight(.semibold)
+            .foregroundColor(.secondary)
+    }
+
+    private var messageView: some View {
+        Text(message)
+            .font(.body)
+            .foregroundColor(.secondary)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: 400)
     }
 }
