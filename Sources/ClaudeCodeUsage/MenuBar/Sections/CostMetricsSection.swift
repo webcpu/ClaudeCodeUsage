@@ -47,7 +47,7 @@ struct CostMetricsSection: View {
                     .foregroundColor(MenuBarTheme.Colors.UI.secondaryText)
                 
                 HStack(spacing: 4) {
-                    Text(store.todaysCost)
+                    Text(store.formattedTodaysCost)
                         .font(MenuBarTheme.Typography.metricValue)
                         .foregroundColor(cachedTodaysCostColor)
                         .monospacedDigit()

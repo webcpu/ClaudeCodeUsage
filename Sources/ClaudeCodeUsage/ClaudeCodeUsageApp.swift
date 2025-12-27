@@ -68,7 +68,7 @@ struct MenuBarLabel: View {
         HStack(spacing: 4) {
             Image(systemName: appearance.icon)
                 .foregroundColor(appearance.color)
-            Text(store.todaysCost)
+            Text(store.formattedTodaysCost)
                 .font(.system(.body, design: .monospaced))
         }
     }
@@ -123,7 +123,7 @@ struct MenuBarContextMenu: View {
                     .foregroundColor(.green)
             }
 
-            Text("Today: \(store.formattedTodaysCost ?? "$0.00")")
+            Text("Today: \(store.formattedTodaysCost)")
 
             Divider()
 
@@ -169,7 +169,7 @@ private enum MenuBarAppearance {
     static func from(store: UsageStore) -> MenuBarAppearance {
         if let session = store.activeSession, session.isActive {
             return .active
-        } else if store.todaysCostValue > store.dailyCostThreshold {
+        } else if store.todaysCost > store.dailyCostThreshold {
             return .warning
         } else {
             return .normal
