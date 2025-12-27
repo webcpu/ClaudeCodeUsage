@@ -8,7 +8,7 @@ import SwiftUI
 // MARK: - Tooltip Builder
 
 /// Builder for creating customized tooltips
-public struct HeatmapTooltipBuilder {
+public struct HeatmapTooltipBuilder: @unchecked Sendable {
     private var day: HeatmapDay
     private var position: CGPoint
     private var style: HeatmapTooltip.TooltipStyle = .standard

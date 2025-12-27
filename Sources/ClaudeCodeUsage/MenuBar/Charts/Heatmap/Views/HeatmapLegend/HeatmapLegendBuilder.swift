@@ -8,7 +8,7 @@ import SwiftUI
 // MARK: - Legend Builder
 
 /// Builder pattern for creating customized legends
-public struct HeatmapLegendBuilder {
+public struct HeatmapLegendBuilder: @unchecked Sendable {
     private var colorTheme: HeatmapColorTheme = .github
     private var maxCost: Double = 0
     private var style: HeatmapLegend.LegendStyle = .horizontal

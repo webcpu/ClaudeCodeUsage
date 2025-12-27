@@ -11,7 +11,7 @@ import struct ClaudeLiveMonitorLib.LiveMonitorConfig
 
 // MARK: - Protocol
 
-protocol SessionMonitorService {
+protocol SessionMonitorService: Sendable {
     func getActiveSession() async -> SessionBlock?
     func getBurnRate() async -> BurnRate?
     func getAutoTokenLimit() async -> Int?
@@ -35,7 +35,7 @@ private func cacheAge(from timestamp: Date) -> TimeInterval {
 
 // MARK: - Default Implementation
 
-final class DefaultSessionMonitorService: SessionMonitorService {
+actor DefaultSessionMonitorService: SessionMonitorService {
     private let monitor: LiveMonitor
 
     private var cachedSession: (session: SessionBlock?, timestamp: Date)?
@@ -58,14 +58,18 @@ final class DefaultSessionMonitorService: SessionMonitorService {
             return cached.session
         }
 
-        let (result, duration) = await timed { await monitor.getActiveBlock() }
+        let start = Date()
+        let result = await monitor.getActiveBlock()
+        let duration = Date().timeIntervalSince(start)
         cachedSession = (result, Date())
         logFetch("getActiveSession", duration: duration, found: result != nil)
         return result
     }
 
     func getBurnRate() async -> BurnRate? {
-        let (result, duration) = await timed { await getActiveSession()?.burnRate }
+        let start = Date()
+        let result = await getActiveSession()?.burnRate
+        let duration = Date().timeIntervalSince(start)
         logFetch("getBurnRate", duration: duration, found: result != nil)
         return result
     }
@@ -76,7 +80,9 @@ final class DefaultSessionMonitorService: SessionMonitorService {
             return cached.limit
         }
 
-        let (result, duration) = await timed { await monitor.getAutoTokenLimit() }
+        let start = Date()
+        let result = await monitor.getAutoTokenLimit()
+        let duration = Date().timeIntervalSince(start)
         cachedTokenLimit = (result, Date())
         logFetch("getAutoTokenLimit", duration: duration, value: result)
         return result
@@ -112,13 +118,13 @@ private func logFetch(_ method: String, duration: TimeInterval, value: Int?) {
 // MARK: - Mock for Testing
 
 #if DEBUG
-final class MockSessionMonitorService: SessionMonitorService {
+final class MockSessionMonitorService: SessionMonitorService, @unchecked Sendable {
     var mockSession: SessionBlock?
     var mockBurnRate: BurnRate?
     var mockTokenLimit: Int?
 
-    func getActiveSession() -> SessionBlock? { mockSession }
-    func getBurnRate() -> BurnRate? { mockBurnRate }
-    func getAutoTokenLimit() -> Int? { mockTokenLimit }
+    func getActiveSession() async -> SessionBlock? { mockSession }
+    func getBurnRate() async -> BurnRate? { mockBurnRate }
+    func getAutoTokenLimit() async -> Int? { mockTokenLimit }
 }
 #endif

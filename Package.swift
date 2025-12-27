@@ -23,29 +23,24 @@ let package = Package(
         .package(path: "Packages/TimingMacro")
     ],
     targets: [
-        // Targets are the basic building blocks of a package, defining a module or a test suite.
-        // Targets can depend on other targets in this package and products from dependencies.
         .target(
             name: "ClaudeCodeUsageKit",
             dependencies: [
                 .product(name: "TimingMacro", package: "TimingMacro")
             ],
-            path: "Sources/ClaudeCodeUsageKit",
-            swiftSettings: [.swiftLanguageMode(.v5)]),
+            path: "Sources/ClaudeCodeUsageKit"),
         .executableTarget(
             name: "ClaudeCodeUsage",
             dependencies: [
                 "ClaudeCodeUsageKit",
                 .product(name: "ClaudeLiveMonitorLib", package: "ClaudeLiveMonitor")
             ],
-            path: "Sources/ClaudeCodeUsage",
-            swiftSettings: [.swiftLanguageMode(.v5)]),
+            path: "Sources/ClaudeCodeUsage"),
         .testTarget(
             name: "ClaudeCodeUsageKitTests",
             dependencies: ["ClaudeCodeUsageKit"],
             path: "Tests/ClaudeCodeUsageKitTests",
             swiftSettings: [
-                .swiftLanguageMode(.v5),
                 .unsafeFlags(["-enable-testing"]),
                 .define("ENABLE_CODE_COVERAGE", .when(configuration: .debug))
             ]),
@@ -58,7 +53,6 @@ let package = Package(
             ],
             path: "Tests/ClaudeCodeUsageTests",
             swiftSettings: [
-                .swiftLanguageMode(.v5),
                 .unsafeFlags(["-enable-testing"]),
                 .define("ENABLE_CODE_COVERAGE", .when(configuration: .debug))
             ]),

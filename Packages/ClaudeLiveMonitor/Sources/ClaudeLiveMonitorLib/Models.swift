@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - Data Models
 
-public struct TokenCounts {
+public struct TokenCounts: Sendable {
     public let inputTokens: Int
     public let outputTokens: Int
     public let cacheCreationInputTokens: Int
@@ -21,7 +21,7 @@ public struct TokenCounts {
     }
 }
 
-public struct UsageEntry {
+public struct UsageEntry: Sendable {
     public let timestamp: Date
     public let usage: TokenCounts
     public let costUSD: Double
@@ -45,7 +45,7 @@ public struct UsageEntry {
     }
 }
 
-public struct BurnRate {
+public struct BurnRate: Sendable {
     public let tokensPerMinute: Int
     public let tokensPerMinuteForIndicator: Int
     public let costPerHour: Double
@@ -57,7 +57,7 @@ public struct BurnRate {
     }
 }
 
-public struct ProjectedUsage {
+public struct ProjectedUsage: Sendable {
     public let totalTokens: Int
     public let totalCost: Double
     public let remainingMinutes: Double
@@ -69,7 +69,7 @@ public struct ProjectedUsage {
     }
 }
 
-public struct SessionBlock {
+public struct SessionBlock: Sendable {
     public let id: String
     public let startTime: Date
     public let endTime: Date
@@ -106,7 +106,7 @@ public struct SessionBlock {
 
 // MARK: - Model Pricing
 
-public struct ModelPricing {
+public struct ModelPricing: Sendable {
     public let inputCostPerToken: Double
     public let outputCostPerToken: Double
     public let cacheCreationCostPerToken: Double

@@ -354,7 +354,9 @@ private enum SystemMemory {
     static func fetchSystemInfo() -> Info {
         let totalMemory = Int64(ProcessInfo.processInfo.physicalMemory)
 
-        let pageSize = vm_kernel_page_size
+        // Use getpagesize() which is thread-safe and avoids Swift 6 concurrency issues
+        let pageSize = vm_size_t(getpagesize())
+
         var vmStats = vm_statistics64()
         var vmStatsSize = mach_msg_type_number_t(
             MemoryLayout<vm_statistics64>.size / MemoryLayout<natural_t>.size

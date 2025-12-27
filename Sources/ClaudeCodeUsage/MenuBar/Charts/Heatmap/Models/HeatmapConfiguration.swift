@@ -12,7 +12,7 @@ import Foundation
 // MARK: - Configuration Struct
 
 /// Configuration settings for heatmap appearance and behavior
-public struct HeatmapConfiguration: Equatable {
+public struct HeatmapConfiguration: Equatable, @unchecked Sendable {
     
     // MARK: - Layout Settings
     
@@ -177,7 +177,7 @@ public struct HeatmapConfiguration: Equatable {
 // MARK: - Color Themes
 
 /// Predefined color themes for heatmap visualization
-public enum HeatmapColorTheme: String, CaseIterable, Equatable {
+public enum HeatmapColorTheme: String, CaseIterable, Equatable, @unchecked Sendable {
     case github = "github"
     case ocean = "ocean"
     case sunset = "sunset"
@@ -275,7 +275,7 @@ public struct HeatmapLayoutConstants {
 // MARK: - Accessibility Settings
 
 /// Accessibility configuration for the heatmap
-public struct HeatmapAccessibility: Equatable {
+public struct HeatmapAccessibility: Equatable, Sendable {
     
     /// Whether to provide accessibility labels
     public let enableAccessibilityLabels: Bool
@@ -337,7 +337,7 @@ private enum DayLabelsConstants {
 /// Validation rules for configuration parameters
 private enum ValidationRules {
     /// All validation rules as closures that return optional error message
-    static let rules: [(HeatmapConfiguration) -> String?] = [
+    static let rules: [@Sendable (HeatmapConfiguration) -> String?] = [
         { $0.squareSize <= 0 ? "Square size must be greater than 0" : nil },
         { $0.spacing < 0 ? "Spacing cannot be negative" : nil },
         { $0.cornerRadius < 0 ? "Corner radius cannot be negative" : nil },

@@ -111,16 +111,16 @@ struct UsageRepositoryErrorTests {
             file: "/path/to/file.swift",
             function: "testFunction()",
             line: 42,
-            additionalInfo: ["key": "value", "count": 10]
+            additionalInfo: ["key": "value", "count": "10"]
         )
-        
+
         // Then
         #expect(context.file == "file.swift")
         #expect(context.function == "testFunction()")
         #expect(context.line == 42)
-        #expect(context.additionalInfo["key"] as? String == "value")
-        #expect(context.additionalInfo["count"] as? Int == 10)
-        
+        #expect(context.additionalInfo["key"] == "value")
+        #expect(context.additionalInfo["count"] == "10")
+
         let description = context.description
         #expect(description.contains("file.swift"))
         #expect(description.contains("42"))
@@ -145,32 +145,38 @@ struct UsageRepositoryErrorTests {
     @Test("Should execute retry strategy")
     func testRetryStrategy() async throws {
         // Given
-        var attemptCount = 0
+        final class Counter: @unchecked Sendable {
+            var count = 0
+        }
+        let counter = Counter()
         let strategy = ErrorRecoveryStrategy.retry(maxAttempts: 3, delay: 0.01)
-        
+
         // When - Operation that fails twice then succeeds
         let result = try await strategy.execute(
             operation: {
-                attemptCount += 1
-                if attemptCount < 3 {
+                counter.count += 1
+                if counter.count < 3 {
                     throw TestError.temporary
                 }
                 return 42
             },
             onError: { _ in }
         )
-        
+
         // Then
         #expect(result == 42)
-        #expect(attemptCount == 3)
+        #expect(counter.count == 3)
     }
     
     @Test("Should fail after max retry attempts")
     func testRetryStrategyFailure() async {
         // Given
+        final class Counter: @unchecked Sendable {
+            var count = 0
+        }
+        let counter = Counter()
         let strategy = ErrorRecoveryStrategy.retry(maxAttempts: 2, delay: 0.01)
-        var errorCount = 0
-        
+
         // When/Then
         await #expect(throws: TestError.self) {
             _ = try await strategy.execute(
@@ -178,54 +184,60 @@ struct UsageRepositoryErrorTests {
                     throw TestError.permanent
                 },
                 onError: { _ in
-                    errorCount += 1
+                    counter.count += 1
                 }
             )
         }
-        
-        #expect(errorCount == 2)
+
+        #expect(counter.count == 2)
     }
     
     @Test("Should execute skip strategy")
     func testSkipStrategy() async throws {
         // Given
+        final class FlagHolder: @unchecked Sendable {
+            var handled = false
+        }
+        let holder = FlagHolder()
         let strategy = ErrorRecoveryStrategy.skip
-        var errorHandled = false
-        
+
         // When
-        let result = try await strategy.execute(
+        let result: Void? = try await strategy.execute(
             operation: {
                 throw TestError.temporary
             },
             onError: { _ in
-                errorHandled = true
+                holder.handled = true
             }
         )
-        
+
         // Then
         #expect(result == nil)
-        #expect(errorHandled == true)
+        #expect(holder.handled == true)
     }
     
     @Test("Should execute fallback strategy")
     func testFallbackStrategy() async throws {
         // Given
-        var fallbackExecuted = false
-        let strategy = ErrorRecoveryStrategy.fallback {
-            fallbackExecuted = true
+        final class FlagHolder: @unchecked Sendable {
+            var executed = false
         }
-        
+        let holder = FlagHolder()
+        let strategy = ErrorRecoveryStrategy.fallback {
+            holder.executed = true
+        }
+
         // When
-        let result = try await strategy.execute(
+        let result: Void? = try await strategy.execute(
             operation: {
                 throw TestError.temporary
             },
             onError: { _ in }
         )
-        
+
         // Then
         #expect(result == nil)
-        #expect(fallbackExecuted == true)
+        #expect(holder.executed == true)
     }
     
     @Test("Should abort on error with abort strategy")
@@ -312,46 +324,52 @@ struct UsageRepositoryErrorTests {
     }
     
     // MARK: - Task Retry Extension Tests
-    
+
     @Test("Should retry task with exponential backoff")
     func testTaskRetrying() async throws {
         // Given
-        var attemptCount = 0
-        
+        final class Counter: @unchecked Sendable {
+            var count = 0
+        }
+        let counter = Counter()
+
         // When
         let result = try await Task.retrying(
             maxRetryCount: 3,
             initialDelay: 0.01
         ) {
-            attemptCount += 1
-            if attemptCount < 2 {
+            counter.count += 1
+            if counter.count < 2 {
                 throw TestError.temporary
             }
             return "success"
         }
-        
+
         // Then
         #expect(result == "success")
-        #expect(attemptCount == 2)
+        #expect(counter.count == 2)
     }
-    
+
     @Test("Should fail task after max retries")
     func testTaskRetryingFailure() async {
         // Given
-        var attemptCount = 0
-        
+        final class Counter: @unchecked Sendable {
+            var count = 0
+        }
+        let counter = Counter()
+
         // When/Then
         await #expect(throws: TestError.self) {
             _ = try await Task.retrying(
                 maxRetryCount: 2,
                 initialDelay: 0.01
             ) {
-                attemptCount += 1
+                counter.count += 1
                 throw TestError.permanent
             }
         }
-        
-        #expect(attemptCount == 2)
+
+        #expect(counter.count == 2)
     }
 }
 

@@ -31,7 +31,7 @@ private enum DateFormat {
 
 // MARK: - File Metadata
 
-private struct FileMetadata {
+private struct FileMetadata: Sendable {
     let path: String
     let projectDir: String
     let earliestTimestamp: String
@@ -297,44 +297,51 @@ public actor UsageRepository {
         from files: [FileMetadata],
         deduplication: Deduplication
     ) async -> [UsageEntry] {
-        await withTaskGroup(of: [UsageEntry].self) { group in
+        // Parse files in parallel (nonisolated, pure function)
+        let results = await withTaskGroup(of: (FileMetadata, [UsageEntry]).self) { group in
             for file in files {
-                group.addTask { await self.parseFile(file, deduplication: deduplication) }
+                group.addTask {
+                    let entries = FileParser.parse(file, deduplication: deduplication)
+                    return (file, entries)
+                }
             }
-            return await group.reduce(into: []) { $0.append(contentsOf: $1) }
+            var allResults: [(FileMetadata, [UsageEntry])] = []
+            for await result in group {
+                allResults.append(result)
+            }
+            return allResults
         }
+
+        // Cache results on actor (isolated)
+        var allEntries: [UsageEntry] = []
+        for (file, entries) in results {
+            fileCache[file.path] = CachedFile(
+                modificationDate: file.modificationDate,
+                entries: entries
+            )
+            allEntries.append(contentsOf: entries)
+        }
+        return allEntries
     }
 
     private func loadEntriesInBatches(
         from files: [FileMetadata],
         deduplication: Deduplication
     ) async -> [UsageEntry] {
-        await stride(from: 0, to: files.count, by: Threshold.batchSize)
-            .asyncFlatMap { startIndex in
-                let endIndex = min(startIndex + Threshold.batchSize, files.count)
-                let batch = Array(files[startIndex..<endIndex])
-                return await self.loadEntriesInParallel(from: batch, deduplication: deduplication)
-            }
+        var allEntries: [UsageEntry] = []
+        for startIndex in stride(from: 0, to: files.count, by: Threshold.batchSize) {
+            let endIndex = min(startIndex + Threshold.batchSize, files.count)
+            let batch = Array(files[startIndex..<endIndex])
+            let batchEntries = await loadEntriesInParallel(from: batch, deduplication: deduplication)
+            allEntries.append(contentsOf: batchEntries)
+        }
+        return allEntries
     }
 
     // MARK: - File Parsing
 
     private func parseFile(_ file: FileMetadata, deduplication: Deduplication) -> [UsageEntry] {
-        guard let fileData = try? Data(contentsOf: URL(fileURLWithPath: file.path)) else {
-            return []
-        }
-
-        let projectPath = PathDecoder.decode(file.projectDir)
-        let entries = LineScanner.extractRanges(from: fileData)
-            .compactMap { range -> UsageEntry? in
-                let lineData = fileData[range]
-                guard JSONValidator.isValidObject(lineData),
-                      let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
-                      deduplication.shouldInclude(json: json) else {
-                    return nil
-                }
-                return EntryParser.parse(json, projectPath: projectPath)
-            }
+        let entries = FileParser.parse(file, deduplication: deduplication)
 
         // Cache parsed entries for future use
         fileCache[file.path] = CachedFile(
@@ -475,6 +482,27 @@ private enum EntryParser {
         var hasUsage: Bool {
             input > 0 || output > 0 || cacheWrite > 0 || cacheRead > 0
         }
+    }
+}
+
+private enum FileParser {
+    /// Pure file parsing function - no actor isolation, safe for concurrent execution
+    static func parse(_ file: FileMetadata, deduplication: Deduplication) -> [UsageEntry] {
+        guard let fileData = try? Data(contentsOf: URL(fileURLWithPath: file.path)) else {
+            return []
+        }
+
+        let projectPath = PathDecoder.decode(file.projectDir)
+        return LineScanner.extractRanges(from: fileData)
+            .compactMap { range -> UsageEntry? in
+                let lineData = fileData[range]
+                guard JSONValidator.isValidObject(lineData),
+                      let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
+                      deduplication.shouldInclude(json: json) else {
+                    return nil
+                }
+                return EntryParser.parse(json, projectPath: projectPath)
+            }
     }
 }
 
@@ -664,7 +692,7 @@ private extension UsageStats {
 // MARK: - Async Helpers
 
 private extension StrideTo where Element == Int {
-    func asyncFlatMap<T>(_ transform: @escaping (Int) async -> [T]) async -> [T] {
+    func asyncFlatMap<T: Sendable>(_ transform: @escaping @Sendable (Int) async -> [T]) async -> [T] {
         var results: [T] = []
         for element in self {
             results.append(contentsOf: await transform(element))

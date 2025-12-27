@@ -117,24 +117,24 @@ public enum UsageRepositoryError: LocalizedError {
 }
 
 /// Error context for detailed debugging
-public struct ErrorContext {
+public struct ErrorContext: Sendable {
     public let file: String
     public let function: String
     public let line: Int
-    public let additionalInfo: [String: Any]
-    
+    public let additionalInfo: [String: String]
+
     public init(
         file: String = #file,
         function: String = #function,
         line: Int = #line,
-        additionalInfo: [String: Any] = [:]
+        additionalInfo: [String: String] = [:]
     ) {
         self.file = URL(fileURLWithPath: file).lastPathComponent
         self.function = function
         self.line = line
         self.additionalInfo = additionalInfo
     }
-    
+
     public var description: String {
         var desc = "[\(file):\(line)] in \(function)"
         if !additionalInfo.isEmpty {
@@ -146,38 +146,38 @@ public struct ErrorContext {
 }
 
 /// Enhanced error with context
-public struct EnhancedError: LocalizedError {
+public struct EnhancedError: LocalizedError, @unchecked Sendable {
     public let baseError: Error
     public let context: ErrorContext
-    
+
     public init(_ error: Error, context: ErrorContext) {
         self.baseError = error
         self.context = context
     }
-    
+
     public var errorDescription: String? {
         if let localizedError = baseError as? LocalizedError {
             return localizedError.errorDescription
         }
         return baseError.localizedDescription
     }
-    
+
     public var failureReason: String? {
         context.description
     }
 }
 
 /// Error recovery strategies
-public enum ErrorRecoveryStrategy {
+public enum ErrorRecoveryStrategy: Sendable {
     case retry(maxAttempts: Int, delay: TimeInterval)
     case skip
-    case fallback(handler: () async throws -> Void)
+    case fallback(handler: @Sendable () async throws -> Void)
     case abort
-    
+
     /// Execute recovery strategy
-    public func execute<T>(
-        operation: () async throws -> T,
-        onError: (Error) -> Void = { _ in }
+    public func execute<T: Sendable>(
+        operation: @Sendable () async throws -> T,
+        onError: @Sendable (Error) -> Void = { _ in }
     ) async throws -> T? {
         switch self {
         case .retry(let maxAttempts, let delay):
@@ -286,7 +286,7 @@ public extension Task where Failure == Error {
     static func retrying(
         maxRetryCount: Int = 3,
         initialDelay: TimeInterval = 1.0,
-        operation: @escaping () async throws -> Success
+        operation: @escaping @Sendable () async throws -> Success
     ) async throws -> Success {
         var currentDelay = initialDelay
         

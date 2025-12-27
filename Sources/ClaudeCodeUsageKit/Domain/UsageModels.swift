@@ -11,13 +11,13 @@ import Foundation
 
 /// Static formatters to avoid re-allocation on every date parse (16,600+ calls)
 private enum DateFormatters {
-    static let withFractionalSeconds: ISO8601DateFormatter = {
+    nonisolated(unsafe) static let withFractionalSeconds: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter
     }()
 
-    static let basic: ISO8601DateFormatter = {
+    nonisolated(unsafe) static let basic: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
         return formatter
@@ -27,7 +27,7 @@ private enum DateFormatters {
 // MARK: - Core Usage Models
 
 /// Represents a single usage entry
-public struct UsageEntry: Codable {
+public struct UsageEntry: Codable, Sendable {
     public let project: String
     public let timestamp: String
     public let model: String
@@ -89,7 +89,7 @@ public struct UsageEntry: Codable {
 }
 
 /// Usage statistics aggregated by model
-public struct ModelUsage: Codable {
+public struct ModelUsage: Codable, Sendable {
     public let model: String
     public let totalCost: Double
     public let totalTokens: Int
@@ -122,7 +122,7 @@ public struct ModelUsage: Codable {
 }
 
 /// Daily usage statistics
-public struct DailyUsage: Codable {
+public struct DailyUsage: Codable, Sendable {
     public let date: String
     public let totalCost: Double
     public let totalTokens: Int
@@ -156,7 +156,7 @@ public struct DailyUsage: Codable {
 }
 
 /// Project usage statistics
-public struct ProjectUsage: Codable {
+public struct ProjectUsage: Codable, Sendable {
     public let projectPath: String
     public let projectName: String
     public let totalCost: Double
@@ -185,7 +185,7 @@ public struct ProjectUsage: Codable {
 }
 
 /// Overall usage statistics
-public struct UsageStats: Codable {
+public struct UsageStats: Codable, Sendable {
     public let totalCost: Double
     public let totalTokens: Int
     public let totalInputTokens: Int
@@ -343,7 +343,7 @@ extension ProjectUsage: Identifiable {
 // MARK: - Model Pricing
 
 /// Claude model pricing information
-public struct ModelPricing {
+public struct ModelPricing: Sendable {
     public let model: String
     public let inputPricePerMillion: Double
     public let outputPricePerMillion: Double

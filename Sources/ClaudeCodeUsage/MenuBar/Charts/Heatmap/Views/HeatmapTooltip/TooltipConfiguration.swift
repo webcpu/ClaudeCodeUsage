@@ -8,7 +8,7 @@ import SwiftUI
 // MARK: - Tooltip Configuration
 
 /// Configuration for tooltip appearance and behavior
-public struct TooltipConfiguration {
+public struct TooltipConfiguration: @unchecked Sendable {
 
     /// Background material
     public let backgroundMaterial: Material

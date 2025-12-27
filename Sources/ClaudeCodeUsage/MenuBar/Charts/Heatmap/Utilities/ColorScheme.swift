@@ -29,7 +29,7 @@ private enum IntensityLevel {
 // MARK: - Color Manager
 
 /// Advanced color management for heatmap visualizations
-public final class HeatmapColorManager {
+public final class HeatmapColorManager: @unchecked Sendable {
 
     // MARK: - Singleton
 
@@ -86,9 +86,7 @@ public final class HeatmapColorManager {
 
     /// Clear color cache to free memory
     public func clearCache() {
-        cacheQueue.async { [weak self] in
-            self?.colorCache.removeAll()
-        }
+        colorCache.removeAll()
     }
 
     // MARK: - Color Calculation (Mid Level)
@@ -135,7 +133,6 @@ public final class HeatmapColorManager {
     // MARK: - Caching (Infrastructure)
 
     private var colorCache: [ColorCacheKey: Color] = [:]
-    private let cacheQueue = DispatchQueue(label: "heatmap.color.cache", qos: .userInitiated)
 
     private struct ColorCacheKey: Hashable {
         let cost: Double
@@ -169,9 +166,7 @@ public final class HeatmapColorManager {
         variation: ColorVariation
     ) {
         let cacheKey = ColorCacheKey(cost: cost, maxCost: maxCost, theme: theme, variation: variation)
-        cacheQueue.async { [weak self] in
-            self?.colorCache[cacheKey] = color
-        }
+        colorCache[cacheKey] = color
     }
 
     // MARK: - Color Variations (Low Level)
@@ -195,7 +190,7 @@ public final class HeatmapColorManager {
 // MARK: - Color Distribution
 
 /// Statistics about color distribution in a heatmap
-public struct ColorDistribution {
+public struct ColorDistribution: Sendable {
     public let totalItems: Int
     public let levelCounts: [Int] // Count for each of the 5 color levels
     public let maxCost: Double
@@ -293,7 +288,7 @@ public extension HeatmapColorTheme {
 // MARK: - Performance Optimizations
 
 /// Performance-optimized color utilities
-public struct HeatmapColorPerformance {
+public struct HeatmapColorPerformance: Sendable {
     
     /// Pre-computed color lookup table for common cost ranges
     public static func buildColorLUT(

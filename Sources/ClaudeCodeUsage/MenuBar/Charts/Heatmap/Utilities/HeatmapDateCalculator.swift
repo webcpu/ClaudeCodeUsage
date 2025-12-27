@@ -6,7 +6,7 @@
 import Foundation
 
 /// Utility class for date calculations in heatmap generation
-public final class HeatmapDateCalculator {
+public final class HeatmapDateCalculator: @unchecked Sendable {
 
     // MARK: - Singleton
 

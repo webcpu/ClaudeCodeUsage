@@ -8,7 +8,7 @@ import Observation
 
 // MARK: - Configuration
 
-public struct AppConfiguration {
+public struct AppConfiguration: Sendable {
     let basePath: String
     let refreshInterval: TimeInterval
     let sessionDurationHours: Double
