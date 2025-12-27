@@ -93,7 +93,7 @@ public actor UsageRepository {
         let files = try discoverFiles(in: projectsPath)
         let entries = await loadEntries(from: files)
 
-        logger.debug("Loaded \(entries.count) entries from \(files.count) files")
+        logger.debug("Entries: \(entries.count) from \(files.count) files")
 
         return Aggregator.aggregate(entries, sessionCount: countSessions(in: files))
     }
@@ -122,7 +122,7 @@ public actor UsageRepository {
         let allFiles = try discoverFiles(in: projectsPath)
         let todayFiles = filterFilesModifiedToday(allFiles)
 
-        logger.debug("Today's files: \(todayFiles.count) of \(allFiles.count) total")
+        logger.debug("Files: \(todayFiles.count) today / \(allFiles.count) total")
 
         // Load entries with fresh deduplication to allow re-loading on refresh
         let entries = await loadEntriesForToday(from: todayFiles)
@@ -281,7 +281,7 @@ public actor UsageRepository {
             newEntries = loadEntriesSequentially(from: dirtyFiles, deduplication: globalDeduplication)
         }
 
-        logger.debug("Cache: \(files.count - dirtyFiles.count) cached, \(dirtyFiles.count) loaded")
+        logger.debug("Cache: \(files.count - dirtyFiles.count) hit / \(dirtyFiles.count) miss")
 
         return cachedEntries + newEntries
     }

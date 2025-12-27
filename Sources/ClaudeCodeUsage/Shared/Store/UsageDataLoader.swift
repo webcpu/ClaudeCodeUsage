@@ -47,19 +47,19 @@ actor UsageDataLoader {
 
     /// Load today's data only - fast path for immediate UI display
     func loadToday() async throws -> TodayLoadResult {
-        async let todayEntriesTask = repository.getTodayUsageEntries()
-        async let todayStatsTask = repository.getTodayUsageStats()
-        async let sessionTask = sessionMonitorService.getActiveSession()
-        async let burnRateTask = sessionMonitorService.getBurnRate()
-        async let tokenLimitTask = sessionMonitorService.getAutoTokenLimit()
+        await LoadTrace.shared.phaseStart(.today)
 
-        let (todayEntries, todayStats, session, burnRate, tokenLimit) = await (
-            try todayEntriesTask,
-            try todayStatsTask,
-            sessionTask,
-            burnRateTask,
-            tokenLimitTask
-        )
+        // Load entries once, derive stats from them (avoid duplicate fetch)
+        async let todayEntriesTask = repository.getTodayUsageEntries()
+        async let sessionTask = fetchSession()
+        async let tokenLimitTask = fetchTokenLimit()
+
+        let todayEntries = try await todayEntriesTask
+        let todayStats = deriveStats(from: todayEntries)
+        let (session, burnRate) = await sessionTask
+        let tokenLimit = await tokenLimitTask
+
+        await LoadTrace.shared.phaseComplete(.today)
 
         return TodayLoadResult(
             todayEntries: todayEntries,
@@ -72,7 +72,9 @@ actor UsageDataLoader {
 
     /// Load full historical data - slower path for complete stats
     func loadHistory() async throws -> FullLoadResult {
+        await LoadTrace.shared.phaseStart(.history)
         let fullStats = try await repository.getUsageStats()
+        await LoadTrace.shared.phaseComplete(.history)
         return FullLoadResult(fullStats: fullStats)
     }
 
@@ -88,6 +90,54 @@ actor UsageDataLoader {
             session: today.session,
             burnRate: today.burnRate,
             autoTokenLimit: today.autoTokenLimit
+        )
+    }
+
+    // MARK: - Session Fetching with Tracing
+
+    private func fetchSession() async -> (SessionBlock?, BurnRate?) {
+        let start = Date()
+        let session = await sessionMonitorService.getActiveSession()
+        let duration = Date().timeIntervalSince(start)
+
+        await LoadTrace.shared.recordSession(
+            found: session != nil,
+            cached: duration < 0.05,
+            duration: duration
+        )
+
+        return (session, session?.burnRate)
+    }
+
+    private func fetchTokenLimit() async -> Int? {
+        let start = Date()
+        let limit = await sessionMonitorService.getAutoTokenLimit()
+        let duration = Date().timeIntervalSince(start)
+
+        await LoadTrace.shared.recordTokenLimit(
+            limit: limit,
+            cached: duration < 0.05,
+            duration: duration
+        )
+
+        return limit
+    }
+
+    // MARK: - Stats Derivation
+
+    private func deriveStats(from entries: [UsageEntry]) -> UsageStats {
+        let sessionCount = Set(entries.compactMap(\.sessionId)).count
+        return UsageStats(
+            totalCost: entries.reduce(0) { $0 + $1.cost },
+            totalTokens: entries.reduce(0) { $0 + $1.totalTokens },
+            totalInputTokens: entries.reduce(0) { $0 + $1.inputTokens },
+            totalOutputTokens: entries.reduce(0) { $0 + $1.outputTokens },
+            totalCacheCreationTokens: entries.reduce(0) { $0 + $1.cacheWriteTokens },
+            totalCacheReadTokens: entries.reduce(0) { $0 + $1.cacheReadTokens },
+            totalSessions: sessionCount,
+            byModel: [],
+            byDate: [],
+            byProject: []
         )
     }
 }

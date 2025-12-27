@@ -8,10 +8,6 @@ import Observation
 import ClaudeCodeUsageKit
 import struct ClaudeLiveMonitorLib.SessionBlock
 import struct ClaudeLiveMonitorLib.BurnRate
-import OSLog
-import TimingMacro
-
-private let performanceLogger = Logger(subsystem: "com.claudecodeusage", category: "StorePerformance")
 
 // MARK: - View State
 
@@ -163,15 +159,14 @@ final class UsageStore {
         refreshCoordinator.start()
     }
 
-    @Timed
     func loadData() async {
         guard !isCurrentlyLoading, !isLoadedRecently else { return }
 
         isCurrentlyLoading = true
         defer { isCurrentlyLoading = false }
 
-        let startTime = dateProvider.now
-        lastLoadStartTime = startTime
+        lastLoadStartTime = dateProvider.now
+        _ = await LoadTrace.shared.start()
 
         do {
             let todayResult = try await dataLoader.loadToday()
@@ -180,7 +175,7 @@ final class UsageStore {
             let historyResult = try await dataLoader.loadHistory()
             apply(historyResult)
 
-            logPerformance(startTime: startTime)
+            await LoadTrace.shared.complete()
         } catch {
             state = .error(error)
         }
@@ -238,15 +233,11 @@ final class UsageStore {
     }
 
     private func performMemoryCleanup() {
-        performanceLogger.info("Performing memory cleanup")
-
         todayEntries = filterToday(todayEntries, referenceDate: dateProvider.now)
 
         if activeSession != nil {
             Task { await loadData() }
         }
-
-        performanceLogger.info("Memory cleanup completed")
     }
 
     // MARK: - Helpers
@@ -254,13 +245,6 @@ final class UsageStore {
     private var isLoadedRecently: Bool {
         guard let lastTime = lastLoadStartTime else { return false }
         return dateProvider.now.timeIntervalSince(lastTime) < 0.5
-    }
-
-    private func logPerformance(startTime: Date) {
-        let totalTime = dateProvider.now.timeIntervalSince(startTime)
-        if totalTime > 2.0 {
-            performanceLogger.warning("Slow data load: \(String(format: "%.2f", totalTime))s")
-        }
     }
 
     deinit {
