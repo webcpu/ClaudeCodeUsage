@@ -33,7 +33,8 @@ private enum ContentState {
     static func from(store: UsageStore) -> ContentState {
         if store.isLoading { return .loading }
         guard let stats = store.stats else { return .error }
-        return stats.byModel.isEmpty ? .empty : .loaded(models: stats.byModel, totalCost: stats.totalCost)
+        let sortedModels = stats.byModel.sorted { $0.totalCost > $1.totalCost }
+        return sortedModels.isEmpty ? .empty : .loaded(models: sortedModels, totalCost: stats.totalCost)
     }
 }
 
