@@ -7,37 +7,72 @@ import SwiftUI
 
 @available(macOS 13.0, *)
 struct ColorService {
-    
-    // MARK: - Percentage-based Colors
+
+    // MARK: - Public API
+
     static func colorForPercentage(_ percentage: Double) -> Color {
-        switch percentage {
-        case 0..<MenuBarTheme.Thresholds.Percentage.low:
-            return MenuBarTheme.Colors.Status.active
-        case MenuBarTheme.Thresholds.Percentage.low..<MenuBarTheme.Thresholds.Percentage.medium:
-            return MenuBarTheme.Colors.Status.warning
-        case MenuBarTheme.Thresholds.Percentage.medium..<MenuBarTheme.Thresholds.Percentage.high:
-            return MenuBarTheme.Colors.Status.warning
-        default:
-            return MenuBarTheme.Colors.Status.critical
-        }
+        color(for: percentage, using: percentageThresholds)
     }
-    
-    // MARK: - Cost Progress Colors
+
     static func colorForCostProgress(_ progress: Double) -> Color {
-        switch progress {
-        case 0..<MenuBarTheme.Thresholds.Cost.normal:
-            return MenuBarTheme.Colors.Status.active
-        case MenuBarTheme.Thresholds.Cost.normal..<MenuBarTheme.Thresholds.Cost.warning:
-            return MenuBarTheme.Colors.Status.warning
-        case MenuBarTheme.Thresholds.Cost.warning..<MenuBarTheme.Thresholds.Cost.critical:
-            return MenuBarTheme.Colors.Status.warning
-        default:
-            return MenuBarTheme.Colors.Status.critical
-        }
+        color(for: progress, using: costProgressThresholds)
     }
-    
-    // MARK: - Session Time Progress Segments
+
     static func sessionTimeSegments() -> [ProgressSegment] {
+        timeSegmentRanges
+    }
+
+    static func sessionTokenSegments() -> [ProgressSegment] {
+        tokenSegmentRanges
+    }
+
+    static func singleColorSegment(color: Color) -> [ProgressSegment] {
+        [ProgressSegment(range: 0...1.0, color: color)]
+    }
+
+    // MARK: - Threshold Lookup (Pure Function)
+
+    private static func color(
+        for value: Double,
+        using thresholds: [ColorThreshold]
+    ) -> Color {
+        thresholds
+            .first { value < $0.upperBound }
+            .map(\.color)
+            ?? MenuBarTheme.Colors.Status.critical
+    }
+
+    // MARK: - Threshold Definitions
+
+    private static var percentageThresholds: [ColorThreshold] {
+        [
+            ColorThreshold(
+                upperBound: MenuBarTheme.Thresholds.Percentage.low,
+                color: MenuBarTheme.Colors.Status.active
+            ),
+            ColorThreshold(
+                upperBound: MenuBarTheme.Thresholds.Percentage.high,
+                color: MenuBarTheme.Colors.Status.warning
+            ),
+        ]
+    }
+
+    private static var costProgressThresholds: [ColorThreshold] {
+        [
+            ColorThreshold(
+                upperBound: MenuBarTheme.Thresholds.Cost.normal,
+                color: MenuBarTheme.Colors.Status.active
+            ),
+            ColorThreshold(
+                upperBound: MenuBarTheme.Thresholds.Cost.critical,
+                color: MenuBarTheme.Colors.Status.warning
+            ),
+        ]
+    }
+
+    // MARK: - Segment Definitions
+
+    private static var timeSegmentRanges: [ProgressSegment] {
         [
             ProgressSegment(
                 range: 0...MenuBarTheme.Thresholds.Sessions.timeSegments.low,
@@ -50,12 +85,11 @@ struct ColorService {
             ProgressSegment(
                 range: MenuBarTheme.Thresholds.Sessions.timeSegments.medium...MenuBarTheme.Thresholds.Sessions.timeSegments.max,
                 color: MenuBarTheme.Colors.ProgressSegments.red
-            )
+            ),
         ]
     }
-    
-    // MARK: - Session Token Progress Segments
-    static func sessionTokenSegments() -> [ProgressSegment] {
+
+    private static var tokenSegmentRanges: [ProgressSegment] {
         [
             ProgressSegment(
                 range: 0...MenuBarTheme.Thresholds.Sessions.tokenSegments.low,
@@ -68,17 +102,19 @@ struct ColorService {
             ProgressSegment(
                 range: MenuBarTheme.Thresholds.Sessions.tokenSegments.medium...MenuBarTheme.Thresholds.Sessions.tokenSegments.max,
                 color: MenuBarTheme.Colors.ProgressSegments.red
-            )
+            ),
         ]
-    }
-    
-    // MARK: - Single Color Segments (for simple progress bars)
-    static func singleColorSegment(color: Color) -> [ProgressSegment] {
-        [ProgressSegment(range: 0...1.0, color: color)]
     }
 }
 
 // MARK: - Supporting Types
+
+@available(macOS 13.0, *)
+private struct ColorThreshold {
+    let upperBound: Double
+    let color: Color
+}
+
 @available(macOS 13.0, *)
 struct ProgressSegment {
     let range: ClosedRange<Double>
