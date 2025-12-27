@@ -76,14 +76,21 @@ private struct AnalyticsCards: View {
 private struct AnalyticsHeader: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Analytics")
-                .font(.largeTitle)
-                .fontWeight(.bold)
-
-            Text("Insights and predictions based on your usage")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+            titleView
+            subtitleView
         }
+    }
+
+    private var titleView: some View {
+        Text("Analytics")
+            .font(.largeTitle)
+            .fontWeight(.bold)
+    }
+
+    private var subtitleView: some View {
+        Text("Insights and predictions based on your usage")
+            .font(.subheadline)
+            .foregroundColor(.secondary)
     }
 }
 
@@ -106,14 +113,37 @@ private struct TokenDistributionCard: View {
 
     var body: some View {
         AnalyticsCard(title: "Token Distribution", icon: "chart.pie", color: .blue) {
-            let breakdown = UsageAnalytics.tokenBreakdown(from: stats)
-            VStack(spacing: 12) {
-                TokenRow(label: "Input", percentage: breakdown.inputPercentage, icon: "arrow.right.circle", color: .blue)
-                TokenRow(label: "Output", percentage: breakdown.outputPercentage, icon: "arrow.left.circle", color: .green)
-                TokenRow(label: "Cache Write", percentage: breakdown.cacheWritePercentage, icon: "square.and.pencil", color: .orange)
-                TokenRow(label: "Cache Read", percentage: breakdown.cacheReadPercentage, icon: "doc.text.magnifyingglass", color: .purple)
-            }
+            TokenDistributionRows(breakdown: UsageAnalytics.tokenBreakdown(from: stats))
         }
+    }
+}
+
+private struct TokenDistributionRows: View {
+    let breakdown: (inputPercentage: Double, outputPercentage: Double, cacheWritePercentage: Double, cacheReadPercentage: Double)
+
+    var body: some View {
+        VStack(spacing: 12) {
+            inputRow
+            outputRow
+            cacheWriteRow
+            cacheReadRow
+        }
+    }
+
+    private var inputRow: some View {
+        TokenRow(label: "Input", percentage: breakdown.inputPercentage, icon: "arrow.right.circle", color: .blue)
+    }
+
+    private var outputRow: some View {
+        TokenRow(label: "Output", percentage: breakdown.outputPercentage, icon: "arrow.left.circle", color: .green)
+    }
+
+    private var cacheWriteRow: some View {
+        TokenRow(label: "Cache Write", percentage: breakdown.cacheWritePercentage, icon: "square.and.pencil", color: .orange)
+    }
+
+    private var cacheReadRow: some View {
+        TokenRow(label: "Cache Read", percentage: breakdown.cacheReadPercentage, icon: "doc.text.magnifyingglass", color: .purple)
     }
 }
 
@@ -127,22 +157,30 @@ private struct PredictionsCard: View {
     var body: some View {
         AnalyticsCard(title: "Predictions", icon: "calendar", color: .green) {
             VStack(alignment: .leading, spacing: 12) {
-                PredictionRow(
-                    label: "Predicted Monthly Cost",
-                    value: metrics.monthlyCost.asCurrency,
-                    icon: "calendar",
-                    detail: "Based on \(metrics.daysElapsed) days of data"
-                )
-
-                if let daily = metrics.averageDailyCost {
-                    PredictionRow(
-                        label: "Average Daily Cost",
-                        value: daily.asCurrency,
-                        icon: "chart.line.uptrend.xyaxis",
-                        detail: nil
-                    )
-                }
+                monthlyCostRow
+                dailyCostRow
             }
+        }
+    }
+
+    private var monthlyCostRow: some View {
+        PredictionRow(
+            label: "Predicted Monthly Cost",
+            value: metrics.monthlyCost.asCurrency,
+            icon: "calendar",
+            detail: "Based on \(metrics.daysElapsed) days of data"
+        )
+    }
+
+    @ViewBuilder
+    private var dailyCostRow: some View {
+        if let daily = metrics.averageDailyCost {
+            PredictionRow(
+                label: "Average Daily Cost",
+                value: daily.asCurrency,
+                icon: "chart.line.uptrend.xyaxis",
+                detail: nil
+            )
         }
     }
 }
@@ -171,18 +209,27 @@ private struct TrendsCard: View {
     var body: some View {
         AnalyticsCard(title: "Usage Trends", icon: "chart.line.uptrend.xyaxis", color: .orange) {
             VStack(alignment: .leading, spacing: 12) {
-                if let trend = TrendCalculator.weeklyTrend(from: stats) {
-                    TrendRow(trend: trend)
-                }
-
-                if let peak = TrendCalculator.peakDay(from: stats) {
-                    InfoRow(
-                        label: "Peak Usage Day",
-                        value: DateFormatting.formatMedium(peak.date),
-                        detail: peak.totalCost.asCurrency
-                    )
-                }
+                weeklyTrendSection
+                peakDaySection
             }
+        }
+    }
+
+    @ViewBuilder
+    private var weeklyTrendSection: some View {
+        if let trend = TrendCalculator.weeklyTrend(from: stats) {
+            TrendRow(trend: trend)
+        }
+    }
+
+    @ViewBuilder
+    private var peakDaySection: some View {
+        if let peak = TrendCalculator.peakDay(from: stats) {
+            InfoRow(
+                label: "Peak Usage Day",
+                value: DateFormatting.formatMedium(peak.date),
+                detail: peak.totalCost.asCurrency
+            )
         }
     }
 }
@@ -232,20 +279,24 @@ private struct YearSelector: View {
                 Button(String(year)) { selectedYear = year }
             }
         } label: {
-            HStack(spacing: 4) {
-                Text(String(selectedYear))
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                Image(systemName: "chevron.down")
-                    .font(.caption)
-            }
-            .foregroundColor(.primary)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(Color.gray.opacity(0.1))
-            .cornerRadius(6)
+            menuLabel
         }
         .buttonStyle(.plain)
+    }
+
+    private var menuLabel: some View {
+        HStack(spacing: 4) {
+            Text(String(selectedYear))
+                .font(.subheadline)
+                .fontWeight(.medium)
+            Image(systemName: "chevron.down")
+                .font(.caption)
+        }
+        .foregroundColor(.primary)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Color.gray.opacity(0.1))
+        .cornerRadius(6)
     }
 }
 
@@ -259,19 +310,22 @@ private struct AnalyticsCard<Content: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Image(systemName: icon)
-                    .foregroundColor(color)
-                Text(title)
-                    .font(.headline)
-            }
-
+            headerView
             content()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
         .background(Color(NSColor.controlBackgroundColor))
         .cornerRadius(12)
+    }
+
+    private var headerView: some View {
+        HStack {
+            Image(systemName: icon)
+                .foregroundColor(color)
+            Text(title)
+                .font(.headline)
+        }
     }
 }
 
@@ -304,16 +358,29 @@ private struct PredictionRow: View {
         HStack {
             Label(label, systemImage: icon)
             Spacer()
-            VStack(alignment: .trailing) {
-                Text(value)
-                    .font(.system(.body, design: .monospaced))
-                    .fontWeight(.semibold)
-                if let detail {
-                    Text(detail)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
+            valueSection
+        }
+    }
+
+    private var valueSection: some View {
+        VStack(alignment: .trailing) {
+            valueText
+            detailText
+        }
+    }
+
+    private var valueText: some View {
+        Text(value)
+            .font(.system(.body, design: .monospaced))
+            .fontWeight(.semibold)
+    }
+
+    @ViewBuilder
+    private var detailText: some View {
+        if let detail {
+            Text(detail)
+                .font(.caption)
+                .foregroundColor(.secondary)
         }
     }
 }
@@ -340,16 +407,24 @@ private struct InfoRow: View {
 
     var body: some View {
         HStack {
-            Text(label)
-                .foregroundColor(.secondary)
+            labelView
             Spacer()
-            VStack(alignment: .trailing) {
-                Text(value)
-                    .font(.subheadline)
-                Text(detail)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
+            valueSection
+        }
+    }
+
+    private var labelView: some View {
+        Text(label)
+            .foregroundColor(.secondary)
+    }
+
+    private var valueSection: some View {
+        VStack(alignment: .trailing) {
+            Text(value)
+                .font(.subheadline)
+            Text(detail)
+                .font(.caption)
+                .foregroundColor(.secondary)
         }
     }
 }
