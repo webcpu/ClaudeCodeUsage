@@ -82,17 +82,19 @@ public enum UsageAnalytics {
     
     /// Group entries by date
     public static func groupByDate(_ entries: [UsageEntry]) -> [String: [UsageEntry]] {
+        let formatter = dateFormatter()
+        let entriesWithDates = entries.compactMap { entry -> (String, UsageEntry)? in
+            guard let date = entry.date else { return nil }
+            return (formatter.string(from: date), entry)
+        }
+        return Dictionary(grouping: entriesWithDates, by: \.0).mapValues { $0.map(\.1) }
+    }
+
+    private static func dateFormatter() -> DateFormatter {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
-        formatter.timeZone = TimeZone.current // Use local timezone for grouping
-        
-        var grouped: [String: [UsageEntry]] = [:]
-        for entry in entries {
-            guard let date = entry.date else { continue }
-            let dateString = formatter.string(from: date)
-            grouped[dateString, default: []].append(entry)
-        }
-        return grouped
+        formatter.timeZone = TimeZone.current
+        return formatter
     }
     
     /// Get daily usage statistics
@@ -237,55 +239,29 @@ public extension UsageAnalytics {
     /// Get individual hourly costs for today from usage entries (non-cumulative) with proper timezone handling
     static func todayHourlyCosts(from entries: [UsageEntry], referenceDate: Date = Date()) -> [Double] {
         let calendar = Calendar.current
-        let now = referenceDate
-        let today = calendar.startOfDay(for: now)
-        
-        // Debug: Print timezone info
-        #if DEBUG
-        print("Current timezone: \(calendar.timeZone.identifier)")
-        print("Today starts at: \(today)")
-        print("Current time: \(now)")
-        #endif
-        
-        // Filter entries for today in local timezone
-        let todayEntries = entries.filter { entry in
+        let today = calendar.startOfDay(for: referenceDate)
+
+        let todayEntries = filterEntriesToday(entries, calendar: calendar, today: today)
+        let hourlyCosts = groupCostsByHour(todayEntries, calendar: calendar)
+        return buildHourlyArray(from: hourlyCosts)
+    }
+
+    private static func filterEntriesToday(_ entries: [UsageEntry], calendar: Calendar, today: Date) -> [UsageEntry] {
+        entries.filter { entry in
             guard let date = entry.date else { return false }
-            // Calendar.isDate properly handles timezone conversion
             return calendar.isDate(date, inSameDayAs: today)
         }
-        
-        #if DEBUG
-        print("Found \(todayEntries.count) entries for today")
-        #endif
-        
-        // Group costs by hour in local timezone
-        var hourlyCosts = [Int: Double]()
-        for entry in todayEntries {
-            guard let date = entry.date else { continue }
-            // calendar.component automatically converts UTC to local timezone
+    }
+
+    private static func groupCostsByHour(_ entries: [UsageEntry], calendar: Calendar) -> [Int: Double] {
+        entries.reduce(into: [Int: Double]()) { result, entry in
+            guard let date = entry.date else { return }
             let hour = calendar.component(.hour, from: date)
-            hourlyCosts[hour, default: 0] += entry.cost
-            
-            #if DEBUG
-            if entry.cost > 0 {
-                //print("Entry at \(date) (UTC) -> hour \(hour) (local): $\(entry.cost)")
-            }
-            #endif
+            result[hour, default: 0] += entry.cost
         }
-        
-        // Create full 24-hour array with individual hourly costs
-        var hourlyArray: [Double] = []
-        for hour in 0..<24 {
-            let cost = hourlyCosts[hour] ?? 0
-            hourlyArray.append(cost)
-            
-            #if DEBUG
-            if cost > 0 {
-                print("Hour \(hour): $\(cost)")
-            }
-            #endif
-        }
-        
-        return hourlyArray
+    }
+
+    private static func buildHourlyArray(from hourlyCosts: [Int: Double]) -> [Double] {
+        (0..<24).map { hourlyCosts[$0] ?? 0 }
     }
 }

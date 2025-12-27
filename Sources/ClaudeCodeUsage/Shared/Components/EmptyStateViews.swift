@@ -6,35 +6,53 @@
 import SwiftUI
 import ClaudeCodeUsageKit
 
+// MARK: - Shared Components
+
+private struct AsyncActionButton: View {
+    let title: String
+    let action: () async -> Void
+    @State private var isExecuting = false
+
+    var body: some View {
+        Button(action: executeAction) {
+            buttonContent
+        }
+        .disabled(isExecuting)
+    }
+
+    private func executeAction() {
+        Task {
+            isExecuting = true
+            await action()
+            isExecuting = false
+        }
+    }
+
+    @ViewBuilder
+    private var buttonContent: some View {
+        if isExecuting {
+            ProgressView()
+                .progressViewStyle(CircularProgressViewStyle())
+                .scaleEffect(0.8)
+        } else {
+            Text(title)
+        }
+    }
+}
+
 // MARK: - Empty State Views
 
 /// Empty state for no usage data
 struct NoUsageDataView: View {
     let onRefresh: () async -> Void
-    @State private var isRefreshing = false
-    
+
     var body: some View {
         ContentUnavailableView {
             Label("No Usage Data", systemImage: "chart.bar.xaxis")
         } description: {
             Text("Start using Claude to see your usage statistics")
         } actions: {
-            Button(action: {
-                Task {
-                    isRefreshing = true
-                    await onRefresh()
-                    isRefreshing = false
-                }
-            }) {
-                if isRefreshing {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle())
-                        .scaleEffect(0.8)
-                } else {
-                    Text("Refresh")
-                }
-            }
-            .disabled(isRefreshing)
+            AsyncActionButton(title: "Refresh", action: onRefresh)
         }
     }
 }
@@ -54,30 +72,14 @@ struct NoActiveSessionView: View {
 struct NoChartDataView: View {
     let dateRange: String
     let onRefresh: () async -> Void
-    @State private var isRefreshing = false
-    
+
     var body: some View {
         ContentUnavailableView {
             Label("No Data Available", systemImage: "chart.line.downtrend.xyaxis")
         } description: {
             Text("No usage data found for \(dateRange)")
         } actions: {
-            Button(action: {
-                Task {
-                    isRefreshing = true
-                    await onRefresh()
-                    isRefreshing = false
-                }
-            }) {
-                if isRefreshing {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle())
-                        .scaleEffect(0.8)
-                } else {
-                    Text("Try Different Range")
-                }
-            }
-            .disabled(isRefreshing)
+            AsyncActionButton(title: "Try Different Range", action: onRefresh)
         }
     }
 }
@@ -115,15 +117,14 @@ struct NoProjectsView: View {
 struct ErrorStateView: View {
     let error: any Error
     let onRetry: () async -> Void
-    @State private var isRetrying = false
-    
+
     var body: some View {
         ContentUnavailableView {
             Label("Something Went Wrong", systemImage: "exclamationmark.triangle")
         } description: {
             Text(errorDescription)
                 .multilineTextAlignment(.center)
-            
+
             if let suggestion = recoverySuggestion {
                 Text(suggestion)
                     .font(.caption)
@@ -131,25 +132,10 @@ struct ErrorStateView: View {
                     .padding(.top, 4)
             }
         } actions: {
-            Button(action: {
-                Task {
-                    isRetrying = true
-                    await onRetry()
-                    isRetrying = false
-                }
-            }) {
-                if isRetrying {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle())
-                        .scaleEffect(0.8)
-                } else {
-                    Text("Try Again")
-                }
-            }
-            .disabled(isRetrying)
+            AsyncActionButton(title: "Try Again", action: onRetry)
         }
     }
-    
+
     private var errorDescription: String {
         error.localizedDescription
     }
@@ -162,30 +148,14 @@ struct ErrorStateView: View {
 /// Network error state
 struct NetworkErrorView: View {
     let onRetry: () async -> Void
-    @State private var isRetrying = false
-    
+
     var body: some View {
         ContentUnavailableView {
             Label("No Internet Connection", systemImage: "wifi.slash")
         } description: {
             Text("Check your internet connection and try again")
         } actions: {
-            Button(action: {
-                Task {
-                    isRetrying = true
-                    await onRetry()
-                    isRetrying = false
-                }
-            }) {
-                if isRetrying {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle())
-                        .scaleEffect(0.8)
-                } else {
-                    Text("Retry")
-                }
-            }
-            .disabled(isRetrying)
+            AsyncActionButton(title: "Retry", action: onRetry)
         }
     }
 }

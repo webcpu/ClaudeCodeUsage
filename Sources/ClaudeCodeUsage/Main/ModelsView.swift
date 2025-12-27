@@ -70,14 +70,21 @@ private struct ModelsContent: View {
 private struct ModelsHeader: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Model Usage")
-                .font(.largeTitle)
-                .fontWeight(.bold)
-
-            Text("Breakdown by AI model")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+            titleView
+            subtitleView
         }
+    }
+
+    private var titleView: some View {
+        Text("Model Usage")
+            .font(.largeTitle)
+            .fontWeight(.bold)
+    }
+
+    private var subtitleView: some View {
+        Text("Breakdown by AI model")
+            .font(.subheadline)
+            .foregroundColor(.secondary)
     }
 }
 
@@ -219,25 +226,29 @@ private enum ModelColorResolver {
 }
 
 private enum ModelNameFormatter {
-    /// Formats model ID to display name: "claude-opus-4-5-20251101" → "Claude Opus 4.5"
+    private static let knownFamilies = ["opus", "sonnet", "haiku"]
+
     static func format(_ model: String) -> String {
         let parts = model.lowercased().components(separatedBy: "-")
+        let family = extractFamily(from: parts)
+        let version = extractVersion(from: parts)
+        return buildDisplayName(family: family, version: version, fallback: model)
+    }
 
-        // Extract family (opus/sonnet/haiku)
-        let family = parts.first { ["opus", "sonnet", "haiku"].contains($0) }
+    private static func extractFamily(from parts: [String]) -> String? {
+        parts.first { knownFamilies.contains($0) }
+    }
 
-        // Extract version numbers (e.g., "4" and "5" from "claude-opus-4-5-...")
+    private static func extractVersion(from parts: [String]) -> String {
         let numbers = parts.compactMap { Int($0) }
-        let version = numbers.count >= 2
+        return numbers.count >= 2
             ? "\(numbers[0]).\(numbers[1])"
             : numbers.first.map { "\($0)" } ?? ""
+    }
 
-        if let family = family {
-            let capitalizedFamily = family.capitalized
-            return version.isEmpty ? "Claude \(capitalizedFamily)" : "Claude \(capitalizedFamily) \(version)"
-        }
-
-        // Fallback: return cleaned original
-        return model
+    private static func buildDisplayName(family: String?, version: String, fallback: String) -> String {
+        guard let family = family else { return fallback }
+        let capitalizedFamily = family.capitalized
+        return version.isEmpty ? "Claude \(capitalizedFamily)" : "Claude \(capitalizedFamily) \(version)"
     }
 }
