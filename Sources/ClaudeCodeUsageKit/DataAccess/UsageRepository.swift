@@ -124,8 +124,8 @@ public actor UsageRepository {
 
         logger.debug("Today's files: \(todayFiles.count) of \(allFiles.count) total")
 
-        // Load entries from today's files, then filter by actual entry timestamp
-        let entries = await loadEntries(from: todayFiles)
+        // Load entries with fresh deduplication to allow re-loading on refresh
+        let entries = await loadEntriesForToday(from: todayFiles)
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
 
@@ -133,6 +133,33 @@ public actor UsageRepository {
             guard let date = entry.date else { return false }
             return calendar.isDate(date, inSameDayAs: today)
         }
+    }
+
+    /// Load entries for today with fresh deduplication
+    private func loadEntriesForToday(from files: [FileMetadata]) async -> [UsageEntry] {
+        var cachedEntries: [UsageEntry] = []
+        var dirtyFiles: [FileMetadata] = []
+
+        for file in files {
+            if let cached = fileCache[file.path],
+               cached.modificationDate == file.modificationDate {
+                cachedEntries.append(contentsOf: cached.entries)
+            } else {
+                dirtyFiles.append(file)
+            }
+        }
+
+        // Fresh deduplication allows re-loading modified files during refresh
+        // (global deduplication would skip entries already seen in previous loads)
+        let freshDeduplication = Deduplication()
+        let newEntries: [UsageEntry]
+        if dirtyFiles.count > Threshold.parallelProcessing {
+            newEntries = await loadEntriesInParallel(from: dirtyFiles, deduplication: freshDeduplication)
+        } else {
+            newEntries = loadEntriesSequentially(from: dirtyFiles, deduplication: freshDeduplication)
+        }
+
+        return cachedEntries + newEntries
     }
 
     /// Get today's stats - fast path for initial load
