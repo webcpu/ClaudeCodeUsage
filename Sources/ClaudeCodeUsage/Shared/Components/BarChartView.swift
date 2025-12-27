@@ -104,15 +104,54 @@ private struct BarView: View {
     let isCurrentHour: Bool
     let isPastHour: Bool
     let isHovered: Bool
-    
+
+    private enum Threshold {
+        static let highCost: Double = 10.0
+    }
+
+    private enum Layout {
+        static let capHeightRatio: CGFloat = 0.15
+        static let capMaxHeight: CGFloat = 4
+        static let mainBarRatio: CGFloat = 0.85
+        static let cornerRadius: CGFloat = 0.5
+        static let zeroBarHeight: CGFloat = 2
+        static let hoverScale: CGFloat = 1.05
+    }
+
+    private enum Opacity {
+        static let orangeCap: Double = 0.9
+        static let activeBar: Double = 1.0
+        static let inactiveBar: Double = 0.85
+    }
+
     private var barHeight: CGFloat {
         guard maxValue > 0 else { return 0 }
         let normalizedValue = min(value / maxValue, 1.0)
         return height * CGFloat(normalizedValue)
     }
-    
+
     private var barColor: Color {
         CostLevel.from(value: value, isPastHour: isPastHour).color
+    }
+
+    private var isHighCost: Bool {
+        value > Threshold.highCost
+    }
+
+    private var barOpacity: Double {
+        (isHovered || isCurrentHour) ? Opacity.activeBar : Opacity.inactiveBar
+    }
+
+    private var barScale: CGFloat {
+        isHovered ? Layout.hoverScale : 1.0
+    }
+
+    private var mainBarHeight: CGFloat {
+        isHighCost ? barHeight * Layout.mainBarRatio : max(barHeight, value == 0 ? Layout.zeroBarHeight : 0)
+    }
+
+    private var mainBarCorners: Set<Corner> {
+        isHighCost ? [] : [.topLeft, .topRight]
     }
 
     var body: some View {
@@ -125,11 +164,11 @@ private struct BarView: View {
 
     @ViewBuilder
     private var orangeCapView: some View {
-        if isPastHour && value > 10.0 {
+        if isPastHour && isHighCost {
             Rectangle()
-                .fill(Color.orange.opacity(0.9))
-                .frame(height: min(barHeight * 0.15, 4))
-                .cornerRadius(0.5, corners: [.topLeft, .topRight])
+                .fill(Color.orange.opacity(Opacity.orangeCap))
+                .frame(height: min(barHeight * Layout.capHeightRatio, Layout.capMaxHeight))
+                .cornerRadius(Layout.cornerRadius, corners: [.topLeft, .topRight])
         }
     }
 
@@ -145,10 +184,10 @@ private struct BarView: View {
     private var pastHourBar: some View {
         Rectangle()
             .fill(barColor)
-            .frame(height: value > 10.0 ? barHeight * 0.85 : max(barHeight, value == 0 ? 2 : 0))
-            .cornerRadius(0.5, corners: value > 10.0 ? [] : [.topLeft, .topRight])
-            .opacity(isHovered ? 1.0 : (isCurrentHour ? 1.0 : 0.85))
-            .scaleEffect(isHovered ? 1.05 : 1.0)
+            .frame(height: mainBarHeight)
+            .cornerRadius(Layout.cornerRadius, corners: mainBarCorners)
+            .opacity(barOpacity)
+            .scaleEffect(barScale)
     }
 
     private var futureHourBar: some View {
@@ -189,6 +228,17 @@ private enum CostLevel {
 
 // MARK: - Grid Overlay
 private struct GridOverlay: View {
+    private enum Opacity {
+        static let quarterLine: Double = 0.1
+        static let halfLine: Double = 0.15
+        static let baseline: Double = 0.3
+    }
+
+    private enum Layout {
+        static let lineHeight: CGFloat = 0.5
+        static let bottomPadding: CGFloat = 12
+    }
+
     var body: some View {
         GeometryReader { _ in
             ZStack {
@@ -201,29 +251,37 @@ private struct GridOverlay: View {
     private var horizontalGridLines: some View {
         VStack(spacing: 0) {
             Spacer()
-            gridLine(opacity: 0.1)
+            quarterGridLine
             Spacer()
-            gridLine(opacity: 0.15)
+            halfGridLine
             Spacer()
-            gridLine(opacity: 0.1)
+            quarterGridLine
             Spacer()
         }
-        .padding(.bottom, 12)
+        .padding(.bottom, Layout.bottomPadding)
+    }
+
+    private var quarterGridLine: some View {
+        gridLine(opacity: Opacity.quarterLine)
+    }
+
+    private var halfGridLine: some View {
+        gridLine(opacity: Opacity.halfLine)
     }
 
     private func gridLine(opacity: Double) -> some View {
         Rectangle()
             .fill(Color.gray.opacity(opacity))
-            .frame(height: 0.5)
+            .frame(height: Layout.lineHeight)
     }
 
     private var baseline: some View {
         VStack {
             Spacer()
             Rectangle()
-                .fill(Color.gray.opacity(0.3))
-                .frame(height: 0.5)
-                .padding(.bottom, 12)
+                .fill(Color.gray.opacity(Opacity.baseline))
+                .frame(height: Layout.lineHeight)
+                .padding(.bottom, Layout.bottomPadding)
         }
     }
 }

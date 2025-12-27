@@ -181,42 +181,100 @@ public enum ErrorRecoveryStrategy: Sendable {
     ) async throws -> T? {
         switch self {
         case .retry(let maxAttempts, let delay):
-            var lastError: Error?
-            for attempt in 1...maxAttempts {
-                do {
-                    return try await operation()
-                } catch {
-                    lastError = error
-                    onError(error)
-                    if attempt < maxAttempts {
-                        try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
-                    }
-                }
-            }
-            throw lastError ?? UsageRepositoryError.timeout(
-                operation: "retry",
-                duration: Double(maxAttempts) * delay
+            return try await executeWithRetry(
+                maxAttempts: maxAttempts,
+                delay: delay,
+                operation: operation,
+                onError: onError
             )
-            
+
         case .skip:
-            do {
-                return try await operation()
-            } catch {
-                onError(error)
-                return nil
-            }
-            
+            return try await executeWithSkip(operation: operation, onError: onError)
+
         case .fallback(let handler):
-            do {
-                return try await operation()
-            } catch {
-                onError(error)
-                try await handler()
-                return nil
-            }
-            
+            return try await executeWithFallback(
+                handler: handler,
+                operation: operation,
+                onError: onError
+            )
+
         case .abort:
             return try await operation()
+        }
+    }
+
+    // MARK: - Strategy Execution Helpers
+
+    private func executeWithRetry<T: Sendable>(
+        maxAttempts: Int,
+        delay: TimeInterval,
+        operation: @Sendable () async throws -> T,
+        onError: @Sendable (Error) -> Void
+    ) async throws -> T {
+        let attempts = (1...maxAttempts).map { $0 }
+        var lastError: Error?
+
+        for attempt in attempts {
+            let result = await captureResult(operation)
+            switch result {
+            case .success(let value):
+                return value
+            case .failure(let error):
+                lastError = error
+                onError(error)
+                await sleepIfNotLastAttempt(attempt: attempt, maxAttempts: maxAttempts, delay: delay)
+            }
+        }
+
+        throw lastError ?? timeoutError(maxAttempts: maxAttempts, delay: delay)
+    }
+
+    private func captureResult<T: Sendable>(
+        _ operation: @Sendable () async throws -> T
+    ) async -> Result<T, Error> {
+        do {
+            return .success(try await operation())
+        } catch {
+            return .failure(error)
+        }
+    }
+
+    private func sleepIfNotLastAttempt(attempt: Int, maxAttempts: Int, delay: TimeInterval) async {
+        guard attempt < maxAttempts else { return }
+        try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+    }
+
+    private func timeoutError(maxAttempts: Int, delay: TimeInterval) -> UsageRepositoryError {
+        .timeout(operation: "retry", duration: Double(maxAttempts) * delay)
+    }
+
+    private func executeWithSkip<T: Sendable>(
+        operation: @Sendable () async throws -> T,
+        onError: @Sendable (Error) -> Void
+    ) async throws -> T? {
+        let result = await captureResult(operation)
+        switch result {
+        case .success(let value):
+            return value
+        case .failure(let error):
+            onError(error)
+            return nil
+        }
+    }
+
+    private func executeWithFallback<T: Sendable>(
+        handler: @Sendable () async throws -> Void,
+        operation: @Sendable () async throws -> T,
+        onError: @Sendable (Error) -> Void
+    ) async throws -> T? {
+        let result = await captureResult(operation)
+        switch result {
+        case .success(let value):
+            return value
+        case .failure(let error):
+            onError(error)
+            try await handler()
+            return nil
         }
     }
 }
@@ -225,45 +283,55 @@ public enum ErrorRecoveryStrategy: Sendable {
 public actor ErrorAggregator {
     private var errors: [Error] = []
     private let maxErrors: Int
-    
+
     public init(maxErrors: Int = 100) {
         self.maxErrors = maxErrors
     }
-    
+
     public func record(_ error: Error) {
         errors.append(error)
         if errors.count > maxErrors {
             errors.removeFirst()
         }
     }
-    
+
     public func getErrors() -> [Error] {
         errors
     }
-    
+
     public func getSummary() -> String {
         guard !errors.isEmpty else {
             return "No errors recorded"
         }
-        
-        let errorTypes = Dictionary(grouping: errors) { error in
-            String(describing: type(of: error))
-        }
-        
-        var summary = "Error Summary (\(errors.count) total):\n"
-        for (type, typeErrors) in errorTypes {
-            summary += "  \(type): \(typeErrors.count) occurrences\n"
-        }
-        
-        return summary
+        return buildSummary(from: groupedErrorTypes)
     }
-    
+
     public func clear() {
         errors.removeAll()
     }
-    
+
     public func hasErrors() -> Bool {
         !errors.isEmpty
+    }
+
+    // MARK: - Summary Building Helpers
+
+    private var groupedErrorTypes: [String: [Error]] {
+        Dictionary(grouping: errors) { error in
+            String(describing: type(of: error))
+        }
+    }
+
+    private func buildSummary(from errorTypes: [String: [Error]]) -> String {
+        let header = "Error Summary (\(errors.count) total):\n"
+        let details = errorTypes
+            .map { formatErrorType(name: $0.key, count: $0.value.count) }
+            .joined()
+        return header + details
+    }
+
+    private func formatErrorType(name: String, count: Int) -> String {
+        "  \(name): \(count) occurrences\n"
     }
 }
 
@@ -288,27 +356,74 @@ public extension Task where Failure == Error {
         initialDelay: TimeInterval = 1.0,
         operation: @escaping @Sendable () async throws -> Success
     ) async throws -> Success {
-        var currentDelay = initialDelay
-        
-        for attempt in 0..<maxRetryCount {
-            do {
-                return try await operation()
-            } catch {
-                if attempt == maxRetryCount - 1 {
-                    throw error
+        try await RetryExecutor.execute(
+            operation: operation,
+            maxRetryCount: maxRetryCount,
+            initialDelay: initialDelay
+        )
+    }
+}
+
+// MARK: - Retry Executor
+
+private enum RetryExecutor {
+    static func execute<T>(
+        operation: @escaping @Sendable () async throws -> T,
+        maxRetryCount: Int,
+        initialDelay: TimeInterval
+    ) async throws -> T {
+        let delays = exponentialDelays(initialDelay: initialDelay, count: maxRetryCount)
+        return try await executeWithDelays(operation: operation, delays: delays)
+    }
+
+    private static func exponentialDelays(initialDelay: TimeInterval, count: Int) -> [TimeInterval] {
+        (0..<count).map { attempt in
+            initialDelay * pow(2.0, Double(attempt))
+        }
+    }
+
+    private static func executeWithDelays<T>(
+        operation: @escaping @Sendable () async throws -> T,
+        delays: [TimeInterval]
+    ) async throws -> T {
+        var lastError: Error?
+
+        for (index, delay) in delays.enumerated() {
+            let result = await attemptExecution(operation: operation)
+
+            switch result {
+            case .success(let value):
+                return value
+            case .failure(let error):
+                lastError = error
+                let isLastAttempt = index == delays.count - 1
+                if !isLastAttempt {
+                    try await sleep(for: delay)
                 }
-                
-                try await Task<Never, Never>.sleep(
-                    nanoseconds: UInt64(currentDelay * 1_000_000_000)
-                )
-                currentDelay *= 2 // Exponential backoff
             }
         }
-        
-        // This should never be reached, but Swift requires it
-        throw UsageRepositoryError.timeout(
+
+        throw lastError ?? timeoutError(delays: delays)
+    }
+
+    private static func attemptExecution<T>(
+        operation: @escaping @Sendable () async throws -> T
+    ) async -> Result<T, Error> {
+        do {
+            return .success(try await operation())
+        } catch {
+            return .failure(error)
+        }
+    }
+
+    private static func sleep(for delay: TimeInterval) async throws {
+        try await Task<Never, Never>.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+    }
+
+    private static func timeoutError(delays: [TimeInterval]) -> UsageRepositoryError {
+        .timeout(
             operation: "retry",
-            duration: currentDelay * Double(maxRetryCount)
+            duration: delays.reduce(0, +)
         )
     }
 }

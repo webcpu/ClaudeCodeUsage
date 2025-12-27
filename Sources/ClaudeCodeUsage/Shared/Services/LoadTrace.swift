@@ -13,6 +13,10 @@ enum LoadPhase: String {
     case history = "History"
 }
 
+private enum Threshold {
+    static let slowLoad: TimeInterval = 2.0
+}
+
 // MARK: - Trace Collector
 
 actor LoadTrace {
@@ -84,37 +88,58 @@ actor LoadTrace {
     // MARK: - Output
 
     private func printSummary(duration: TimeInterval) {
-        let isSlow = duration > 2.0
-        let durationStr = formatDuration(duration)
+        let output = buildSummary(duration: duration)
+        logOutput(output, isSlow: duration > Threshold.slowLoad)
+    }
 
-        var lines: [String] = []
-        lines.append("┌─ Data Load " + String(repeating: "─", count: 40))
+    private func buildSummary(duration: TimeInterval) -> String {
+        [
+            headerLine,
+            todayPhaseLine,
+            sessionLine,
+            tokenLimitLine,
+            historyPhaseLine,
+            footerLine(duration: duration)
+        ]
+        .compactMap { $0 }
+        .joined(separator: "\n")
+    }
 
-        // Phase 1: Today
-        let todayDur = phaseDurations[.today].map { " (\(formatDuration($0)))" } ?? ""
-        lines.append("│ Phase 1: Today\(todayDur)")
+    private var headerLine: String {
+        "┌─ Data Load " + String(repeating: "─", count: 40)
+    }
 
-        if let found = sessionFound {
-            let sessionStr = found ? "active" : "none"
+    private var todayPhaseLine: String {
+        let duration = phaseDurations[.today].map { " (\(formatDuration($0)))" } ?? ""
+        return "│ Phase 1: Today\(duration)"
+    }
+
+    private var sessionLine: String? {
+        sessionFound.map { found in
+            let status = found ? "active" : "none"
             let timing = sessionCached ? "cached" : formatDuration(sessionDuration)
-            lines.append("│   Session: \(sessionStr) [\(timing)]")
+            return "│   Session: \(status) [\(timing)]"
         }
+    }
 
-        if let limit = tokenLimit {
+    private var tokenLimitLine: String? {
+        tokenLimit.map { limit in
             let timing = tokenLimitCached ? "cached" : formatDuration(tokenLimitDuration)
-            lines.append("│   TokenLimit: \(formatNumber(limit)) [\(timing)]")
+            return "│   TokenLimit: \(formatNumber(limit)) [\(timing)]"
         }
+    }
 
-        // Phase 2: History
-        let historyDur = phaseDurations[.history].map { " (\(formatDuration($0)))" } ?? ""
-        lines.append("│ Phase 2: History\(historyDur)")
+    private var historyPhaseLine: String {
+        let duration = phaseDurations[.history].map { " (\(formatDuration($0)))" } ?? ""
+        return "│ Phase 2: History\(duration)"
+    }
 
-        // Footer
-        let status = isSlow ? " [slow]" : ""
-        lines.append("└─ Total: \(durationStr)\(status) " + String(repeating: "─", count: 28))
+    private func footerLine(duration: TimeInterval) -> String {
+        let status = duration > Threshold.slowLoad ? " [slow]" : ""
+        return "└─ Total: \(formatDuration(duration))\(status) " + String(repeating: "─", count: 28)
+    }
 
-        let output = lines.joined(separator: "\n")
-
+    private func logOutput(_ output: String, isSlow: Bool) {
         if isSlow {
             logger.warning("\(output)")
         } else {
