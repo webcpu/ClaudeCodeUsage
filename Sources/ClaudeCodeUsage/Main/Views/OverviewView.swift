@@ -163,7 +163,25 @@ private struct CostBreakdownRow: View {
 // MARK: - Pure Transformations
 
 private enum ModelNameFormatter {
+    /// Formats model ID to display name: "claude-opus-4-5-20251101" → "Claude Opus 4.5"
     static func format(_ model: String) -> String {
-        model.components(separatedBy: "-").prefix(3).joined(separator: "-")
+        let parts = model.lowercased().components(separatedBy: "-")
+
+        // Extract family (opus/sonnet/haiku)
+        let family = parts.first { ["opus", "sonnet", "haiku"].contains($0) }
+
+        // Extract version numbers (e.g., "4" and "5" from "claude-opus-4-5-...")
+        let numbers = parts.compactMap { Int($0) }
+        let version = numbers.count >= 2
+            ? "\(numbers[0]).\(numbers[1])"
+            : numbers.first.map { "\($0)" } ?? ""
+
+        if let family = family {
+            let capitalizedFamily = family.capitalized
+            return version.isEmpty ? "Claude \(capitalizedFamily)" : "Claude \(capitalizedFamily) \(version)"
+        }
+
+        // Fallback: return cleaned original
+        return model
     }
 }
