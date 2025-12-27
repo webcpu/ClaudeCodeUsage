@@ -3,7 +3,7 @@
 //  ClaudeCodeUsage
 //
 //  Repository for accessing and processing Claude Code usage data.
-//  Simplified architecture: no protocol indirection, direct implementations.
+//  Architecture: FP + SLAP (Functional Programming + Single Level of Abstraction Principle)
 //
 
 import Foundation
@@ -11,11 +11,41 @@ import OSLog
 
 private let logger = Logger(subsystem: "com.claudecodeusage", category: "Repository")
 
+// MARK: - Constants
+
+private enum Threshold {
+    static let parallelProcessing = 5
+    static let batchProcessing = 500
+    static let batchSize = 100
+}
+
+private enum ByteValue {
+    static let openBrace: UInt8 = 0x7B   // '{'
+    static let closeBrace: UInt8 = 0x7D  // '}'
+    static let newline: Int32 = 0x0A     // '\n'
+}
+
+private enum DateFormat {
+    static let dayString = "yyyy-MM-dd"
+}
+
+// MARK: - File Metadata
+
+private struct FileMetadata {
+    let path: String
+    let projectDir: String
+    let earliestTimestamp: String
+}
+
+// MARK: - Public Types
+
 /// Sort order for queries
 public enum SortOrder: String, Sendable {
     case ascending = "asc"
     case descending = "desc"
 }
+
+// MARK: - Repository
 
 /// Repository for accessing and processing usage data.
 /// Uses actor isolation for thread safety.
@@ -35,91 +65,58 @@ public actor UsageRepository {
     /// Get overall usage statistics
     public func getUsageStats() async throws -> UsageStats {
         let projectsPath = basePath + "/projects"
-
         guard FileManager.default.fileExists(atPath: projectsPath) else {
-            return createEmptyStats()
+            return UsageStats.empty
         }
 
-        let deduplication = Deduplication()
-        let filesToProcess = try collectJSONLFiles(from: projectsPath)
-        let sortedFiles = sortFilesByTimestamp(filesToProcess)
+        let files = try discoverFiles(in: projectsPath)
+        let entries = await loadEntries(from: files)
 
-        let entries: [UsageEntry]
-        if sortedFiles.count > 500 {
-            entries = await processFilesInBatches(sortedFiles, batchSize: 100, deduplication: deduplication)
-        } else {
-            entries = await processFiles(sortedFiles, deduplication: deduplication)
-        }
+        logger.debug("Loaded \(entries.count) entries from \(files.count) files")
 
-        #if DEBUG
-        print("[UsageRepository] Loaded \(entries.count) entries from \(sortedFiles.count) files")
-        #endif
-
-        let sessionCount = countUniqueSessions(from: sortedFiles)
-        return aggregateStatistics(from: entries, sessionCount: sessionCount)
+        return Aggregator.aggregate(entries, sessionCount: countSessions(in: files))
     }
 
     /// Get detailed usage entries
     public func getUsageEntries(limit: Int? = nil) async throws -> [UsageEntry] {
         let projectsPath = basePath + "/projects"
-
         guard FileManager.default.fileExists(atPath: projectsPath) else {
             return []
         }
 
-        let deduplication = Deduplication()
-        let filesToProcess = try collectJSONLFiles(from: projectsPath)
-        let sortedFiles = sortFilesByTimestamp(filesToProcess)
-        var entries = await processFiles(sortedFiles, deduplication: deduplication)
+        let files = try discoverFiles(in: projectsPath)
+        let entries = await loadEntries(from: files)
+            .sorted { $0.timestamp > $1.timestamp }
 
-        entries.sort { $0.timestamp > $1.timestamp }
-
-        if let limit = limit {
-            return Array(entries.prefix(limit))
-        }
-        return entries
+        return limit.map { Array(entries.prefix($0)) } ?? entries
     }
 
     /// Get today's usage entries only - optimized for fast initial load
     public func getTodayUsageEntries() async throws -> [UsageEntry] {
         let projectsPath = basePath + "/projects"
-
         guard FileManager.default.fileExists(atPath: projectsPath) else {
             return []
         }
 
-        let deduplication = Deduplication()
-        let allFiles = try collectJSONLFiles(from: projectsPath)
+        let allFiles = try discoverFiles(in: projectsPath)
+        let todayFiles = filterFilesModifiedToday(allFiles)
 
-        let calendar = Calendar.current
-        let todayStart = calendar.startOfDay(for: Date())
-        let formatter = ISO8601DateFormatter()
+        logger.debug("Today's files: \(todayFiles.count) of \(allFiles.count) total")
 
-        let todayFiles = allFiles.filter { file in
-            if let date = formatter.date(from: file.earliestTimestamp) {
-                return date >= todayStart
-            }
-            return false
-        }
-
-        #if DEBUG
-        print("[UsageRepository] Today's files: \(todayFiles.count) of \(allFiles.count) total")
-        #endif
-
-        return await processFiles(todayFiles, deduplication: deduplication)
+        return await loadEntries(from: todayFiles)
     }
 
     /// Get today's stats - fast path for initial load
     public func getTodayUsageStats() async throws -> UsageStats {
         let entries = try await getTodayUsageEntries()
-        let sessionCount = Set(entries.compactMap { $0.sessionId }).count
-        return aggregateStatistics(from: entries, sessionCount: sessionCount)
+        let sessionCount = Set(entries.compactMap(\.sessionId)).count
+        return Aggregator.aggregate(entries, sessionCount: sessionCount)
     }
 
     /// Get usage statistics filtered by date range
     public func getUsageByDateRange(startDate: Date, endDate: Date) async throws -> UsageStats {
         let allStats = try await getUsageStats()
-        return filterByDateRange(allStats, start: startDate, end: endDate)
+        return Filter.byDateRange(allStats, start: startDate, end: endDate)
     }
 
     /// Get session-level statistics with optional filtering and sorting
@@ -128,408 +125,358 @@ public actor UsageRepository {
         until: Date? = nil,
         order: SortOrder? = nil
     ) async throws -> [ProjectUsage] {
-        let allStats = try await getUsageStats()
-        var projects = allStats.byProject
-
-        if let since = since, let until = until {
-            projects = projects.filter { project in
-                if let date = project.lastUsedDate {
-                    return date >= since && date <= until
-                }
-                return false
-            }
-        }
-
-        if let order = order {
-            projects = projects.sorted { a, b in
-                order == .ascending ? a.totalCost < b.totalCost : a.totalCost > b.totalCost
-            }
-        }
-
-        return projects
+        try await getUsageStats().byProject
+            |> { Filter.byDateRange($0, since: since, until: until) }
+            |> { Sort.byCost($0, order: order) }
     }
 
     /// Load entries for a specific date
     public func loadEntriesForDate(_ date: Date) async throws -> [UsageEntry] {
-        let allEntries = try await getUsageEntries()
         let calendar = Calendar.current
         let targetDay = calendar.startOfDay(for: date)
 
-        return allEntries.filter { entry in
-            guard let entryDate = entry.date else { return false }
-            return calendar.startOfDay(for: entryDate) == targetDay
+        return try await getUsageEntries().filter { entry in
+            entry.date.map { calendar.startOfDay(for: $0) == targetDay } ?? false
         }
     }
 
-    // MARK: - File Collection
+    // MARK: - File Discovery
 
-    private func collectJSONLFiles(
-        from projectsPath: String
-    ) throws -> [(path: String, projectDir: String, earliestTimestamp: String)] {
-        var filesToProcess: [(path: String, projectDir: String, earliestTimestamp: String)] = []
-        let projectDirs = try FileManager.default.contentsOfDirectory(atPath: projectsPath)
-
-        for projectDir in projectDirs {
-            if shouldSkipDirectory(projectDir) { continue }
-
-            let projectPath = projectsPath + "/" + projectDir
-
-            let files: [String]
-            do {
-                files = try FileManager.default.contentsOfDirectory(atPath: projectPath)
-            } catch {
-                logger.warning("Failed to read directory \(projectPath): \(error.localizedDescription)")
-                continue
+    private func discoverFiles(in projectsPath: String) throws -> [FileMetadata] {
+        try FileManager.default.contentsOfDirectory(atPath: projectsPath)
+            .filter { !DirectoryFilter.shouldSkip($0) }
+            .flatMap { projectDir in
+                jsonlFiles(in: projectsPath + "/" + projectDir, projectDir: projectDir)
             }
+            .sorted { $0.earliestTimestamp < $1.earliestTimestamp }
+    }
 
-            for file in files where file.hasSuffix(".jsonl") {
-                let filePath = projectPath + "/" + file
-                if let earliestTimestamp = getEarliestTimestamp(from: filePath) {
-                    filesToProcess.append((
-                        path: filePath,
-                        projectDir: projectDir,
-                        earliestTimestamp: earliestTimestamp
-                    ))
-                }
-            }
+    private func jsonlFiles(in projectPath: String, projectDir: String) -> [FileMetadata] {
+        (try? FileManager.default.contentsOfDirectory(atPath: projectPath))
+            .map { files in
+                files
+                    .filter { $0.hasSuffix(".jsonl") }
+                    .compactMap { file -> FileMetadata? in
+                        let filePath = projectPath + "/" + file
+                        return FileTimestamp.earliest(from: filePath).map {
+                            FileMetadata(path: filePath, projectDir: projectDir, earliestTimestamp: $0)
+                        }
+                    }
+            } ?? []
+    }
+
+    private func filterFilesModifiedToday(_ files: [FileMetadata]) -> [FileMetadata] {
+        let todayStart = Calendar.current.startOfDay(for: Date())
+        let formatter = ISO8601DateFormatter()
+        return files.filter { file in
+            formatter.date(from: file.earliestTimestamp).map { $0 >= todayStart } ?? false
         }
-
-        return filesToProcess
     }
 
-    private func sortFilesByTimestamp(
-        _ files: [(path: String, projectDir: String, earliestTimestamp: String)]
-    ) -> [(path: String, projectDir: String, earliestTimestamp: String)] {
-        files.sorted { $0.earliestTimestamp < $1.earliestTimestamp }
-    }
+    // MARK: - Entry Loading
 
-    // MARK: - File Processing
+    private func loadEntries(from files: [FileMetadata]) async -> [UsageEntry] {
+        let deduplication = Deduplication()
 
-    private func processFiles(
-        _ files: [(path: String, projectDir: String, earliestTimestamp: String)],
-        deduplication: Deduplication
-    ) async -> [UsageEntry] {
-        if files.count > 5 {
-            return await processFilesInParallel(files, deduplication: deduplication)
+        if files.count > Threshold.batchProcessing {
+            return await loadEntriesInBatches(from: files, deduplication: deduplication)
+        } else if files.count > Threshold.parallelProcessing {
+            return await loadEntriesInParallel(from: files, deduplication: deduplication)
         } else {
-            return processFilesSequentially(files, deduplication: deduplication)
+            return loadEntriesSequentially(from: files, deduplication: deduplication)
         }
     }
 
-    private func processFilesSequentially(
-        _ files: [(path: String, projectDir: String, earliestTimestamp: String)],
+    private func loadEntriesSequentially(
+        from files: [FileMetadata],
         deduplication: Deduplication
     ) -> [UsageEntry] {
-        var allEntries: [UsageEntry] = []
-        for (filePath, projectDir, _) in files {
-            let entries = processJSONLFile(at: filePath, projectDir: projectDir, deduplication: deduplication)
-            allEntries.append(contentsOf: entries)
-        }
-        return allEntries
+        files.flatMap { parseFile($0, deduplication: deduplication) }
     }
 
-    private func processFilesInParallel(
-        _ files: [(path: String, projectDir: String, earliestTimestamp: String)],
+    private func loadEntriesInParallel(
+        from files: [FileMetadata],
         deduplication: Deduplication
     ) async -> [UsageEntry] {
         await withTaskGroup(of: [UsageEntry].self) { group in
-            for (filePath, projectDir, _) in files {
-                group.addTask {
-                    await self.processJSONLFile(at: filePath, projectDir: projectDir, deduplication: deduplication)
-                }
+            for file in files {
+                group.addTask { await self.parseFile(file, deduplication: deduplication) }
             }
-
-            var allEntries: [UsageEntry] = []
-            for await entries in group {
-                allEntries.append(contentsOf: entries)
-            }
-            return allEntries
+            return await group.reduce(into: []) { $0.append(contentsOf: $1) }
         }
     }
 
-    private func processFilesInBatches(
-        _ files: [(path: String, projectDir: String, earliestTimestamp: String)],
-        batchSize: Int,
+    private func loadEntriesInBatches(
+        from files: [FileMetadata],
         deduplication: Deduplication
     ) async -> [UsageEntry] {
-        var allEntries: [UsageEntry] = []
-        let totalBatches = (files.count + batchSize - 1) / batchSize
-
-        for batchIndex in 0..<totalBatches {
-            let startIndex = batchIndex * batchSize
-            let endIndex = min(startIndex + batchSize, files.count)
-            let batch = Array(files[startIndex..<endIndex])
-            let batchEntries = await processFilesInParallel(batch, deduplication: deduplication)
-            allEntries.append(contentsOf: batchEntries)
-        }
-
-        return allEntries
+        await stride(from: 0, to: files.count, by: Threshold.batchSize)
+            .asyncFlatMap { startIndex in
+                let endIndex = min(startIndex + Threshold.batchSize, files.count)
+                let batch = Array(files[startIndex..<endIndex])
+                return await self.loadEntriesInParallel(from: batch, deduplication: deduplication)
+            }
     }
 
-    private func processJSONLFile(
-        at path: String,
-        projectDir: String,
-        deduplication: Deduplication
-    ) -> [UsageEntry] {
-        guard let fileData = try? Data(contentsOf: URL(fileURLWithPath: path)) else {
+    // MARK: - File Parsing
+
+    private func parseFile(_ file: FileMetadata, deduplication: Deduplication) -> [UsageEntry] {
+        guard let fileData = try? Data(contentsOf: URL(fileURLWithPath: file.path)) else {
             return []
         }
 
-        let decodedProjectPath = decodeProjectPath(projectDir)
-        var entries: [UsageEntry] = []
-        let lineRanges = extractLineRanges(from: fileData)
-
-        for range in lineRanges {
-            let lineData = fileData[range]
-
-            guard lineData.count > 2,
-                  lineData.first == 0x7B,  // '{'
-                  lineData.last == 0x7D    // '}'
-            else { continue }
-
-            guard let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any] else {
-                continue
+        let projectPath = PathDecoder.decode(file.projectDir)
+        return LineScanner.extractRanges(from: fileData)
+            .compactMap { range -> UsageEntry? in
+                let lineData = fileData[range]
+                guard JSONValidator.isValidObject(lineData),
+                      let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
+                      deduplication.shouldInclude(json: json) else {
+                    return nil
+                }
+                return EntryParser.parse(json, projectPath: projectPath)
             }
-
-            let messageId = extractMessageId(from: json)
-            let requestId = extractRequestId(from: json)
-
-            guard deduplication.shouldInclude(messageId: messageId, requestId: requestId) else {
-                continue
-            }
-
-            if let entry = createEntry(from: json, projectPath: decodedProjectPath) {
-                entries.append(entry)
-            }
-        }
-
-        return entries
     }
 
-    /// Extract line ranges using memchr for SIMD-optimized byte scanning
-    private func extractLineRanges(from data: Data) -> [Range<Data.Index>] {
-        var ranges: [Range<Data.Index>] = []
-        let count = data.count
-        guard count > 0 else { return ranges }
+    // MARK: - Session Counting
 
-        let bytes = [UInt8](data)
-        bytes.withUnsafeBufferPointer { buffer in
-            guard let ptr = buffer.baseAddress else { return }
+    private func countSessions(in files: [FileMetadata]) -> Int {
+        Set(
+            files.compactMap { file in
+                let filename = URL(fileURLWithPath: file.path).lastPathComponent
+                return filename.hasSuffix(".jsonl") ? String(filename.dropLast(6)) : nil
+            }
+        ).count
+    }
+}
+
+// MARK: - Pure Transformations
+
+private enum DirectoryFilter {
+    static func shouldSkip(_ name: String) -> Bool {
+        name.hasPrefix("-private-var-folders-") ||
+        name.hasPrefix(".")
+    }
+}
+
+private enum PathDecoder {
+    static func decode(_ encodedPath: String) -> String {
+        if encodedPath.hasPrefix("-") {
+            return "/" + String(encodedPath.dropFirst()).replacingOccurrences(of: "-", with: "/")
+        }
+        return encodedPath.replacingOccurrences(of: "-", with: "/")
+    }
+}
+
+private enum FileTimestamp {
+    static func earliest(from path: String) -> String? {
+        if let attributes = try? FileManager.default.attributesOfItem(atPath: path),
+           let modDate = attributes[.modificationDate] as? Date {
+            return ISO8601DateFormatter().string(from: modDate)
+        }
+        return ISO8601DateFormatter().string(from: Date())
+    }
+}
+
+private enum JSONValidator {
+    static func isValidObject(_ data: Data) -> Bool {
+        data.count > 2 &&
+        data.first == ByteValue.openBrace &&
+        data.last == ByteValue.closeBrace
+    }
+}
+
+private enum LineScanner {
+    static func extractRanges(from data: Data) -> [Range<Data.Index>] {
+        guard data.count > 0 else { return [] }
+
+        return [UInt8](data).withUnsafeBufferPointer { buffer in
+            guard let ptr = buffer.baseAddress else { return [] }
+            var ranges: [Range<Int>] = []
             var offset = 0
 
-            while offset < count {
-                let remaining = count - offset
-                let lineEnd: Int
-
-                if let found = memchr(ptr + offset, 0x0A, remaining) {
-                    lineEnd = UnsafePointer(found.assumingMemoryBound(to: UInt8.self)) - ptr
-                } else {
-                    lineEnd = count
-                }
+            while offset < data.count {
+                let remaining = data.count - offset
+                let lineEnd = memchr(ptr + offset, ByteValue.newline, remaining)
+                    .map { UnsafePointer($0.assumingMemoryBound(to: UInt8.self)) - ptr }
+                    ?? data.count
 
                 if lineEnd > offset {
                     ranges.append(offset..<lineEnd)
                 }
                 offset = lineEnd + 1
             }
+            return ranges
         }
-
-        return ranges
     }
+}
 
-    // MARK: - JSON Parsing (Inlined from UsageDataParserProtocol)
-
-    private func extractMessageId(from json: [String: Any]) -> String? {
-        guard let message = json["message"] as? [String: Any] else { return nil }
-        return message["id"] as? String
-    }
-
-    private func extractRequestId(from json: [String: Any]) -> String? {
-        json["requestId"] as? String
-    }
-
-    private func createEntry(from json: [String: Any], projectPath: String) -> UsageEntry? {
+private enum EntryParser {
+    static func parse(_ json: [String: Any], projectPath: String) -> UsageEntry? {
         guard let message = json["message"] as? [String: Any],
               let usage = message["usage"] as? [String: Any] else {
             return nil
         }
 
+        let tokens = extractTokens(from: usage)
+        guard tokens.hasUsage else { return nil }
+
         let model = message["model"] as? String ?? "unknown"
-        let inputTokens = usage["input_tokens"] as? Int ?? 0
-        let outputTokens = usage["output_tokens"] as? Int ?? 0
-        let cacheWriteTokens = usage["cache_creation_input_tokens"] as? Int ?? 0
-        let cacheReadTokens = usage["cache_read_input_tokens"] as? Int ?? 0
-
-        if inputTokens == 0 && outputTokens == 0 && cacheWriteTokens == 0 && cacheReadTokens == 0 {
-            return nil
-        }
-
-        var cost = json["costUSD"] as? Double ?? 0.0
-        if cost == 0.0 && (inputTokens > 0 || outputTokens > 0) {
-            if let pricing = ModelPricing.pricing(for: model) {
-                cost = pricing.calculateCost(
-                    inputTokens: inputTokens,
-                    outputTokens: outputTokens,
-                    cacheWriteTokens: cacheWriteTokens,
-                    cacheReadTokens: cacheReadTokens
-                )
-            }
-        }
+        let cost = calculateCost(json: json, model: model, tokens: tokens)
 
         return UsageEntry(
             project: projectPath,
             timestamp: json["timestamp"] as? String ?? "",
             model: model,
-            inputTokens: inputTokens,
-            outputTokens: outputTokens,
-            cacheWriteTokens: cacheWriteTokens,
-            cacheReadTokens: cacheReadTokens,
+            inputTokens: tokens.input,
+            outputTokens: tokens.output,
+            cacheWriteTokens: tokens.cacheWrite,
+            cacheReadTokens: tokens.cacheRead,
             cost: cost,
             sessionId: json["sessionId"] as? String
         )
     }
 
-    // MARK: - Path Decoding (Inlined from ProjectPathDecoder)
-
-    private func decodeProjectPath(_ encodedPath: String) -> String {
-        if encodedPath.hasPrefix("-") {
-            return "/" + String(encodedPath.dropFirst()).replacingOccurrences(of: "-", with: "/")
-        }
-        return encodedPath.replacingOccurrences(of: "-", with: "/")
+    private static func extractTokens(from usage: [String: Any]) -> TokenCounts {
+        TokenCounts(
+            input: usage["input_tokens"] as? Int ?? 0,
+            output: usage["output_tokens"] as? Int ?? 0,
+            cacheWrite: usage["cache_creation_input_tokens"] as? Int ?? 0,
+            cacheRead: usage["cache_read_input_tokens"] as? Int ?? 0
+        )
     }
 
-    // MARK: - Statistics Aggregation (Inlined from StatisticsAggregator)
+    private static func calculateCost(json: [String: Any], model: String, tokens: TokenCounts) -> Double {
+        if let cost = json["costUSD"] as? Double, cost > 0 {
+            return cost
+        }
+        return ModelPricing.pricing(for: model)?.calculateCost(
+            inputTokens: tokens.input,
+            outputTokens: tokens.output,
+            cacheWriteTokens: tokens.cacheWrite,
+            cacheReadTokens: tokens.cacheRead
+        ) ?? 0.0
+    }
 
-    private func aggregateStatistics(from entries: [UsageEntry], sessionCount: Int) -> UsageStats {
-        var totalCost = 0.0
-        var totalInputTokens = 0
-        var totalOutputTokens = 0
-        var totalCacheWriteTokens = 0
-        var totalCacheReadTokens = 0
+    private struct TokenCounts {
+        let input: Int
+        let output: Int
+        let cacheWrite: Int
+        let cacheRead: Int
 
+        var hasUsage: Bool {
+            input > 0 || output > 0 || cacheWrite > 0 || cacheRead > 0
+        }
+    }
+}
+
+// MARK: - Aggregation
+
+private enum Aggregator {
+    static func aggregate(_ entries: [UsageEntry], sessionCount: Int) -> UsageStats {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = DateFormat.dayString
+
+        let result = entries.reduce(into: AggregationState()) { state, entry in
+            state.addEntry(entry, dateFormatter: dateFormatter)
+        }
+
+        return UsageStats(
+            totalCost: result.totalCost,
+            totalTokens: result.totalTokens,
+            totalInputTokens: result.totalInputTokens,
+            totalOutputTokens: result.totalOutputTokens,
+            totalCacheCreationTokens: result.totalCacheWriteTokens,
+            totalCacheReadTokens: result.totalCacheReadTokens,
+            totalSessions: sessionCount,
+            byModel: Array(result.modelStats.values),
+            byDate: result.dailyStats.values.sorted { $0.date < $1.date },
+            byProject: Array(result.projectStats.values)
+        )
+    }
+
+    private struct AggregationState {
+        var totalCost: Double = 0
+        var totalInputTokens: Int = 0
+        var totalOutputTokens: Int = 0
+        var totalCacheWriteTokens: Int = 0
+        var totalCacheReadTokens: Int = 0
         var modelStats: [String: ModelUsage] = [:]
         var dailyStats: [String: DailyUsage] = [:]
         var projectStats: [String: ProjectUsage] = [:]
 
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd"
+        var totalTokens: Int {
+            totalInputTokens + totalOutputTokens + totalCacheWriteTokens + totalCacheReadTokens
+        }
 
-        for entry in entries {
+        mutating func addEntry(_ entry: UsageEntry, dateFormatter: DateFormatter) {
             totalCost += entry.cost
             totalInputTokens += entry.inputTokens
             totalOutputTokens += entry.outputTokens
             totalCacheWriteTokens += entry.cacheWriteTokens
             totalCacheReadTokens += entry.cacheReadTokens
 
-            // Model stats
-            if var modelUsage = modelStats[entry.model] {
-                modelUsage = ModelUsage(
-                    model: entry.model,
-                    totalCost: modelUsage.totalCost + entry.cost,
-                    totalTokens: modelUsage.totalTokens + entry.totalTokens,
-                    inputTokens: modelUsage.inputTokens + entry.inputTokens,
-                    outputTokens: modelUsage.outputTokens + entry.outputTokens,
-                    cacheCreationTokens: modelUsage.cacheCreationTokens + entry.cacheWriteTokens,
-                    cacheReadTokens: modelUsage.cacheReadTokens + entry.cacheReadTokens,
-                    sessionCount: modelUsage.sessionCount + 1
-                )
-                modelStats[entry.model] = modelUsage
-            } else {
-                modelStats[entry.model] = ModelUsage(
-                    model: entry.model,
-                    totalCost: entry.cost,
-                    totalTokens: entry.totalTokens,
-                    inputTokens: entry.inputTokens,
-                    outputTokens: entry.outputTokens,
-                    cacheCreationTokens: entry.cacheWriteTokens,
-                    cacheReadTokens: entry.cacheReadTokens,
-                    sessionCount: 1
-                )
-            }
-
-            // Daily stats
-            if let date = entry.date {
-                let dateString = dateFormatter.string(from: date)
-                if var daily = dailyStats[dateString] {
-                    daily = DailyUsage(
-                        date: dateString,
-                        totalCost: daily.totalCost + entry.cost,
-                        totalTokens: daily.totalTokens + entry.totalTokens,
-                        modelsUsed: Array(Set(daily.modelsUsed + [entry.model]))
-                    )
-                    dailyStats[dateString] = daily
-                } else {
-                    dailyStats[dateString] = DailyUsage(
-                        date: dateString,
-                        totalCost: entry.cost,
-                        totalTokens: entry.totalTokens,
-                        modelsUsed: [entry.model]
-                    )
-                }
-            }
-
-            // Project stats
-            if var project = projectStats[entry.project] {
-                project = ProjectUsage(
-                    projectPath: entry.project,
-                    projectName: URL(fileURLWithPath: entry.project).lastPathComponent,
-                    totalCost: project.totalCost + entry.cost,
-                    totalTokens: project.totalTokens + entry.totalTokens,
-                    sessionCount: project.sessionCount,
-                    lastUsed: max(project.lastUsed, entry.timestamp)
-                )
-                projectStats[entry.project] = project
-            } else {
-                projectStats[entry.project] = ProjectUsage(
-                    projectPath: entry.project,
-                    projectName: URL(fileURLWithPath: entry.project).lastPathComponent,
-                    totalCost: entry.cost,
-                    totalTokens: entry.totalTokens,
-                    sessionCount: 1,
-                    lastUsed: entry.timestamp
-                )
-            }
+            updateModelStats(entry)
+            updateDailyStats(entry, dateFormatter: dateFormatter)
+            updateProjectStats(entry)
         }
 
-        let totalTokens = totalInputTokens + totalOutputTokens + totalCacheWriteTokens + totalCacheReadTokens
+        private mutating func updateModelStats(_ entry: UsageEntry) {
+            let existing = modelStats[entry.model]
+            modelStats[entry.model] = ModelUsage(
+                model: entry.model,
+                totalCost: (existing?.totalCost ?? 0) + entry.cost,
+                totalTokens: (existing?.totalTokens ?? 0) + entry.totalTokens,
+                inputTokens: (existing?.inputTokens ?? 0) + entry.inputTokens,
+                outputTokens: (existing?.outputTokens ?? 0) + entry.outputTokens,
+                cacheCreationTokens: (existing?.cacheCreationTokens ?? 0) + entry.cacheWriteTokens,
+                cacheReadTokens: (existing?.cacheReadTokens ?? 0) + entry.cacheReadTokens,
+                sessionCount: (existing?.sessionCount ?? 0) + 1
+            )
+        }
 
-        return UsageStats(
-            totalCost: totalCost,
-            totalTokens: totalTokens,
-            totalInputTokens: totalInputTokens,
-            totalOutputTokens: totalOutputTokens,
-            totalCacheCreationTokens: totalCacheWriteTokens,
-            totalCacheReadTokens: totalCacheReadTokens,
-            totalSessions: sessionCount,
-            byModel: Array(modelStats.values),
-            byDate: Array(dailyStats.values).sorted { $0.date < $1.date },
-            byProject: Array(projectStats.values)
-        )
+        private mutating func updateDailyStats(_ entry: UsageEntry, dateFormatter: DateFormatter) {
+            guard let date = entry.date else { return }
+            let dateString = dateFormatter.string(from: date)
+            let existing = dailyStats[dateString]
+
+            dailyStats[dateString] = DailyUsage(
+                date: dateString,
+                totalCost: (existing?.totalCost ?? 0) + entry.cost,
+                totalTokens: (existing?.totalTokens ?? 0) + entry.totalTokens,
+                modelsUsed: Array(Set((existing?.modelsUsed ?? []) + [entry.model]))
+            )
+        }
+
+        private mutating func updateProjectStats(_ entry: UsageEntry) {
+            let existing = projectStats[entry.project]
+            projectStats[entry.project] = ProjectUsage(
+                projectPath: entry.project,
+                projectName: URL(fileURLWithPath: entry.project).lastPathComponent,
+                totalCost: (existing?.totalCost ?? 0) + entry.cost,
+                totalTokens: (existing?.totalTokens ?? 0) + entry.totalTokens,
+                sessionCount: existing?.sessionCount ?? 1,
+                lastUsed: max(existing?.lastUsed ?? "", entry.timestamp)
+            )
+        }
     }
+}
 
-    // MARK: - Filtering (Inlined from FilterService)
+// MARK: - Filtering
 
-    private func filterByDateRange(_ stats: UsageStats, start: Date, end: Date) -> UsageStats {
-        if start.timeIntervalSince1970 < 0 {
-            return stats
-        }
+private enum Filter {
+    static func byDateRange(_ stats: UsageStats, start: Date, end: Date) -> UsageStats {
+        guard start.timeIntervalSince1970 >= 0 else { return stats }
 
         let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.dateFormat = DateFormat.dayString
         let startString = formatter.string(from: start)
         let endString = formatter.string(from: end)
 
-        let filteredByDate = stats.byDate.filter { daily in
-            daily.date >= startString && daily.date <= endString
-        }
+        let filtered = stats.byDate.filter { $0.date >= startString && $0.date <= endString }
+        guard !filtered.isEmpty else { return stats }
 
-        if filteredByDate.isEmpty {
-            return stats
-        }
-
-        let (totalCost, totalTokens) = filteredByDate.reduce((0.0, 0)) { acc, daily in
-            (acc.0 + daily.totalCost, acc.1 + daily.totalTokens)
-        }
+        let (totalCost, totalTokens) = filtered.reduce((0.0, 0)) { ($0.0 + $1.totalCost, $0.1 + $1.totalTokens) }
 
         return UsageStats(
             totalCost: totalCost,
@@ -540,70 +487,44 @@ public actor UsageRepository {
             totalCacheReadTokens: stats.totalCacheReadTokens,
             totalSessions: stats.totalSessions,
             byModel: stats.byModel,
-            byDate: filteredByDate,
+            byDate: filtered,
             byProject: stats.byProject
         )
     }
 
-    // MARK: - Helpers
-
-    private func getEarliestTimestamp(from path: String) -> String? {
-        if let attributes = try? FileManager.default.attributesOfItem(atPath: path),
-           let modDate = attributes[.modificationDate] as? Date {
-            return ISO8601DateFormatter().string(from: modDate)
+    static func byDateRange(_ projects: [ProjectUsage], since: Date?, until: Date?) -> [ProjectUsage] {
+        guard let since = since, let until = until else { return projects }
+        return projects.filter { project in
+            project.lastUsedDate.map { $0 >= since && $0 <= until } ?? false
         }
-        return ISO8601DateFormatter().string(from: Date())
-    }
-
-    private func countUniqueSessions(
-        from files: [(path: String, projectDir: String, earliestTimestamp: String)]
-    ) -> Int {
-        var sessionIds = Set<String>()
-        for (filePath, _, _) in files {
-            let filename = URL(fileURLWithPath: filePath).lastPathComponent
-            if filename.hasSuffix(".jsonl") {
-                sessionIds.insert(String(filename.dropLast(6)))
-            }
-        }
-        return sessionIds.count
-    }
-
-    private func shouldSkipDirectory(_ directoryName: String) -> Bool {
-        directoryName.hasPrefix("-private-var-folders-") ||
-        directoryName.contains("claude-kit-sessions") ||
-        directoryName.hasPrefix(".")
-    }
-
-    private func createEmptyStats() -> UsageStats {
-        UsageStats(
-            totalCost: 0,
-            totalTokens: 0,
-            totalInputTokens: 0,
-            totalOutputTokens: 0,
-            totalCacheCreationTokens: 0,
-            totalCacheReadTokens: 0,
-            totalSessions: 0,
-            byModel: [],
-            byDate: [],
-            byProject: []
-        )
     }
 }
 
-// MARK: - Deduplication (Inlined from DeduplicationService)
+// MARK: - Sorting
 
-/// Thread-safe deduplication using messageId:requestId hash
+private enum Sort {
+    static func byCost(_ projects: [ProjectUsage], order: SortOrder?) -> [ProjectUsage] {
+        guard let order = order else { return projects }
+        return projects.sorted { a, b in
+            order == .ascending ? a.totalCost < b.totalCost : a.totalCost > b.totalCost
+        }
+    }
+}
+
+// MARK: - Deduplication
+
 private final class Deduplication: @unchecked Sendable {
     private var processedHashes: Set<String> = []
     private let queue = DispatchQueue(label: "com.claudeusage.deduplication", attributes: .concurrent)
 
-    func shouldInclude(messageId: String?, requestId: String?) -> Bool {
-        guard let messageId = messageId, let requestId = requestId else {
+    func shouldInclude(json: [String: Any]) -> Bool {
+        guard let message = json["message"] as? [String: Any],
+              let messageId = message["id"] as? String,
+              let requestId = json["requestId"] as? String else {
             return true
         }
 
         let uniqueHash = "\(messageId):\(requestId)"
-
         var shouldInclude = false
         queue.sync(flags: .barrier) {
             if !processedHashes.contains(uniqueHash) {
@@ -611,7 +532,42 @@ private final class Deduplication: @unchecked Sendable {
                 shouldInclude = true
             }
         }
-
         return shouldInclude
     }
+}
+
+// MARK: - Extensions
+
+private extension UsageStats {
+    static let empty = UsageStats(
+        totalCost: 0,
+        totalTokens: 0,
+        totalInputTokens: 0,
+        totalOutputTokens: 0,
+        totalCacheCreationTokens: 0,
+        totalCacheReadTokens: 0,
+        totalSessions: 0,
+        byModel: [],
+        byDate: [],
+        byProject: []
+    )
+}
+
+// MARK: - Async Helpers
+
+private extension StrideTo where Element == Int {
+    func asyncFlatMap<T>(_ transform: @escaping (Int) async -> [T]) async -> [T] {
+        var results: [T] = []
+        for element in self {
+            results.append(contentsOf: await transform(element))
+        }
+        return results
+    }
+}
+
+// MARK: - Pipe Operator
+
+infix operator |>: AdditionPrecedence
+private func |> <T, U>(value: T, transform: (T) -> U) -> U {
+    transform(value)
 }
