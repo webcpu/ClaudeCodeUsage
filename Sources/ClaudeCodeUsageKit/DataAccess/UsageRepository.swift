@@ -124,7 +124,15 @@ public actor UsageRepository {
 
         logger.debug("Today's files: \(todayFiles.count) of \(allFiles.count) total")
 
-        return await loadEntries(from: todayFiles)
+        // Load entries from today's files, then filter by actual entry timestamp
+        let entries = await loadEntries(from: todayFiles)
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+
+        return entries.filter { entry in
+            guard let date = entry.date else { return false }
+            return calendar.isDate(date, inSameDayAs: today)
+        }
     }
 
     /// Get today's stats - fast path for initial load
