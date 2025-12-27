@@ -4,88 +4,116 @@ import SwiftParser
 import SwiftSyntax
 import SwiftSyntaxMacros
 
+// MARK: - Public API
+
 public struct TimedMacro: BodyMacro {
     public static func expansion(
         of node: AttributeSyntax,
         providingBodyFor declaration: some DeclSyntaxProtocol & WithOptionalCodeBlockSyntax,
         in context: some MacroExpansionContext
     ) throws -> [CodeBlockItemSyntax] {
-        guard let funcDecl = declaration.as(FunctionDeclSyntax.self) else {
-            throw MacroError.notAFunction
-        }
+        let funcDecl = try extractFunctionDecl(from: declaration)
+        let signature = FunctionSignature(from: funcDecl)
+        return buildTimedBody(for: funcDecl, signature: signature)
+    }
+}
 
-        guard let body = funcDecl.body else {
-            throw MacroError.missingBody
-        }
+// MARK: - Function Signature Extraction
 
-        let isAsync = funcDecl.signature.effectSpecifiers?.asyncSpecifier != nil
-        let isThrowing = funcDecl.signature.effectSpecifiers?.throwsClause != nil
-        let returnType = funcDecl.signature.returnClause?.type.description
-            .trimmingCharacters(in: .whitespaces)
-        let hasReturn = returnType != nil && returnType != "Void" && returnType != "()"
+private struct FunctionSignature {
+    let isAsync: Bool
+    let isThrowing: Bool
+    let hasReturn: Bool
 
-        let statements = body.statements
-
-        if hasReturn {
-            return buildTimedBodyWithReturn(
-                statements: statements,
-                isAsync: isAsync,
-                isThrowing: isThrowing
-            )
-        } else {
-            return buildTimedBodyVoid(statements: statements)
-        }
+    init(from funcDecl: FunctionDeclSyntax) {
+        let effects = funcDecl.signature.effectSpecifiers
+        self.isAsync = effects?.asyncSpecifier != nil
+        self.isThrowing = effects?.throwsClause != nil
+        self.hasReturn = Self.detectReturn(from: funcDecl)
     }
 
-    private static func buildTimedBodyVoid(
-        statements: CodeBlockItemListSyntax
-    ) -> [CodeBlockItemSyntax] {
-        let originalBody = statements.map { $0.description }.joined()
-
-        let code = """
-            let _startTime = ContinuousClock.now
-            defer {
-                let _elapsed = ContinuousClock.now - _startTime
-                print("[Timed] \\(#function) took \\(_elapsed)")
-            }
-            \(originalBody)
-            """
-
-        return parseStatements(code)
+    private static func detectReturn(from funcDecl: FunctionDeclSyntax) -> Bool {
+        guard let returnType = funcDecl.signature.returnClause?.type.description
+            .trimmingCharacters(in: .whitespaces) else { return false }
+        return returnType != "Void" && returnType != "()"
     }
 
-    private static func buildTimedBodyWithReturn(
-        statements: CodeBlockItemListSyntax,
-        isAsync: Bool,
-        isThrowing: Bool
-    ) -> [CodeBlockItemSyntax] {
-        let originalBody = statements.map { $0.description }.joined()
-
-        let tryAwait = [
+    var effectPrefix: String {
+        [
             isThrowing ? "try" : nil,
             isAsync ? "await" : nil
-        ].compactMap { $0 }.joined(separator: " ")
+        ]
+        .compactMap { $0 }
+        .joined(separator: " ")
+    }
+}
 
-        let prefix = tryAwait.isEmpty ? "" : "\(tryAwait) "
+// MARK: - Validation
 
-        let code = """
+private func extractFunctionDecl(
+    from declaration: some DeclSyntaxProtocol & WithOptionalCodeBlockSyntax
+) throws -> FunctionDeclSyntax {
+    guard let funcDecl = declaration.as(FunctionDeclSyntax.self) else {
+        throw MacroError.notAFunction
+    }
+    guard funcDecl.body != nil else {
+        throw MacroError.missingBody
+    }
+    return funcDecl
+}
+
+// MARK: - Code Generation
+
+private func buildTimedBody(
+    for funcDecl: FunctionDeclSyntax,
+    signature: FunctionSignature
+) -> [CodeBlockItemSyntax] {
+    let originalBody = extractBody(from: funcDecl)
+
+    let code = signature.hasReturn
+        ? CodeTemplate.withReturn(body: originalBody, effectPrefix: signature.effectPrefix)
+        : CodeTemplate.voidReturn(body: originalBody)
+
+    return parseStatements(code)
+}
+
+private func extractBody(from funcDecl: FunctionDeclSyntax) -> String {
+    funcDecl.body!.statements.map(\.description).joined()
+}
+
+private func parseStatements(_ code: String) -> [CodeBlockItemSyntax] {
+    Parser.parse(source: code).statements.map { $0 }
+}
+
+// MARK: - Code Templates
+
+private enum CodeTemplate {
+    static func voidReturn(body: String) -> String {
+        """
+        let _startTime = ContinuousClock.now
+        defer {
+            let _elapsed = ContinuousClock.now - _startTime
+            print("[Timed] \\(#function) took \\(_elapsed)")
+        }
+        \(body)
+        """
+    }
+
+    static func withReturn(body: String, effectPrefix: String) -> String {
+        let prefix = effectPrefix.isEmpty ? "" : "\(effectPrefix) "
+        return """
             let _startTime = ContinuousClock.now
             let _result = \(prefix){
-                \(originalBody)
+                \(body)
             }()
             let _elapsed = ContinuousClock.now - _startTime
             print("[Timed] \\(#function) took \\(_elapsed)")
             return _result
             """
-
-        return parseStatements(code)
-    }
-
-    private static func parseStatements(_ code: String) -> [CodeBlockItemSyntax] {
-        let sourceFile = Parser.parse(source: code)
-        return sourceFile.statements.map { $0 }
     }
 }
+
+// MARK: - Errors
 
 enum MacroError: Error, CustomStringConvertible {
     case notAFunction
@@ -100,6 +128,8 @@ enum MacroError: Error, CustomStringConvertible {
         }
     }
 }
+
+// MARK: - Plugin
 
 @main
 struct TimingMacroPlugin: CompilerPlugin {
