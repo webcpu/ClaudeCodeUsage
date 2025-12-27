@@ -73,10 +73,30 @@ final class UsageStore {
         return nil
     }
 
+    /// Full historical stats - only available after Phase 2 completes
     var stats: UsageStats? {
+        if case .loaded(let stats) = state { return stats }
+        return nil
+    }
+
+    /// Today's stats - available after Phase 1 (fast path)
+    var todayStats: UsageStats? {
         switch state {
-        case .loadedToday(let stats), .loaded(let stats): return stats
-        default: return nil
+        case .loadedToday, .loaded:
+            return UsageStats(
+                totalCost: todaysCostValue,
+                totalTokens: todayEntries.reduce(0) { $0 + $1.totalTokens },
+                totalInputTokens: todayEntries.reduce(0) { $0 + $1.inputTokens },
+                totalOutputTokens: todayEntries.reduce(0) { $0 + $1.outputTokens },
+                totalCacheCreationTokens: todayEntries.reduce(0) { $0 + $1.cacheWriteTokens },
+                totalCacheReadTokens: todayEntries.reduce(0) { $0 + $1.cacheReadTokens },
+                totalSessions: 1,
+                byModel: [],
+                byDate: [],
+                byProject: []
+            )
+        default:
+            return nil
         }
     }
 
