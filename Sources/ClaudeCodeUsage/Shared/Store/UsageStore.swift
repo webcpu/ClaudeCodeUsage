@@ -239,7 +239,14 @@ final class UsageStore {
         burnRate = result.burnRate
         autoTokenLimit = result.autoTokenLimit
         todayEntries = result.todayEntries
-        state = .loadedToday(result.todayStats)
+
+        // Only transition to .loadedToday on first load (cold start)
+        // Don't regress from .loaded to .loadedToday during refresh
+        if case .loaded = state {
+            // Keep existing .loaded state - don't flicker
+        } else {
+            state = .loadedToday(result.todayStats)
+        }
 
         updateCalculatedProperties(stats: result.todayStats)
         updateChartData()
