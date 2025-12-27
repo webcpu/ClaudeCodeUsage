@@ -16,17 +16,12 @@ private let performanceLogger = Logger(subsystem: "com.claudecodeusage", categor
 
 enum ViewState {
     case loading
-    case loadedToday(UsageStats)  // Today's data loaded, history loading
-    case loaded(UsageStats)       // All data loaded
+    case loadedToday(UsageStats)
+    case loaded(UsageStats)
     case error(Error)
 
     var isLoading: Bool {
         if case .loading = self { return true }
-        return false
-    }
-
-    var isLoadingHistory: Bool {
-        if case .loadedToday = self { return true }
         return false
     }
 
@@ -39,11 +34,6 @@ enum ViewState {
 
     var stats: UsageStats? {
         if case .loaded(let stats) = self { return stats }
-        return nil
-    }
-
-    var error: Error? {
-        if case .error(let error) = self { return error }
         return nil
     }
 }
@@ -71,26 +61,21 @@ private func filterToday(_ entries: [UsageEntry], referenceDate: Date) -> [Usage
 @Observable
 @MainActor
 final class UsageStore {
-    // MARK: - Source State (Single Source of Truth)
+    // MARK: - Source State
 
     private(set) var state: ViewState = .loading
     private(set) var activeSession: SessionBlock?
     private(set) var burnRate: BurnRate?
-    private(set) var autoTokenLimit: Int?
     private(set) var todayEntries: [UsageEntry] = []
-    private(set) var lastRefreshTime: Date
 
     // MARK: - Configuration
 
     private let defaultThreshold: Double
 
-    // MARK: - Derived Properties (All Computed)
+    // MARK: - Derived Properties
 
     var isLoading: Bool { state.isLoading }
-    var isLoadingHistory: Bool { state.isLoadingHistory }
-    var hasInitiallyLoaded: Bool { state.hasLoaded }
     var stats: UsageStats? { state.stats }
-    var errorMessage: String? { state.error?.localizedDescription }
 
     var todaysCost: Double {
         todayEntries.reduce(0.0) { $0 + $1.cost }
@@ -111,20 +96,6 @@ final class UsageStore {
         return min(elapsed / total, 1.5)
     }
 
-    var sessionTokenProgress: Double {
-        guard let session = activeSession, let limit = autoTokenLimit, limit > 0 else { return 0 }
-        return min(Double(session.tokenCounts.total) / Double(limit), 1.5)
-    }
-
-    var todaySessionCount: Int {
-        activeSession != nil ? 1 : 0
-    }
-
-    var estimatedDailySessions: Int {
-        guard let stats = stats, !stats.byDate.isEmpty else { return 0 }
-        return max(1, stats.totalSessions / stats.byDate.count)
-    }
-
     var averageDailyCost: Double {
         guard let stats = stats, !stats.byDate.isEmpty else { return 0 }
         let recentDays = stats.byDate.suffix(7)
@@ -139,13 +110,8 @@ final class UsageStore {
         todaysCost.asCurrency
     }
 
-    var formattedTotalCost: String {
-        stats?.totalCost.asCurrency ?? "$0.00"
-    }
-
     // MARK: - Dependencies
 
-    let sessionMonitorService: SessionMonitorService
     private let dataLoader: UsageDataLoader
     private let dateProvider: DateProviding
     private let refreshCoordinator: RefreshCoordinator
@@ -169,12 +135,9 @@ final class UsageStore {
         let repo = repository ?? UsageRepository(basePath: config.configuration.basePath)
         let sessionService = sessionMonitorService ?? DefaultSessionMonitorService(configuration: config.configuration)
 
-        self.sessionMonitorService = sessionService
         self.dataLoader = UsageDataLoader(repository: repo, sessionMonitorService: sessionService)
         self.dateProvider = dateProvider
-        self.lastRefreshTime = dateProvider.now
         self.defaultThreshold = config.configuration.dailyCostThreshold
-
         self.refreshCoordinator = RefreshCoordinator(
             dateProvider: dateProvider,
             refreshInterval: config.configuration.refreshInterval
@@ -193,7 +156,7 @@ final class UsageStore {
         guard !hasInitialized else { return }
         hasInitialized = true
 
-        if !hasInitiallyLoaded {
+        if !state.hasLoaded {
             await loadData()
         }
         refreshCoordinator.start()
@@ -207,14 +170,11 @@ final class UsageStore {
 
         let startTime = dateProvider.now
         lastLoadStartTime = startTime
-        lastRefreshTime = startTime
 
         do {
-            // Phase 1: Load and apply today's data
             let todayResult = try await dataLoader.loadToday()
             apply(todayResult)
 
-            // Phase 2: Load and apply historical data
             let historyResult = try await dataLoader.loadHistory()
             apply(historyResult)
 
@@ -229,10 +189,8 @@ final class UsageStore {
     private func apply(_ result: TodayLoadResult) {
         activeSession = result.session
         burnRate = result.burnRate
-        autoTokenLimit = result.autoTokenLimit
         todayEntries = result.todayEntries
 
-        // Don't regress from .loaded to .loadedToday during refresh
         if case .loaded = state { return }
         state = .loadedToday(result.todayStats)
     }
@@ -245,7 +203,7 @@ final class UsageStore {
         await loadData()
     }
 
-    // MARK: - Lifecycle Delegation
+    // MARK: - Lifecycle
 
     func handleAppBecameActive() {
         refreshCoordinator.handleAppBecameActive()
@@ -257,10 +215,6 @@ final class UsageStore {
 
     func handleWindowFocus() {
         refreshCoordinator.handleWindowFocus()
-    }
-
-    func startRefreshTimer() {
-        refreshCoordinator.start()
     }
 
     func stopRefreshTimer() {
@@ -309,17 +263,5 @@ final class UsageStore {
 
     deinit {
         NotificationCenter.default.removeObserver(self)
-    }
-}
-
-// MARK: - Token Formatting
-
-func formatTokenCount(_ count: Int) -> String {
-    if count >= 1_000_000 {
-        return String(format: "%.1fM", Double(count) / 1_000_000)
-    } else if count >= 1_000 {
-        return String(format: "%.1fK", Double(count) / 1_000)
-    } else {
-        return "\(count)"
     }
 }
