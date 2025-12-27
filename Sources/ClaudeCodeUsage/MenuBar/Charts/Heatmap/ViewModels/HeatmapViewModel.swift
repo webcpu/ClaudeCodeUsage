@@ -233,10 +233,7 @@ public final class HeatmapViewModel {
         maxCost: Double,
         dateRange: ClosedRange<Date>
     ) -> [HeatmapWeek] {
-        var weeks: [HeatmapWeek] = []
-        weeks.reserveCapacity(weeksLayout.count)
-
-        for (weekIndex, weekDates) in weeksLayout.enumerated() {
+        weeksLayout.enumerated().map { weekIndex, weekDates in
             let weekDays = buildWeekDays(
                 from: weekDates,
                 weekIndex: weekIndex,
@@ -244,10 +241,8 @@ public final class HeatmapViewModel {
                 maxCost: maxCost,
                 dateRange: dateRange
             )
-            weeks.append(HeatmapWeek(weekNumber: weekIndex, days: weekDays))
+            return HeatmapWeek(weekNumber: weekIndex, days: weekDays)
         }
-
-        return weeks
     }
 
     /// Build days array for a single week
@@ -258,11 +253,9 @@ public final class HeatmapViewModel {
         maxCost: Double,
         dateRange: ClosedRange<Date>
     ) -> [HeatmapDay?] {
-        var weekDays: [HeatmapDay?] = Array(repeating: nil, count: 7)
-
-        for (dayIndex, dayDate) in weekDates.enumerated() {
-            guard let dayDate = dayDate, dateRange.contains(dayDate) else { continue }
-            weekDays[dayIndex] = createHeatmapDay(
+        weekDates.enumerated().map { dayIndex, dayDate in
+            guard let dayDate, dateRange.contains(dayDate) else { return nil }
+            return createHeatmapDay(
                 for: dayDate,
                 dayIndex: dayIndex,
                 weekIndex: weekIndex,
@@ -270,8 +263,6 @@ public final class HeatmapViewModel {
                 maxCost: maxCost
             )
         }
-
-        return weekDays
     }
 
     /// Generate month labels for heatmap header

@@ -65,74 +65,84 @@ public struct YearlyCostHeatmap: View {
     
     public var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Header with summary information
             headerSection
-            
-            // Main content based on state
             contentSection
-            
-            // Legend (if enabled and data is available)
-            if configuration.showLegend && viewModel.hasData {
-                legendSection
-            }
+            legendSectionIfVisible
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(configuration.padding)
         .background(Color(NSColor.controlBackgroundColor))
         .cornerRadius(12)
-        .task {
-            // Load data when view appears
-            await viewModel.updateStats(stats)
-        }
-        .onAppear {
-            screenBounds = NSScreen.main?.frame ?? .zero
+        .task { await viewModel.updateStats(stats) }
+        .onAppear { screenBounds = NSScreen.main?.frame ?? .zero }
+    }
+
+    private var shouldShowLegend: Bool {
+        configuration.showLegend && viewModel.hasData
+    }
+
+    @ViewBuilder
+    private var legendSectionIfVisible: some View {
+        if shouldShowLegend {
+            legendSection
         }
     }
     
     // MARK: - Header Section
-    
+
     @ViewBuilder
     private var headerSection: some View {
         HStack {
-            // Title and summary
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Image(systemName: "calendar.badge.plus")
-                        .foregroundColor(.green)
-                    
-                    Text("Daily Cost Activity")
-                        .font(.headline)
-                        .fontWeight(.semibold)
-                }
-                
-                if let summary = viewModel.summaryStats {
-                    Text("\(summary.daysWithUsage) days of usage in last 365 days")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                } else if viewModel.isLoading {
-                    Text("Loading usage data...")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
-            
+            titleAndSummary
             Spacer()
-            
-            // Cost summary
-            VStack(alignment: .trailing, spacing: 4) {
-                if let summary = viewModel.summaryStats {
-                    Text(summary.totalCost.asCurrency)
-                        .font(.title3)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.primary)
-                    
-                    Text("Last 365 days")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                } else if viewModel.isLoading {
-                    ProgressView()
-                        .scaleEffect(0.8)
-                }
+            costSummary
+        }
+    }
+
+    private var titleAndSummary: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            headerTitle
+            summarySubtitle
+        }
+    }
+
+    private var headerTitle: some View {
+        HStack {
+            Image(systemName: "calendar.badge.plus")
+                .foregroundColor(.green)
+            Text("Daily Cost Activity")
+                .font(.headline)
+                .fontWeight(.semibold)
+        }
+    }
+
+    @ViewBuilder
+    private var summarySubtitle: some View {
+        if let summary = viewModel.summaryStats {
+            Text("\(summary.daysWithUsage) days of usage in last 365 days")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        } else if viewModel.isLoading {
+            Text("Loading usage data...")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+    }
+
+    @ViewBuilder
+    private var costSummary: some View {
+        VStack(alignment: .trailing, spacing: 4) {
+            if let summary = viewModel.summaryStats {
+                Text(summary.totalCost.asCurrency)
+                    .font(.title3)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+                Text("Last 365 days")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            } else if viewModel.isLoading {
+                ProgressView()
+                    .scaleEffect(0.8)
             }
         }
     }
@@ -453,30 +463,7 @@ struct YearlyCostHeatmap_Previews: PreviewProvider {
     }
     
     static var sampleStats: UsageStats {
-        // Generate realistic sample data
-        var dailyUsage: [DailyUsage] = []
-        let calendar = Calendar.current
-        let today = Date()
-        
-        for dayOffset in 0..<365 {
-            let date = calendar.date(byAdding: .day, value: -dayOffset, to: today)!
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyyy-MM-dd"
-            
-            // Simulate realistic usage patterns
-            let isWeekend = [1, 7].contains(calendar.component(.weekday, from: date))
-            let baseUsage = isWeekend ? 0.3 : 1.0
-            let randomFactor = Double.random(in: 0.2...1.8)
-            let cost = dayOffset < 300 ? baseUsage * randomFactor * 3.0 : 0 // Some days with no usage
-            
-            dailyUsage.append(DailyUsage(
-                date: formatter.string(from: date),
-                totalCost: cost > 2.8 ? 0 : cost, // 10% of days with no usage
-                totalTokens: Int(cost * 1000),
-                modelsUsed: ["claude-sonnet-4"]
-            ))
-        }
-        
+        let dailyUsage = generateSampleDailyUsage()
         return UsageStats(
             totalCost: dailyUsage.reduce(0) { $0 + $1.totalCost },
             totalTokens: dailyUsage.reduce(0) { $0 + $1.totalTokens },
@@ -489,6 +476,60 @@ struct YearlyCostHeatmap_Previews: PreviewProvider {
             byDate: dailyUsage,
             byProject: []
         )
+    }
+
+    private static func generateSampleDailyUsage() -> [DailyUsage] {
+        let calendar = Calendar.current
+        let today = Date()
+        let dateFormatter = makeDateFormatter()
+
+        return (0..<365).map { dayOffset in
+            makeDailyUsage(
+                dayOffset: dayOffset,
+                today: today,
+                calendar: calendar,
+                dateFormatter: dateFormatter
+            )
+        }
+    }
+
+    private static func makeDateFormatter() -> DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }
+
+    private static func makeDailyUsage(
+        dayOffset: Int,
+        today: Date,
+        calendar: Calendar,
+        dateFormatter: DateFormatter
+    ) -> DailyUsage {
+        let date = calendar.date(byAdding: .day, value: -dayOffset, to: today)!
+        let cost = calculateSampleCost(for: date, dayOffset: dayOffset, calendar: calendar)
+        return DailyUsage(
+            date: dateFormatter.string(from: date),
+            totalCost: cost,
+            totalTokens: Int(cost * 1000),
+            modelsUsed: ["claude-sonnet-4"]
+        )
+    }
+
+    private static func calculateSampleCost(
+        for date: Date,
+        dayOffset: Int,
+        calendar: Calendar
+    ) -> Double {
+        let hasNoRecentActivity = dayOffset >= 300
+        guard !hasNoRecentActivity else { return 0 }
+
+        let weekday = calendar.component(.weekday, from: date)
+        let isWeekend = weekday == 1 || weekday == 7
+        let baseUsage = isWeekend ? 0.3 : 1.0
+        let randomFactor = Double.random(in: 0.2...1.8)
+        let rawCost = baseUsage * randomFactor * 3.0
+        let simulateNoUsageDay = rawCost > 2.8
+        return simulateNoUsageDay ? 0 : rawCost
     }
 }
 #endif

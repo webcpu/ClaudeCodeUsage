@@ -2,49 +2,42 @@
 //  UsageAnalytics.swift
 //  ClaudeCodeUsage
 //
-//  Analytics and computations for usage data
-//
 
 import Foundation
 
+// MARK: - UsageAnalytics
+
 public enum UsageAnalytics {
-    
+
     // MARK: - Cost Calculations
-    
-    /// Calculate total cost from usage entries
+
     public static func totalCost(from entries: [UsageEntry]) -> Double {
         entries.reduce(0) { $0 + $1.cost }
     }
-    
-    /// Calculate average cost per session
+
     public static func averageCostPerSession(from entries: [UsageEntry]) -> Double {
-        let sessions = Set(entries.compactMap { $0.sessionId })
-        guard !sessions.isEmpty else { return 0 }
-        return totalCost(from: entries) / Double(sessions.count)
+        let sessionCount = Set(entries.compactMap { $0.sessionId }).count
+        guard sessionCount > 0 else { return 0 }
+        return totalCost(from: entries) / Double(sessionCount)
     }
-    
-    /// Get cost breakdown by model
+
     public static func costBreakdown(from stats: UsageStats) -> [(model: String, cost: Double, percentage: Double)] {
-        let total = stats.totalCost
-        guard total > 0 else { return [] }
-        
+        guard stats.totalCost > 0 else { return [] }
         return stats.byModel
             .sorted { $0.totalCost > $1.totalCost }
-            .map { model in
-                (model: model.model,
-                 cost: model.totalCost,
-                 percentage: (model.totalCost / total) * 100)
-            }
+            .map { modelToCostPercentage($0, totalCost: stats.totalCost) }
     }
-    
+
+    private static func modelToCostPercentage(_ model: ModelUsage, totalCost: Double) -> (model: String, cost: Double, percentage: Double) {
+        (model: model.model, cost: model.totalCost, percentage: (model.totalCost / totalCost) * 100)
+    }
+
     // MARK: - Token Analysis
-    
-    /// Calculate total tokens from usage entries
+
     public static func totalTokens(from entries: [UsageEntry]) -> Int {
         entries.reduce(0) { $0 + $1.totalTokens }
     }
-    
-    /// Get token breakdown by type
+
     public static func tokenBreakdown(from stats: UsageStats) -> (
         inputPercentage: Double,
         outputPercentage: Double,
@@ -53,41 +46,50 @@ public enum UsageAnalytics {
     ) {
         let total = Double(stats.totalTokens)
         guard total > 0 else { return (0, 0, 0, 0) }
-        
-        // Single-pass reduction for better performance
-        let (input, output, cacheWrite, cacheRead) = stats.byModel.reduce((0, 0, 0, 0)) { acc, model in
+
+        let tokens = aggregateTokensByType(stats.byModel)
+        return tokenPercentages(from: tokens, total: total)
+    }
+
+    private static func aggregateTokensByType(_ models: [ModelUsage]) -> (input: Int, output: Int, cacheWrite: Int, cacheRead: Int) {
+        models.reduce((0, 0, 0, 0)) { acc, model in
             (acc.0 + model.inputTokens,
              acc.1 + model.outputTokens,
              acc.2 + model.cacheCreationTokens,
              acc.3 + model.cacheReadTokens)
         }
-        
-        return (
-            inputPercentage: (Double(input) / total) * 100,
-            outputPercentage: (Double(output) / total) * 100,
-            cacheWritePercentage: (Double(cacheWrite) / total) * 100,
-            cacheReadPercentage: (Double(cacheRead) / total) * 100
-        )
     }
-    
+
+    private static func tokenPercentages(
+        from tokens: (input: Int, output: Int, cacheWrite: Int, cacheRead: Int),
+        total: Double
+    ) -> (inputPercentage: Double, outputPercentage: Double, cacheWritePercentage: Double, cacheReadPercentage: Double) {
+        (inputPercentage: (Double(tokens.input) / total) * 100,
+         outputPercentage: (Double(tokens.output) / total) * 100,
+         cacheWritePercentage: (Double(tokens.cacheWrite) / total) * 100,
+         cacheReadPercentage: (Double(tokens.cacheRead) / total) * 100)
+    }
+
     // MARK: - Time-based Analysis
-    
-    /// Filter entries by date range
+
     public static func filterByDateRange(_ entries: [UsageEntry], from startDate: Date, to endDate: Date) -> [UsageEntry] {
-        entries.filter { entry in
-            guard let date = entry.date else { return false }
-            return date >= startDate && date <= endDate
-        }
+        entries.filter { isWithinRange($0, startDate: startDate, endDate: endDate) }
     }
-    
-    /// Group entries by date
+
+    private static func isWithinRange(_ entry: UsageEntry, startDate: Date, endDate: Date) -> Bool {
+        guard let date = entry.date else { return false }
+        return date >= startDate && date <= endDate
+    }
+
     public static func groupByDate(_ entries: [UsageEntry]) -> [String: [UsageEntry]] {
         let formatter = dateFormatter()
-        let entriesWithDates = entries.compactMap { entry -> (String, UsageEntry)? in
-            guard let date = entry.date else { return nil }
-            return (formatter.string(from: date), entry)
-        }
+        let entriesWithDates = entries.compactMap { pairWithDateString($0, formatter: formatter) }
         return Dictionary(grouping: entriesWithDates, by: \.0).mapValues { $0.map(\.1) }
+    }
+
+    private static func pairWithDateString(_ entry: UsageEntry, formatter: DateFormatter) -> (String, UsageEntry)? {
+        guard let date = entry.date else { return nil }
+        return (formatter.string(from: date), entry)
     }
 
     private static func dateFormatter() -> DateFormatter {
@@ -96,101 +98,102 @@ public enum UsageAnalytics {
         formatter.timeZone = TimeZone.current
         return formatter
     }
-    
-    /// Get daily usage statistics
+
     public static func dailyUsage(from entries: [UsageEntry]) -> [DailyUsage] {
-        let grouped = groupByDate(entries)
-        
-        return grouped.map { (date, dayEntries) in
-            let models = Set(dayEntries.map { $0.model })
-            return DailyUsage(
-                date: date,
-                totalCost: totalCost(from: dayEntries),
-                totalTokens: totalTokens(from: dayEntries),
-                modelsUsed: Array(models)
-            )
-        }.sorted { $0.date < $1.date }
+        groupByDate(entries)
+            .map { toDailyUsage(date: $0, entries: $1) }
+            .sorted { $0.date < $1.date }
     }
-    
+
+    private static func toDailyUsage(date: String, entries: [UsageEntry]) -> DailyUsage {
+        DailyUsage(
+            date: date,
+            totalCost: totalCost(from: entries),
+            totalTokens: totalTokens(from: entries),
+            modelsUsed: Array(Set(entries.map { $0.model }))
+        )
+    }
+
     // MARK: - Predictions
-    
-    /// Predict monthly cost based on daily average
+
     public static func predictMonthlyCost(from stats: UsageStats, daysElapsed: Int) -> Double {
         guard daysElapsed > 0 else { return 0 }
-        let dailyAverage = stats.totalCost / Double(daysElapsed)
-        return dailyAverage * 30
+        return (stats.totalCost / Double(daysElapsed)) * 30
     }
-    
-    /// Calculate burn rate (cost per hour)
+
     public static func burnRate(from entries: [UsageEntry], hours: Int = 24) -> Double {
-        let recentEntries = entries.suffix(100) // Look at recent entries
+        let recentEntries = Array(entries.suffix(100))
         guard !recentEntries.isEmpty else { return 0 }
-        
-        let timeRange = recentEntries.compactMap { $0.date }.reduce((min: Date.distantFuture, max: Date.distantPast)) { result, date in
-            (min: min(result.min, date), max: max(result.max, date))
-        }
-        
-        let hours = timeRange.max.timeIntervalSince(timeRange.min) / 3600
-        guard hours > 0 else { return 0 }
-        
-        return totalCost(from: Array(recentEntries)) / hours
+
+        let hoursElapsed = calculateHoursElapsed(recentEntries)
+        guard hoursElapsed > 0 else { return 0 }
+
+        return totalCost(from: recentEntries) / hoursElapsed
     }
-    
+
+    private static func calculateHoursElapsed(_ entries: [UsageEntry]) -> Double {
+        let timeRange = entries
+            .compactMap { $0.date }
+            .reduce((min: Date.distantFuture, max: Date.distantPast)) { (min($0.min, $1), max($0.max, $1)) }
+        return timeRange.max.timeIntervalSince(timeRange.min) / 3600
+    }
+
     // MARK: - Cache Efficiency
-    
-    /// Calculate cache savings
+
     public static func cacheSavings(from stats: UsageStats) -> CacheSavings {
-        // Single-pass reduction for cache and input tokens
-        let (cacheReadTokens, inputTokens) = stats.byModel.reduce((0, 0)) { acc, model in
-            (acc.0 + model.cacheReadTokens, acc.1 + model.inputTokens)
-        }
-        
-        // Estimate savings (cache reads are typically 10% of input cost)
-        let estimatedInputCost = Double(inputTokens) * 0.00001 // Rough estimate
-        let estimatedCacheCost = Double(cacheReadTokens) * 0.000001 // 10% of input
-        let saved = max(0, (Double(cacheReadTokens) * 0.000009)) // 90% savings
-        
+        let cacheReadTokens = stats.byModel.reduce(0) { $0 + $1.cacheReadTokens }
+        let estimatedSaved = estimateCacheSavings(cacheReadTokens)
         return CacheSavings(
             tokensSaved: cacheReadTokens,
-            estimatedSaved: saved,
-            description: cacheReadTokens > 0 ? 
-                "Saved ~$\(String(format: "%.2f", saved)) with cache (\(cacheReadTokens.abbreviated) tokens)" :
-                "No cache usage yet"
+            estimatedSaved: estimatedSaved,
+            description: cacheSavingsDescription(tokens: cacheReadTokens, saved: estimatedSaved)
         )
+    }
+
+    private static func estimateCacheSavings(_ cacheReadTokens: Int) -> Double {
+        max(0, Double(cacheReadTokens) * 0.000009)
+    }
+
+    private static func cacheSavingsDescription(tokens: Int, saved: Double) -> String {
+        tokens > 0
+            ? "Saved ~$\(String(format: "%.2f", saved)) with cache (\(tokens.abbreviated) tokens)"
+            : "No cache usage yet"
     }
 }
 
-// Note: TimeRange is already defined in UsageModels.swift
-
 // MARK: - Formatting Extensions
+
 public extension Int {
-    /// Format large numbers with abbreviations (K, M, B)
     var abbreviated: String {
-        if self >= 1_000_000_000 {
-            return String(format: "%.1fB", Double(self) / 1_000_000_000)
-        } else if self >= 1_000_000 {
-            return String(format: "%.1fM", Double(self) / 1_000_000)
-        } else if self >= 1_000 {
-            return String(format: "%.1fK", Double(self) / 1_000)
-        } else {
-            return "\(self)"
-        }
+        abbreviatedNumber(self)
+    }
+}
+
+private func abbreviatedNumber(_ value: Int) -> String {
+    switch value {
+    case 1_000_000_000...:
+        return String(format: "%.1fB", Double(value) / 1_000_000_000)
+    case 1_000_000...:
+        return String(format: "%.1fM", Double(value) / 1_000_000)
+    case 1_000...:
+        return String(format: "%.1fK", Double(value) / 1_000)
+    default:
+        return "\(value)"
     }
 }
 
 public extension Double {
-    /// Format as currency
     var asCurrency: String {
         String(format: "$%.2f", self)
     }
-    
-    /// Format as percentage
+
     var asPercentage: String {
         String(format: "%.1f%%", self)
     }
 }
 
 // MARK: - Supporting Types
+
 public struct CacheSavings {
     public let tokensSaved: Int
     public let estimatedSaved: Double
@@ -198,45 +201,19 @@ public struct CacheSavings {
 }
 
 // MARK: - Hourly Accumulation
+
 public extension UsageAnalytics {
-    /// Get hourly cost accumulation for today from usage entries (cumulative)
+
     static func todayHourlyAccumulation(from entries: [UsageEntry], referenceDate: Date = Date()) -> [Double] {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: referenceDate)
         let currentHour = calendar.component(.hour, from: referenceDate)
-        
-        // Filter entries for today
-        let todayEntries = entries.filter { entry in
-            guard let date = entry.date else { return false }
-            return calendar.isDate(date, inSameDayAs: today)
-        }
-        
-        // Sort by timestamp
-        let sortedEntries = todayEntries.sorted { 
-            ($0.date ?? Date.distantPast) < ($1.date ?? Date.distantPast) 
-        }
-        
-        // Group costs by hour
-        var hourlyCosts = [Int: Double]()
-        for entry in sortedEntries {
-            guard let date = entry.date else { continue }
-            let hour = calendar.component(.hour, from: date)
-            hourlyCosts[hour, default: 0] += entry.cost
-        }
-        
-        // Create cumulative array
-        var cumulative: [Double] = []
-        var total = 0.0
-        
-        for hour in 0...currentHour {
-            total += hourlyCosts[hour] ?? 0
-            cumulative.append(total)
-        }
-        
-        return cumulative
+
+        let todayEntries = filterEntriesToday(entries, calendar: calendar, today: today)
+        let hourlyCosts = groupCostsByHour(todayEntries, calendar: calendar)
+        return buildCumulativeArray(from: hourlyCosts, throughHour: currentHour)
     }
-    
-    /// Get individual hourly costs for today from usage entries (non-cumulative) with proper timezone handling
+
     static func todayHourlyCosts(from entries: [UsageEntry], referenceDate: Date = Date()) -> [Double] {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: referenceDate)
@@ -263,5 +240,14 @@ public extension UsageAnalytics {
 
     private static func buildHourlyArray(from hourlyCosts: [Int: Double]) -> [Double] {
         (0..<24).map { hourlyCosts[$0] ?? 0 }
+    }
+
+    private static func buildCumulativeArray(from hourlyCosts: [Int: Double], throughHour: Int) -> [Double] {
+        (0...throughHour)
+            .map { hourlyCosts[$0] ?? 0 }
+            .reduce(into: [Double]()) { cumulative, cost in
+                let runningTotal = (cumulative.last ?? 0) + cost
+                cumulative.append(runningTotal)
+            }
     }
 }

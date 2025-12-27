@@ -124,41 +124,27 @@ public actor UsageRepository {
 
         logger.debug("Files: \(todayFiles.count) today / \(allFiles.count) total")
 
-        // Load entries with fresh deduplication to allow re-loading on refresh
-        let entries = await loadEntriesForToday(from: todayFiles)
+        let entries = await loadEntriesWithFreshDeduplication(from: todayFiles)
+        return filterEntriesToday(entries)
+    }
+
+    private func loadEntriesWithFreshDeduplication(from files: [FileMetadata]) async -> [UsageEntry] {
+        await loadEntriesForToday(from: files)
+    }
+
+    private func filterEntriesToday(_ entries: [UsageEntry]) -> [UsageEntry] {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
-
         return entries.filter { entry in
-            guard let date = entry.date else { return false }
-            return calendar.isDate(date, inSameDayAs: today)
+            entry.date.map { calendar.isDate($0, inSameDayAs: today) } ?? false
         }
     }
 
-    /// Load entries for today with fresh deduplication
     private func loadEntriesForToday(from files: [FileMetadata]) async -> [UsageEntry] {
-        var cachedEntries: [UsageEntry] = []
-        var dirtyFiles: [FileMetadata] = []
-
-        for file in files {
-            if let cached = fileCache[file.path],
-               cached.modificationDate == file.modificationDate {
-                cachedEntries.append(contentsOf: cached.entries)
-            } else {
-                dirtyFiles.append(file)
-            }
-        }
-
-        // Fresh deduplication allows re-loading modified files during refresh
-        // (global deduplication would skip entries already seen in previous loads)
+        let (cachedFiles, dirtyFiles) = partitionByCache(files)
+        let cachedEntries = cachedFiles.flatMap { fileCache[$0.path]?.entries ?? [] }
         let freshDeduplication = Deduplication()
-        let newEntries: [UsageEntry]
-        if dirtyFiles.count > Threshold.parallelProcessing {
-            newEntries = await loadEntriesInParallel(from: dirtyFiles, deduplication: freshDeduplication)
-        } else {
-            newEntries = loadEntriesSequentially(from: dirtyFiles, deduplication: freshDeduplication)
-        }
-
+        let newEntries = await loadNewEntries(from: dirtyFiles, deduplication: freshDeduplication)
         return cachedEntries + newEntries
     }
 
@@ -214,35 +200,48 @@ public actor UsageRepository {
             .map { files in
                 files
                     .filter { $0.hasSuffix(".jsonl") }
-                    .compactMap { file -> FileMetadata? in
-                        let filePath = projectPath + "/" + file
-
-                        // Fast path: use cached metadata for old files (immutable)
-                        if let cached = fileCache[filePath] {
-                            let isOldFile = cached.modificationDate < todayStart
-                            if isOldFile {
-                                // Old files are immutable - skip filesystem read
-                                return FileMetadata(
-                                    path: filePath,
-                                    projectDir: projectDir,
-                                    earliestTimestamp: ISO8601DateFormatter().string(from: cached.modificationDate),
-                                    modificationDate: cached.modificationDate
-                                )
-                            }
-                        }
-
-                        // Slow path: read fresh attributes for new or today's files
-                        guard let (timestamp, modDate) = FileTimestamp.extract(from: filePath) else {
-                            return nil
-                        }
-                        return FileMetadata(
-                            path: filePath,
-                            projectDir: projectDir,
-                            earliestTimestamp: timestamp,
-                            modificationDate: modDate
-                        )
-                    }
+                    .compactMap { buildMetadata(for: $0, in: projectPath, projectDir: projectDir, todayStart: todayStart) }
             } ?? []
+    }
+
+    private func buildMetadata(
+        for file: String,
+        in projectPath: String,
+        projectDir: String,
+        todayStart: Date
+    ) -> FileMetadata? {
+        let filePath = projectPath + "/" + file
+
+        if let cached = cachedMetadataForOldFile(at: filePath, projectDir: projectDir, todayStart: todayStart) {
+            return cached
+        }
+
+        return freshMetadata(at: filePath, projectDir: projectDir)
+    }
+
+    private func cachedMetadataForOldFile(at filePath: String, projectDir: String, todayStart: Date) -> FileMetadata? {
+        guard let cached = fileCache[filePath],
+              cached.modificationDate < todayStart else {
+            return nil
+        }
+        return FileMetadata(
+            path: filePath,
+            projectDir: projectDir,
+            earliestTimestamp: ISO8601DateFormatter().string(from: cached.modificationDate),
+            modificationDate: cached.modificationDate
+        )
+    }
+
+    private func freshMetadata(at filePath: String, projectDir: String) -> FileMetadata? {
+        guard let (timestamp, modDate) = FileTimestamp.extract(from: filePath) else {
+            return nil
+        }
+        return FileMetadata(
+            path: filePath,
+            projectDir: projectDir,
+            earliestTimestamp: timestamp,
+            modificationDate: modDate
+        )
     }
 
     private func filterFilesModifiedToday(_ files: [FileMetadata]) -> [FileMetadata] {
@@ -256,34 +255,38 @@ public actor UsageRepository {
     // MARK: - Entry Loading
 
     private func loadEntries(from files: [FileMetadata]) async -> [UsageEntry] {
-        // Partition files into cached (unchanged) and dirty (new or modified)
-        var cachedEntries: [UsageEntry] = []
-        var dirtyFiles: [FileMetadata] = []
+        let (cachedFiles, dirtyFiles) = partitionByCache(files)
+        let cachedEntries = cachedFiles.flatMap { fileCache[$0.path]?.entries ?? [] }
+        let newEntries = await loadNewEntries(from: dirtyFiles, deduplication: globalDeduplication)
+        logger.debug("Cache: \(cachedFiles.count) hit / \(dirtyFiles.count) miss")
+        return cachedEntries + newEntries
+    }
 
-        for file in files {
-            if let cached = fileCache[file.path],
-               cached.modificationDate == file.modificationDate {
-                // File unchanged - use cached entries
-                cachedEntries.append(contentsOf: cached.entries)
+    private func partitionByCache(_ files: [FileMetadata]) -> (cached: [FileMetadata], dirty: [FileMetadata]) {
+        files.reduce(into: (cached: [FileMetadata](), dirty: [FileMetadata]())) { result, file in
+            if isCacheHit(for: file) {
+                result.cached.append(file)
             } else {
-                // File is new or modified - needs parsing
-                dirtyFiles.append(file)
+                result.dirty.append(file)
             }
         }
+    }
 
-        // Only parse dirty files
-        let newEntries: [UsageEntry]
-        if dirtyFiles.count > Threshold.batchProcessing {
-            newEntries = await loadEntriesInBatches(from: dirtyFiles, deduplication: globalDeduplication)
-        } else if dirtyFiles.count > Threshold.parallelProcessing {
-            newEntries = await loadEntriesInParallel(from: dirtyFiles, deduplication: globalDeduplication)
-        } else {
-            newEntries = loadEntriesSequentially(from: dirtyFiles, deduplication: globalDeduplication)
+    private func isCacheHit(for file: FileMetadata) -> Bool {
+        fileCache[file.path]?.modificationDate == file.modificationDate
+    }
+
+    private func loadNewEntries(from files: [FileMetadata], deduplication: Deduplication) async -> [UsageEntry] {
+        switch files.count {
+        case 0:
+            return []
+        case 1...Threshold.parallelProcessing:
+            return loadEntriesSequentially(from: files, deduplication: deduplication)
+        case (Threshold.parallelProcessing + 1)...Threshold.batchProcessing:
+            return await loadEntriesInParallel(from: files, deduplication: deduplication)
+        default:
+            return await loadEntriesInBatches(from: files, deduplication: deduplication)
         }
-
-        logger.debug("Cache: \(files.count - dirtyFiles.count) hit / \(dirtyFiles.count) miss")
-
-        return cachedEntries + newEntries
     }
 
     private func loadEntriesSequentially(
@@ -297,58 +300,48 @@ public actor UsageRepository {
         from files: [FileMetadata],
         deduplication: Deduplication
     ) async -> [UsageEntry] {
-        // Parse files in parallel (nonisolated, pure function)
-        let results = await withTaskGroup(of: (FileMetadata, [UsageEntry]).self) { group in
-            for file in files {
-                group.addTask {
-                    let entries = FileParser.parse(file, deduplication: deduplication)
-                    return (file, entries)
-                }
-            }
-            var allResults: [(FileMetadata, [UsageEntry])] = []
-            for await result in group {
-                allResults.append(result)
-            }
-            return allResults
-        }
+        let results = await parseFilesInParallel(files, deduplication: deduplication)
+        return cacheAndExtractEntries(from: results)
+    }
 
-        // Cache results on actor (isolated)
-        var allEntries: [UsageEntry] = []
-        for (file, entries) in results {
-            fileCache[file.path] = CachedFile(
-                modificationDate: file.modificationDate,
-                entries: entries
-            )
-            allEntries.append(contentsOf: entries)
+    private func parseFilesInParallel(
+        _ files: [FileMetadata],
+        deduplication: Deduplication
+    ) async -> [(FileMetadata, [UsageEntry])] {
+        await withTaskGroup(of: (FileMetadata, [UsageEntry]).self) { group in
+            files.forEach { file in
+                group.addTask { (file, FileParser.parse(file, deduplication: deduplication)) }
+            }
+            return await group.reduce(into: []) { $0.append($1) }
         }
-        return allEntries
+    }
+
+    private func cacheAndExtractEntries(from results: [(FileMetadata, [UsageEntry])]) -> [UsageEntry] {
+        results.flatMap { file, entries in
+            fileCache[file.path] = CachedFile(modificationDate: file.modificationDate, entries: entries)
+            return entries
+        }
     }
 
     private func loadEntriesInBatches(
         from files: [FileMetadata],
         deduplication: Deduplication
     ) async -> [UsageEntry] {
-        var allEntries: [UsageEntry] = []
-        for startIndex in stride(from: 0, to: files.count, by: Threshold.batchSize) {
-            let endIndex = min(startIndex + Threshold.batchSize, files.count)
-            let batch = Array(files[startIndex..<endIndex])
-            let batchEntries = await loadEntriesInParallel(from: batch, deduplication: deduplication)
-            allEntries.append(contentsOf: batchEntries)
+        await batches(of: files, size: Threshold.batchSize)
+            .asyncFlatMap { [self] in await loadEntriesInParallel(from: $0, deduplication: deduplication) }
+    }
+
+    private func batches(of files: [FileMetadata], size: Int) -> [[FileMetadata]] {
+        stride(from: 0, to: files.count, by: size).map { startIndex in
+            Array(files[startIndex..<min(startIndex + size, files.count)])
         }
-        return allEntries
     }
 
     // MARK: - File Parsing
 
     private func parseFile(_ file: FileMetadata, deduplication: Deduplication) -> [UsageEntry] {
         let entries = FileParser.parse(file, deduplication: deduplication)
-
-        // Cache parsed entries for future use
-        fileCache[file.path] = CachedFile(
-            modificationDate: file.modificationDate,
-            entries: entries
-        )
-
+        fileCache[file.path] = CachedFile(modificationDate: file.modificationDate, entries: entries)
         return entries
     }
 
@@ -691,8 +684,8 @@ private extension UsageStats {
 
 // MARK: - Async Helpers
 
-private extension StrideTo where Element == Int {
-    func asyncFlatMap<T: Sendable>(_ transform: @escaping @Sendable (Int) async -> [T]) async -> [T] {
+private extension Array where Element: Sendable {
+    func asyncFlatMap<T: Sendable>(_ transform: @escaping @Sendable (Element) async -> [T]) async -> [T] {
         var results: [T] = []
         for element in self {
             results.append(contentsOf: await transform(element))
