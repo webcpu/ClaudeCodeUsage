@@ -22,36 +22,16 @@ final class AppLifecycleManager {
     }
     
     private func setupNotificationHandlers() {
-        // App became active
-        NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
+        observe(NSApplication.didBecomeActiveNotification) { [weak self] in self?.handleAppBecameActive() }
+        observe(NSApplication.didResignActiveNotification) { [weak self] in self?.handleAppResignActive() }
+        observe(NSWindow.didBecomeKeyNotification) { [weak self] in self?.handleWindowFocus() }
+        observe(NSWindow.willCloseNotification) { [weak self] in self?.handleWindowWillClose() }
+    }
+
+    private func observe(_ notification: NSNotification.Name, handler: @escaping () -> Void) {
+        NotificationCenter.default.publisher(for: notification)
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                self?.handleAppBecameActive()
-            }
-            .store(in: &cancellables)
-        
-        // App resigned active
-        NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                self?.handleAppResignActive()
-            }
-            .store(in: &cancellables)
-        
-        // Window became key
-        NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                self?.handleWindowFocus()
-            }
-            .store(in: &cancellables)
-        
-        // Window will close
-        NotificationCenter.default.publisher(for: NSWindow.willCloseNotification)
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                self?.handleWindowWillClose()
-            }
+            .sink { _ in handler() }
             .store(in: &cancellables)
     }
     
