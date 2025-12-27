@@ -9,6 +9,7 @@ import ClaudeCodeUsageKit
 import struct ClaudeLiveMonitorLib.SessionBlock
 import struct ClaudeLiveMonitorLib.BurnRate
 import OSLog
+import TimingMacro
 
 private let performanceLogger = Logger(subsystem: "com.claudecodeusage", category: "StorePerformance")
 
@@ -162,6 +163,7 @@ final class UsageStore {
         refreshCoordinator.start()
     }
 
+    @Timed
     func loadData() async {
         guard !isCurrentlyLoading, !isLoadedRecently else { return }
 
