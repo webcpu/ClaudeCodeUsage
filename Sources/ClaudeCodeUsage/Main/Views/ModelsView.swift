@@ -13,7 +13,7 @@ struct ModelsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 ModelsHeader()
-                ModelsContent(store: store)
+                ModelsContent(state: ContentState.from(store: store))
             }
             .padding()
         }
@@ -21,27 +21,40 @@ struct ModelsView: View {
     }
 }
 
+// MARK: - Content State
+
+@MainActor
+private enum ContentState {
+    case loading
+    case empty
+    case loaded(models: [ModelUsage], totalCost: Double)
+    case error
+
+    static func from(store: UsageStore) -> ContentState {
+        if store.isLoading { return .loading }
+        guard let stats = store.stats else { return .error }
+        return stats.byModel.isEmpty ? .empty : .loaded(models: stats.byModel, totalCost: stats.totalCost)
+    }
+}
+
 // MARK: - Content Router
 
 private struct ModelsContent: View {
-    let store: UsageStore
+    let state: ContentState
 
     var body: some View {
-        if let stats = store.stats {
-            if stats.byModel.isEmpty {
-                EmptyStateView(
-                    icon: "cpu",
-                    title: "No Model Data",
-                    message: "Model usage will appear here once you start using Claude Code."
-                )
-            } else {
-                ModelsList(models: stats.byModel, totalCost: stats.totalCost)
-            }
-        } else if store.isLoading {
-            ProgressView("Loading models...")
-                .frame(maxWidth: .infinity)
-                .padding(.top, 50)
-        } else {
+        switch state {
+        case .loading:
+            LoadingView(message: "Loading models...")
+        case .empty:
+            EmptyStateView(
+                icon: "cpu",
+                title: "No Model Data",
+                message: "Model usage will appear here once you start using Claude Code."
+            )
+        case .loaded(let models, let totalCost):
+            ModelsList(models: models, totalCost: totalCost)
+        case .error:
             EmptyStateView(
                 icon: "cpu",
                 title: "No Data Available",
@@ -64,6 +77,18 @@ private struct ModelsHeader: View {
                 .font(.subheadline)
                 .foregroundColor(.secondary)
         }
+    }
+}
+
+// MARK: - Loading View
+
+private struct LoadingView: View {
+    let message: String
+
+    var body: some View {
+        ProgressView(message)
+            .frame(maxWidth: .infinity)
+            .padding(.top, 50)
     }
 }
 
@@ -92,24 +117,9 @@ struct ModelCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Label(ModelNameFormatter.format(model.model), systemImage: "cpu")
-                    .font(.headline)
-                Spacer()
-                Text(model.totalCost.asCurrency)
-                    .font(.system(.body, design: .monospaced))
-                    .fontWeight(.semibold)
-            }
-
+            ModelHeader(name: model.model, cost: model.totalCost)
             UsageBar(percentage: metrics.percentage, color: metrics.color)
-
-            HStack {
-                StatLabel(icon: "doc.text", value: "\(model.sessionCount) sessions")
-                Spacer()
-                StatLabel(icon: "number", value: "\(model.totalTokens.abbreviated) tokens")
-                Spacer()
-                StatLabel(icon: "percent", value: metrics.percentage.asPercentage)
-            }
+            ModelStats(model: model, percentage: metrics.percentage)
         }
         .padding()
         .background(Color(NSColor.controlBackgroundColor))
@@ -117,7 +127,23 @@ struct ModelCard: View {
     }
 }
 
-// MARK: - Usage Bar
+// MARK: - Card Components
+
+private struct ModelHeader: View {
+    let name: String
+    let cost: Double
+
+    var body: some View {
+        HStack {
+            Label(ModelNameFormatter.format(name), systemImage: "cpu")
+                .font(.headline)
+            Spacer()
+            Text(cost.asCurrency)
+                .font(.system(.body, design: .monospaced))
+                .fontWeight(.semibold)
+        }
+    }
+}
 
 private struct UsageBar: View {
     let percentage: Double
@@ -138,7 +164,20 @@ private struct UsageBar: View {
     }
 }
 
-// MARK: - Stat Label
+private struct ModelStats: View {
+    let model: ModelUsage
+    let percentage: Double
+
+    var body: some View {
+        HStack {
+            StatLabel(icon: "doc.text", value: "\(model.sessionCount) sessions")
+            Spacer()
+            StatLabel(icon: "number", value: "\(model.totalTokens.abbreviated) tokens")
+            Spacer()
+            StatLabel(icon: "percent", value: percentage.asPercentage)
+        }
+    }
+}
 
 private struct StatLabel: View {
     let icon: String

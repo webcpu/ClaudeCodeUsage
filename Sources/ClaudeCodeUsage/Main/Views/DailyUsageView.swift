@@ -13,7 +13,7 @@ struct DailyUsageView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 DailyUsageHeader()
-                DailyUsageContent(store: store)
+                DailyUsageContent(state: ContentState.from(store: store))
             }
             .padding()
         }
@@ -21,27 +21,40 @@ struct DailyUsageView: View {
     }
 }
 
+// MARK: - Content State
+
+@MainActor
+private enum ContentState {
+    case loading
+    case empty
+    case loaded([DailyUsage])
+    case error
+
+    static func from(store: UsageStore) -> ContentState {
+        if store.isLoading { return .loading }
+        guard let stats = store.stats else { return .error }
+        return stats.byDate.isEmpty ? .empty : .loaded(stats.byDate)
+    }
+}
+
 // MARK: - Content Router
 
 private struct DailyUsageContent: View {
-    let store: UsageStore
+    let state: ContentState
 
     var body: some View {
-        if let stats = store.stats {
-            if stats.byDate.isEmpty {
-                EmptyStateView(
-                    icon: "calendar",
-                    title: "No Usage Data",
-                    message: "Daily usage statistics will appear here once you start using Claude Code.\nData is collected from ~/.claude/projects/"
-                )
-            } else {
-                DailyUsageList(dates: stats.byDate)
-            }
-        } else if store.isLoading {
-            ProgressView("Loading daily usage...")
-                .frame(maxWidth: .infinity)
-                .padding(.top, 50)
-        } else {
+        switch state {
+        case .loading:
+            LoadingView(message: "Loading daily usage...")
+        case .empty:
+            EmptyStateView(
+                icon: "calendar",
+                title: "No Usage Data",
+                message: "Daily usage statistics will appear here once you start using Claude Code.\nData is collected from ~/.claude/projects/"
+            )
+        case .loaded(let dates):
+            DailyUsageList(dates: dates)
+        case .error:
             EmptyStateView(
                 icon: "calendar",
                 title: "No Data Available",
@@ -64,6 +77,18 @@ private struct DailyUsageHeader: View {
                 .font(.subheadline)
                 .foregroundColor(.secondary)
         }
+    }
+}
+
+// MARK: - Loading View
+
+private struct LoadingView: View {
+    let message: String
+
+    var body: some View {
+        ProgressView(message)
+            .frame(maxWidth: .infinity)
+            .padding(.top, 50)
     }
 }
 
@@ -90,31 +115,10 @@ struct DailyCard: View {
 
     var body: some View {
         HStack(spacing: 16) {
-            DateBadge(day: dateInfo.dayOfMonth, month: dateInfo.monthAbbreviation, isToday: dateInfo.isToday)
-
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text(dateInfo.dayOfWeek)
-                        .font(.headline)
-                    if dateInfo.isToday {
-                        Badge(text: "TODAY", color: .accentColor)
-                    }
-                }
-                Text("\(daily.modelCount) model\(daily.modelCount == 1 ? "" : "s") used")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-
+            DateBadge(info: dateInfo)
+            DateDetails(info: dateInfo, modelCount: daily.modelCount)
             Spacer()
-
-            VStack(alignment: .trailing, spacing: 4) {
-                Text(daily.totalCost.asCurrency)
-                    .font(.system(.body, design: .monospaced))
-                    .fontWeight(.semibold)
-                Text("\(daily.totalTokens.abbreviated) tokens")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
+            CostMetrics(cost: daily.totalCost, tokens: daily.totalTokens)
         }
         .padding()
         .background(Color(NSColor.controlBackgroundColor))
@@ -122,31 +126,63 @@ struct DailyCard: View {
     }
 }
 
-// MARK: - Date Badge
+// MARK: - Card Components
 
 private struct DateBadge: View {
-    let day: String
-    let month: String
-    let isToday: Bool
+    let info: DateInfo
 
     var body: some View {
         VStack(spacing: 4) {
-            Text(day)
+            Text(info.dayOfMonth)
                 .font(.title2)
                 .fontWeight(.bold)
-            Text(month)
+            Text(info.monthAbbreviation)
                 .font(.caption)
                 .textCase(.uppercase)
         }
         .frame(width: 50)
         .padding(.vertical, 8)
-        .background(isToday ? Color.accentColor : Color.gray.opacity(0.2))
-        .foregroundColor(isToday ? .white : .primary)
+        .background(info.isToday ? Color.accentColor : Color.gray.opacity(0.2))
+        .foregroundColor(info.isToday ? .white : .primary)
         .cornerRadius(8)
     }
 }
 
-// MARK: - Badge
+private struct DateDetails: View {
+    let info: DateInfo
+    let modelCount: Int
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(info.dayOfWeek)
+                    .font(.headline)
+                if info.isToday {
+                    Badge(text: "TODAY", color: .accentColor)
+                }
+            }
+            Text("\(modelCount) model\(modelCount == 1 ? "" : "s") used")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+    }
+}
+
+private struct CostMetrics: View {
+    let cost: Double
+    let tokens: Int
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 4) {
+            Text(cost.asCurrency)
+                .font(.system(.body, design: .monospaced))
+                .fontWeight(.semibold)
+            Text("\(tokens.abbreviated) tokens")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+    }
+}
 
 private struct Badge: View {
     let text: String

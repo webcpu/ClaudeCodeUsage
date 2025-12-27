@@ -13,7 +13,7 @@ struct AnalyticsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 AnalyticsHeader()
-                AnalyticsContent(store: store)
+                AnalyticsContent(state: ContentState.from(store: store))
             }
             .padding()
         }
@@ -21,19 +21,33 @@ struct AnalyticsView: View {
     }
 }
 
+// MARK: - Content State
+
+@MainActor
+private enum ContentState {
+    case loading
+    case loaded(UsageStats)
+    case error
+
+    static func from(store: UsageStore) -> ContentState {
+        if store.isLoading { return .loading }
+        guard let stats = store.stats else { return .error }
+        return .loaded(stats)
+    }
+}
+
 // MARK: - Content Router
 
 private struct AnalyticsContent: View {
-    let store: UsageStore
+    let state: ContentState
 
     var body: some View {
-        if let stats = store.stats {
+        switch state {
+        case .loading:
+            LoadingView(message: "Analyzing data...")
+        case .loaded(let stats):
             AnalyticsCards(stats: stats)
-        } else if store.isLoading {
-            ProgressView("Analyzing data...")
-                .frame(maxWidth: .infinity)
-                .padding(.top, 50)
-        } else {
+        case .error:
             EmptyStateView(
                 icon: "chart.bar.xaxis",
                 title: "No Analytics Available",
@@ -70,6 +84,18 @@ private struct AnalyticsHeader: View {
                 .font(.subheadline)
                 .foregroundColor(.secondary)
         }
+    }
+}
+
+// MARK: - Loading View
+
+private struct LoadingView: View {
+    let message: String
+
+    var body: some View {
+        ProgressView(message)
+            .frame(maxWidth: .infinity)
+            .padding(.top, 50)
     }
 }
 
@@ -167,24 +193,30 @@ private struct YearlyCostHeatmapCard: View {
     let stats: UsageStats
     @State private var selectedYear: Int = Calendar.current.component(.year, from: Date())
 
-    private var availableYears: [Int] {
-        YearExtractor.years(from: stats.byDate)
-    }
+    private var availableYears: [Int] { YearExtractor.years(from: stats.byDate) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Spacer()
-                if availableYears.count > 1 {
-                    YearSelector(years: availableYears, selectedYear: $selectedYear)
-                }
-            }
-
+            HeatmapHeader(years: availableYears, selectedYear: $selectedYear)
             YearlyCostHeatmap(stats: stats, year: selectedYear)
         }
         .onAppear {
             if let mostRecent = availableYears.first {
                 selectedYear = mostRecent
+            }
+        }
+    }
+}
+
+private struct HeatmapHeader: View {
+    let years: [Int]
+    @Binding var selectedYear: Int
+
+    var body: some View {
+        HStack {
+            Spacer()
+            if years.count > 1 {
+                YearSelector(years: years, selectedYear: $selectedYear)
             }
         }
     }
@@ -360,10 +392,7 @@ private enum TrendCalculator {
 
 private enum YearExtractor {
     static func years(from dates: [DailyUsage]) -> [Int] {
-        dates
-            .compactMap { Int($0.date.prefix(4)) }
-            |> { Set($0) }
-            |> { Array($0).sorted(by: >) }
+        Array(Set(dates.compactMap { Int($0.date.prefix(4)) })).sorted(by: >)
     }
 }
 
@@ -401,10 +430,4 @@ private struct UsageTrend {
     var formattedPercentage: String {
         "\(direction == .up ? "+" : "-")\(percentage.asPercentage)"
     }
-}
-
-// MARK: - Pipe Operator
-
-private func |> <T, U>(value: T, transform: (T) -> U) -> U {
-    transform(value)
 }

@@ -11,36 +11,58 @@ struct OverviewView: View {
 
     var body: some View {
         ScrollView {
-            OverviewContent(store: store)
+            OverviewContent(state: ContentState.from(store: store))
         }
         .frame(minWidth: 600, idealWidth: 840, maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+// MARK: - Content State
+
+@MainActor
+private enum ContentState {
+    case loading
+    case loaded(UsageStats)
+    case error
+
+    static func from(store: UsageStore) -> ContentState {
+        if store.isLoading { return .loading }
+        guard let stats = store.stats else { return .error }
+        return .loaded(stats)
     }
 }
 
 // MARK: - Content Router
 
 private struct OverviewContent: View {
-    let store: UsageStore
+    let state: ContentState
 
     var body: some View {
-        if store.isLoading {
-            ProgressView("Loading...")
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(.top, 100)
-        } else if let stats = store.stats {
-            VStack(alignment: .leading, spacing: 20) {
-                OverviewHeader()
-                MetricsGrid(stats: stats)
-                CostBreakdownSection(stats: stats)
-            }
-            .padding()
-        } else {
+        switch state {
+        case .loading:
+            LoadingView(message: "Loading...")
+        case .loaded(let stats):
+            LoadedContent(stats: stats)
+        case .error:
             EmptyStateView(
                 icon: "chart.line.uptrend.xyaxis",
                 title: "No Data Available",
                 message: "Run Claude Code sessions to generate usage data."
             )
         }
+    }
+}
+
+private struct LoadedContent: View {
+    let stats: UsageStats
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            OverviewHeader()
+            MetricsGrid(stats: stats)
+            CostBreakdownSection(stats: stats)
+        }
+        .padding()
     }
 }
 
@@ -57,6 +79,18 @@ private struct OverviewHeader: View {
                 .font(.subheadline)
                 .foregroundColor(.secondary)
         }
+    }
+}
+
+// MARK: - Loading View
+
+private struct LoadingView: View {
+    let message: String
+
+    var body: some View {
+        ProgressView(message)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(.top, 100)
     }
 }
 
