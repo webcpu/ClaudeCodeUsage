@@ -88,7 +88,7 @@ final class UsageStore {
 
     var sessionTimeProgress: Double {
         guard let session = activeSession else { return 0 }
-        let elapsed = dateProvider.now.timeIntervalSince(session.startTime)
+        let elapsed = clock.now.timeIntervalSince(session.startTime)
         let total = session.endTime.timeIntervalSince(session.startTime)
         return min(elapsed / total, 1.5)
     }
@@ -100,7 +100,7 @@ final class UsageStore {
     }
 
     var todayHourlyCosts: [Double] {
-        UsageAnalytics.todayHourlyCosts(from: todayEntries, referenceDate: dateProvider.now)
+        UsageAnalytics.todayHourlyCosts(from: todayEntries, referenceDate: clock.now)
     }
 
     var formattedTodaysCost: String {
@@ -110,7 +110,7 @@ final class UsageStore {
     // MARK: - Dependencies
 
     private let dataLoader: UsageDataLoader
-    private let dateProvider: DateProviding
+    private let clock: any ClockProtocol
     private let refreshCoordinator: RefreshCoordinator
 
     // MARK: - Internal State
@@ -126,17 +126,17 @@ final class UsageStore {
         repository: UsageRepository? = nil,
         sessionMonitorService: SessionMonitorService? = nil,
         configurationService: ConfigurationService? = nil,
-        dateProvider: DateProviding = SystemDateProvider()
+        clock: any ClockProtocol = SystemClock()
     ) {
         let config = configurationService ?? DefaultConfigurationService()
         let repo = repository ?? UsageRepository(basePath: config.configuration.basePath)
         let sessionService = sessionMonitorService ?? DefaultSessionMonitorService(configuration: config.configuration)
 
         self.dataLoader = UsageDataLoader(repository: repo, sessionMonitorService: sessionService)
-        self.dateProvider = dateProvider
+        self.clock = clock
         self.defaultThreshold = config.configuration.dailyCostThreshold
         self.refreshCoordinator = RefreshCoordinator(
-            dateProvider: dateProvider,
+            clock: clock,
             refreshInterval: config.configuration.refreshInterval
         )
 
@@ -165,7 +165,7 @@ final class UsageStore {
         isCurrentlyLoading = true
         defer { isCurrentlyLoading = false }
 
-        lastLoadStartTime = dateProvider.now
+        lastLoadStartTime = clock.now
         _ = await LoadTrace.shared.start()
 
         do {
@@ -233,7 +233,7 @@ final class UsageStore {
     }
 
     private func performMemoryCleanup() {
-        todayEntries = filterToday(todayEntries, referenceDate: dateProvider.now)
+        todayEntries = filterToday(todayEntries, referenceDate: clock.now)
 
         if activeSession != nil {
             Task { await loadData() }
@@ -244,7 +244,7 @@ final class UsageStore {
 
     private var isLoadedRecently: Bool {
         guard let lastTime = lastLoadStartTime else { return false }
-        return dateProvider.now.timeIntervalSince(lastTime) < 0.5
+        return clock.now.timeIntervalSince(lastTime) < 0.5
     }
 
     deinit {

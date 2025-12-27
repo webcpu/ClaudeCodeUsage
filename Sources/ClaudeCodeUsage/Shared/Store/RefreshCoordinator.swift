@@ -14,7 +14,7 @@ final class RefreshCoordinator {
     private var dayChangeObserver: NSObjectProtocol?
     private var lastKnownDay: String
     private var lastRefreshTime: Date
-    private let dateProvider: DateProviding
+    private let clock: any ClockProtocol
     private let refreshInterval: TimeInterval
 
     /// Callback for refresh - set after init to avoid capturing self before initialization
@@ -27,13 +27,13 @@ final class RefreshCoordinator {
     }()
 
     init(
-        dateProvider: DateProviding,
+        clock: any ClockProtocol = SystemClock(),
         refreshInterval: TimeInterval
     ) {
-        self.dateProvider = dateProvider
+        self.clock = clock
         self.refreshInterval = refreshInterval
-        self.lastRefreshTime = dateProvider.now
-        self.lastKnownDay = Self.dayFormatter.string(from: dateProvider.now)
+        self.lastRefreshTime = clock.now
+        self.lastKnownDay = Self.dayFormatter.string(from: clock.now)
     }
 
     // MARK: - Timer Management
@@ -69,7 +69,7 @@ final class RefreshCoordinator {
 
     func handleAppBecameActive() {
         if shouldRefresh() {
-            lastRefreshTime = dateProvider.now
+            lastRefreshTime = clock.now
             Task { await onRefresh?() }
         }
         start()
@@ -81,7 +81,7 @@ final class RefreshCoordinator {
 
     func handleWindowFocus() {
         if shouldRefresh() {
-            lastRefreshTime = dateProvider.now
+            lastRefreshTime = clock.now
             Task { await onRefresh?() }
         }
     }
@@ -89,7 +89,7 @@ final class RefreshCoordinator {
     // MARK: - Private
 
     private func shouldRefresh() -> Bool {
-        dateProvider.now.timeIntervalSince(lastRefreshTime) > 2.0
+        clock.now.timeIntervalSince(lastRefreshTime) > 2.0
     }
 
     private func startDayChangeMonitoring() {
@@ -123,12 +123,12 @@ final class RefreshCoordinator {
     }
 
     private func updateLastKnownDay() {
-        lastKnownDay = Self.dayFormatter.string(from: dateProvider.now)
+        lastKnownDay = Self.dayFormatter.string(from: clock.now)
     }
 
     @objc private func handleSignificantTimeChange() {
         Task { @MainActor in
-            let currentDay = Self.dayFormatter.string(from: dateProvider.now)
+            let currentDay = Self.dayFormatter.string(from: clock.now)
 
             if currentDay != lastKnownDay {
                 lastKnownDay = currentDay
