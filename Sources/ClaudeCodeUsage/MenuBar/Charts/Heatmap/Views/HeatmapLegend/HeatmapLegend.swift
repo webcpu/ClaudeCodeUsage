@@ -145,10 +145,9 @@ public struct HeatmapLegend: View {
 
     @ViewBuilder
     private var verticalColorSquares: some View {
-        ForEach(Array(colorTheme.colors.reversed().enumerated()), id: \.offset) { index, color in
+        ForEach(Array((0..<5).reversed()), id: \.self) { level in
             LegendSquare(
-                color: color,
-                level: colorTheme.colors.count - 1 - index,
+                level: level,
                 accessibility: accessibility
             )
         }
@@ -197,10 +196,9 @@ public struct HeatmapLegend: View {
     @ViewBuilder
     private var colorSquares: some View {
         HStack(spacing: 3) {
-            ForEach(Array(colorTheme.colors.enumerated()), id: \.offset) { index, color in
+            ForEach(0..<5, id: \.self) { level in
                 LegendSquare(
-                    color: color,
-                    level: index,
+                    level: level,
                     accessibility: accessibility
                 )
             }

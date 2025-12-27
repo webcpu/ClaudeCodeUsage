@@ -78,11 +78,14 @@ public struct HeatmapDay: Identifiable, Equatable, Hashable {
     /// Pre-formatted cost string for display (e.g., "$1.23" or "No usage")
     public let costString: String
 
-    /// Pre-computed color to avoid repeated calculations during rendering
+    /// Pre-computed color for light mode (legacy - use color(for:) for scheme-aware color)
     public let color: Color
 
     /// Intensity level (0.0 to 1.0) relative to the maximum cost
     public let intensity: Double
+
+    /// Discrete intensity level (0-4) for color lookup
+    public let intensityLevel: Int
 
     // MARK: - Initialization
 
@@ -107,7 +110,15 @@ public struct HeatmapDay: Identifiable, Equatable, Hashable {
         self.costString = cost > 0 ? cost.asCurrency : "No usage"
 
         self.intensity = IntensityLevelCalculator.intensity(cost: cost, maxCost: maxCost)
+        self.intensityLevel = IntensityLevelCalculator.level(for: self.intensity)
         self.color = HeatmapColorScheme.color(for: cost, maxCost: maxCost)
+    }
+
+    // MARK: - Color Scheme Support
+
+    /// Returns the appropriate color for the given color scheme
+    public func color(for scheme: ColorScheme) -> Color {
+        HeatmapColorScheme.color(for: intensityLevel, scheme: scheme)
     }
 
     // MARK: - Equatable & Hashable
@@ -252,26 +263,61 @@ private enum IntensityLevelCalculator {
 
 // MARK: - Color Scheme
 
-/// Optimized color scheme for heatmap visualization
+/// Optimized color scheme for heatmap visualization with light/dark mode support
 public enum HeatmapColorScheme {
 
-    // MARK: - Color Constants
+    // MARK: - Light Mode Colors (GitHub Light Theme)
 
-    /// Array of all legend colors (5 levels from no activity to high activity)
-    public static let legendColors: [Color] = [
-        Color(red: 240/255, green: 242/255, blue: 245/255),  // Level 0: No contributions
-        Color(red: 186/255, green: 236/255, blue: 191/255),  // Level 1: Low contributions
-        Color(red: 109/255, green: 191/255, blue: 116/255),  // Level 2: Medium-low contributions
-        Color(red: 83/255, green: 162/255, blue: 88/255),    // Level 3: Medium-high contributions
-        Color(red: 45/255, green: 97/255, blue: 48/255)      // Level 4: High contributions
+    /// Colors for light mode (5 levels from no activity to high activity)
+    public static let lightColors: [Color] = [
+        Color(red: 235/255, green: 237/255, blue: 240/255),  // Level 0: #ebedf0
+        Color(red: 155/255, green: 233/255, blue: 168/255),  // Level 1: #9be9a8
+        Color(red: 64/255, green: 196/255, blue: 99/255),    // Level 2: #40c463
+        Color(red: 48/255, green: 161/255, blue: 78/255),    // Level 3: #30a14e
+        Color(red: 33/255, green: 110/255, blue: 57/255)     // Level 4: #216e39
     ]
+
+    // MARK: - Dark Mode Colors (GitHub Dark Theme)
+
+    /// Colors for dark mode (5 levels from no activity to high activity)
+    public static let darkColors: [Color] = [
+        Color(red: 22/255, green: 27/255, blue: 34/255),     // Level 0: #161b22
+        Color(red: 14/255, green: 68/255, blue: 41/255),     // Level 1: #0e4429
+        Color(red: 0/255, green: 109/255, blue: 50/255),     // Level 2: #006d32
+        Color(red: 38/255, green: 166/255, blue: 65/255),    // Level 3: #26a641
+        Color(red: 57/255, green: 211/255, blue: 83/255)     // Level 4: #39d353
+    ]
+
+    // MARK: - Legacy Support
+
+    /// Legacy color array (light mode) - kept for backward compatibility
+    @available(*, deprecated, message: "Use colors(for:) with ColorScheme instead")
+    public static var legendColors: [Color] { lightColors }
 
     // MARK: - Color Calculation
 
-    /// Returns the appropriate color for a given cost value
+    /// Returns colors for the specified color scheme
+    public static func colors(for scheme: ColorScheme) -> [Color] {
+        scheme == .dark ? darkColors : lightColors
+    }
+
+    /// Returns the appropriate color for a given level and color scheme
+    public static func color(for level: Int, scheme: ColorScheme) -> Color {
+        let colors = colors(for: scheme)
+        let index = max(0, min(colors.count - 1, level))
+        return colors[index]
+    }
+
+    /// Returns the appropriate color for a given cost value (light mode - legacy)
     public static func color(for cost: Double, maxCost: Double) -> Color {
         let level = intensityLevel(for: cost, maxCost: maxCost)
-        return legendColors[level]
+        return lightColors[level]
+    }
+
+    /// Returns the appropriate color for a given cost value and color scheme
+    public static func color(for cost: Double, maxCost: Double, scheme: ColorScheme) -> Color {
+        let level = intensityLevel(for: cost, maxCost: maxCost)
+        return color(for: level, scheme: scheme)
     }
 
     /// Returns the intensity level (0-4) for legend purposes

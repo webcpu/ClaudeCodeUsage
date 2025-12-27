@@ -9,13 +9,18 @@ import SwiftUI
 
 /// Individual square in the legend
 struct LegendSquare: View {
-    let color: Color
     let level: Int
     let accessibility: HeatmapAccessibility
 
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var squareColor: Color {
+        HeatmapColorScheme.color(for: level, scheme: colorScheme)
+    }
+
     var body: some View {
         Rectangle()
-            .fill(color)
+            .fill(squareColor)
             .frame(width: 11, height: 11)
             .cornerRadius(2)
             .overlay(

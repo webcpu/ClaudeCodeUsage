@@ -42,7 +42,13 @@ struct DaySquare: View {
     let isHovered: Bool
     let accessibility: HeatmapAccessibility
 
+    @Environment(\.colorScheme) private var colorScheme
+
     // MARK: - Computed Properties
+
+    private var dayColor: Color {
+        day.color(for: colorScheme)
+    }
 
     private var borderStyle: BorderStyle {
         BorderStyle.forDay(day, isHovered: isHovered, config: configuration)
@@ -62,7 +68,7 @@ struct DaySquare: View {
 
     var body: some View {
         Rectangle()
-            .fill(day.color)
+            .fill(dayColor)
             .frame(width: configuration.squareSize, height: configuration.squareSize)
             .cornerRadius(configuration.cornerRadius)
             .overlay(
