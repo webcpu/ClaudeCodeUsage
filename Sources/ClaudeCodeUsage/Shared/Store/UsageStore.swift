@@ -95,7 +95,7 @@ final class UsageStore {
     }
 
     // MARK: - Dependencies
-    private let client: ClaudeUsageClient
+    private let repository: UsageRepository
     let sessionMonitorService: SessionMonitorService
     private let configurationService: ConfigurationService
     private let dateProvider: DateProviding
@@ -113,16 +113,14 @@ final class UsageStore {
 
     // MARK: - Initialization
     init(
-        client: ClaudeUsageClient? = nil,
+        repository: UsageRepository? = nil,
         sessionMonitorService: SessionMonitorService? = nil,
         configurationService: ConfigurationService? = nil,
         dateProvider: DateProviding = SystemDateProvider()
     ) {
         let config = configurationService ?? DefaultConfigurationService()
         self.configurationService = config
-        self.client = client ?? ClaudeUsageClient(
-            dataSource: .localFiles(basePath: config.configuration.basePath)
-        )
+        self.repository = repository ?? UsageRepository(basePath: config.configuration.basePath)
         self.sessionMonitorService = sessionMonitorService
             ?? DefaultSessionMonitorService(configuration: config.configuration)
         self.dateProvider = dateProvider
@@ -192,8 +190,8 @@ final class UsageStore {
             // PHASE 1: Load today's data + session info (FAST)
             let phase1Start = dateProvider.now
 
-            async let todayEntriesLoading = client.getTodayUsageEntries()
-            async let todayStatsLoading = client.getTodayUsageStats()
+            async let todayEntriesLoading = repository.getTodayUsageEntries()
+            async let todayStatsLoading = repository.getTodayUsageStats()
             async let sessionLoading = sessionMonitorService.getActiveSession()
             async let burnRateLoading = sessionMonitorService.getBurnRate()
             async let tokenLimitLoading = sessionMonitorService.getAutoTokenLimit()
@@ -220,7 +218,7 @@ final class UsageStore {
 
             // PHASE 2: Load full historical data
             let phase2Start = dateProvider.now
-            let fullStats = try await client.getUsageStats()
+            let fullStats = try await repository.getUsageStats()
 
             #if DEBUG
             let phase2Time = dateProvider.now.timeIntervalSince(phase2Start)

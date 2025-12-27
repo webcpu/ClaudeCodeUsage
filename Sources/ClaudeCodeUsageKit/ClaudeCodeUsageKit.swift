@@ -15,8 +15,8 @@ import Foundation
 /// ```swift
 /// import ClaudeCodeUsageKit
 ///
-/// let client = ClaudeUsageClient()
-/// let stats = try await client.getUsageStats()
+/// let repository = UsageRepository()
+/// let stats = try await repository.getUsageStats()
 /// print("Total cost: \(stats.totalCost)")
 /// ```
 public struct ClaudeCodeUsageKit {
