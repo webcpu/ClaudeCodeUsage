@@ -1,140 +1,16 @@
+//
+//  LiveMonitor+SessionBlocks.swift
+//
+//  Session block identification, creation, and calculation logic.
+//
+
 import Foundation
 
-// MARK: - Configuration
+// MARK: - Session Block Identification
 
-public struct LiveMonitorConfig {
-    public let claudePaths: [String]
-    public let sessionDurationHours: Double
-    public let tokenLimit: Int?
-    public let refreshInterval: TimeInterval
-    public let order: SortOrder
+extension LiveMonitor {
 
-    public enum SortOrder {
-        case ascending
-        case descending
-    }
-
-    public init(claudePaths: [String], sessionDurationHours: Double = 5,
-                tokenLimit: Int? = nil, refreshInterval: TimeInterval = 1.0,
-                order: SortOrder = .descending) {
-        self.claudePaths = claudePaths
-        self.sessionDurationHours = sessionDurationHours
-        self.tokenLimit = tokenLimit
-        self.refreshInterval = refreshInterval
-        self.order = order
-    }
-}
-
-// MARK: - Live Monitor
-
-/// LiveMonitor manages the reading and processing of Claude usage files.
-/// Uses Swift actor for thread-safe access - no manual locking needed.
-public actor LiveMonitor {
-    private let config: LiveMonitorConfig
-    private var lastFileTimestamps: [String: Date] = [:]
-    private var processedHashes: Set<String> = Set()
-    private var allEntries: [UsageEntry] = []
-    private var maxTokensFromPreviousSessions: Int = 0
-    private let parser = JSONLParser()
-
-    public init(config: LiveMonitorConfig) {
-        self.config = config
-    }
-
-    // MARK: - Public API
-
-    public func getActiveBlock() -> SessionBlock? {
-        let files = findUsageFiles()
-        guard !files.isEmpty else { return nil }
-
-        loadModifiedFiles(files)
-
-        let blocks = identifySessionBlocks(entries: allEntries)
-        maxTokensFromPreviousSessions = maxTokensFromCompletedBlocks(blocks)
-
-        return mostRecentActiveBlock(from: blocks)
-    }
-
-    public func getAutoTokenLimit() -> Int? {
-        _ = getActiveBlock()
-        return maxTokensFromPreviousSessions > 0 ? maxTokensFromPreviousSessions : nil
-    }
-
-    public func clearCache() {
-        lastFileTimestamps.removeAll()
-        processedHashes.removeAll()
-        allEntries.removeAll()
-        maxTokensFromPreviousSessions = 0
-    }
-
-    // MARK: - File Discovery
-
-    private func findUsageFiles() -> [String] {
-        config.claudePaths.flatMap { findJSONLFiles(in: $0) }
-    }
-
-    private func findJSONLFiles(in claudePath: String) -> [String] {
-        let projectsPath = "\(claudePath)/projects"
-        let fileManager = FileManager.default
-
-        guard fileManager.fileExists(atPath: projectsPath),
-              let enumerator = fileManager.enumerator(atPath: projectsPath) else {
-            return []
-        }
-
-        return enumerator
-            .compactMap { $0 as? String }
-            .filter { $0.hasSuffix(".jsonl") }
-            .map { "\(projectsPath)/\($0)" }
-    }
-
-    // MARK: - File Loading
-
-    private func loadModifiedFiles(_ files: [String]) {
-        let filesToRead = files.filter { isFileModified($0) }
-        guard !filesToRead.isEmpty else { return }
-
-        loadEntriesFromFiles(filesToRead)
-    }
-
-    private func isFileModified(_ file: String) -> Bool {
-        guard let timestamp = fileModificationTime(file) else { return false }
-        let wasModified = lastFileTimestamps[file].map { timestamp > $0 } ?? true
-        if wasModified {
-            lastFileTimestamps[file] = timestamp
-        }
-        return wasModified
-    }
-
-    private func fileModificationTime(_ path: String) -> Date? {
-        try? FileManager.default
-            .attributesOfItem(atPath: path)[.modificationDate] as? Date
-    }
-
-    private func loadEntriesFromFiles(_ files: [String]) {
-        let newEntries = files.flatMap { parser.parseFile(at: $0, processedHashes: &processedHashes) }
-        allEntries.append(contentsOf: newEntries)
-        allEntries.sort { $0.timestamp < $1.timestamp }
-    }
-
-    // MARK: - Block Selection
-
-    private func maxTokensFromCompletedBlocks(_ blocks: [SessionBlock]) -> Int {
-        blocks
-            .filter { !$0.isActive && !$0.isGap }
-            .map(\.tokenCounts.total)
-            .max() ?? 0
-    }
-
-    private func mostRecentActiveBlock(from blocks: [SessionBlock]) -> SessionBlock? {
-        blocks
-            .filter(\.isActive)
-            .max { ($0.actualEndTime ?? $0.startTime) < ($1.actualEndTime ?? $1.startTime) }
-    }
-
-    // MARK: - Session Block Identification
-
-    private func identifySessionBlocks(entries: [UsageEntry]) -> [SessionBlock] {
+    func identifySessionBlocks(entries: [UsageEntry]) -> [SessionBlock] {
         guard !entries.isEmpty else { return [] }
 
         let sessionDurationSeconds = config.sessionDurationHours * 60 * 60
@@ -186,8 +62,11 @@ public actor LiveMonitor {
         let timeSinceLastEntry = lastEntryTime.map { entryTime.timeIntervalSince($0) } ?? 0
         return timeSinceBlockStart > sessionDuration || timeSinceLastEntry > sessionDuration
     }
+}
 
-    // MARK: - Block Creation
+// MARK: - Block Creation
+
+extension LiveMonitor {
 
     private func createBlock(startTime: Date, entries: [UsageEntry], now: Date, sessionDuration: TimeInterval) -> SessionBlock? {
         guard !entries.isEmpty else { return nil }
@@ -216,8 +95,11 @@ public actor LiveMonitor {
             projectedUsage: projectedUsage
         )
     }
+}
 
-    // MARK: - Pure Calculations
+// MARK: - Pure Calculations
+
+extension LiveMonitor {
 
     private func computeIsActive(actualEndTime: Date?, now: Date, endTime: Date, sessionDuration: TimeInterval) -> Bool {
         guard let actualEndTime else { return false }
@@ -264,10 +146,13 @@ public actor LiveMonitor {
             remainingMinutes: remainingMinutes
         )
     }
+}
 
-    // MARK: - Date Utilities
+// MARK: - Date Utilities
 
-    private func floorToHour(_ date: Date) -> Date {
+extension LiveMonitor {
+
+    func floorToHour(_ date: Date) -> Date {
         let secondsSinceEpoch = date.timeIntervalSince1970
         let secondsInHour = 3600.0
         let flooredSeconds = floor(secondsSinceEpoch / secondsInHour) * secondsInHour
@@ -277,7 +162,7 @@ public actor LiveMonitor {
 
 // MARK: - TokenCounts Extension
 
-private extension TokenCounts {
+extension TokenCounts {
     static let zero = TokenCounts(
         inputTokens: 0,
         outputTokens: 0,
