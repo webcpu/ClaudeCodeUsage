@@ -17,44 +17,6 @@ protocol AppSettingsServiceProtocol: AnyObject {
     func showAboutPanel()
 }
 
-// MARK: - Error Handling
-
-enum AppSettingsError: LocalizedError {
-    case serviceManagementFailed(Error)
-    case permissionDenied
-    case unsupportedOS
-
-    var errorDescription: String? {
-        switch self {
-        case .serviceManagementFailed(let error):
-            return "Failed to update launch settings: \(error.localizedDescription)"
-        case .permissionDenied:
-            return "Permission denied. Please check System Settings > Login Items."
-        case .unsupportedOS:
-            return "Open at Login requires macOS 13.0 or later"
-        }
-    }
-
-    var recoverySuggestion: String? {
-        switch self {
-        case .serviceManagementFailed:
-            return "Try again or check System Settings > Login Items"
-        case .permissionDenied:
-            return "Grant permission in System Settings"
-        case .unsupportedOS:
-            return "Update to macOS 13.0 or later"
-        }
-    }
-}
-
-// MARK: - App Metadata
-
-private enum AppMetadata {
-    static let name = "Usage Dashboard"
-    static let version = "1.0.0"
-    static let credits = "Claude Code Usage Tracking"
-}
-
 // MARK: - Main Implementation
 
 @Observable
@@ -148,3 +110,39 @@ final class MockAppSettingsService: AppSettingsServiceProtocol {
     }
 }
 #endif
+
+// MARK: - Supporting Types
+
+enum AppSettingsError: LocalizedError {
+    case serviceManagementFailed(Error)
+    case permissionDenied
+    case unsupportedOS
+
+    var errorDescription: String? {
+        switch self {
+        case .serviceManagementFailed(let error):
+            return "Failed to update launch settings: \(error.localizedDescription)"
+        case .permissionDenied:
+            return "Permission denied. Please check System Settings > Login Items."
+        case .unsupportedOS:
+            return "Open at Login requires macOS 13.0 or later"
+        }
+    }
+
+    var recoverySuggestion: String? {
+        switch self {
+        case .serviceManagementFailed:
+            return "Try again or check System Settings > Login Items"
+        case .permissionDenied:
+            return "Grant permission in System Settings"
+        case .unsupportedOS:
+            return "Update to macOS 13.0 or later"
+        }
+    }
+}
+
+private enum AppMetadata {
+    static let name = "Usage Dashboard"
+    static let version = "1.0.0"
+    static let credits = "Claude Code Usage Tracking"
+}
