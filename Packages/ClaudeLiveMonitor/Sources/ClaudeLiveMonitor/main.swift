@@ -1,11 +1,155 @@
 import Foundation
 import ClaudeLiveMonitorLib
 
-// MARK: - Command Line Interface
+// MARK: - Constants
 
-struct CLI {
-    static func printHelp() {
-        print("""
+private enum Defaults {
+    static let refreshInterval: TimeInterval = 1.0
+    static let sessionDurationHours: Double = 5.0
+}
+
+private enum EnvironmentKey {
+    static let claudeConfigDir = "CLAUDE_CONFIG_DIR"
+}
+
+private enum ANSICode {
+    static let yellow = "\u{001B}[33m"
+    static let reset = "\u{001B}[0m"
+    static let hideCursor = "\u{001B}[?25l"
+    static let showCursor = "\u{001B}[?25h"
+}
+
+// MARK: - Parsed Arguments
+
+struct ParsedArguments {
+    let tokenLimit: Int?
+    let refreshInterval: TimeInterval
+    let sessionDuration: Double
+    let shouldShowHelp: Bool
+
+    static let `default` = ParsedArguments(
+        tokenLimit: nil,
+        refreshInterval: Defaults.refreshInterval,
+        sessionDuration: Defaults.sessionDurationHours,
+        shouldShowHelp: false
+    )
+}
+
+// MARK: - Argument Parsing
+
+private enum ArgumentParser {
+    static func parse(_ args: [String]) -> ParsedArguments {
+        if containsHelpFlag(args) {
+            return ParsedArguments(tokenLimit: nil, refreshInterval: 0, sessionDuration: 0, shouldShowHelp: true)
+        }
+
+        var tokenLimit: Int?
+        var refreshInterval = Defaults.refreshInterval
+        var sessionDuration = Defaults.sessionDurationHours
+        var index = 1
+
+        while index < args.count {
+            let consumed = parseArgument(
+                args: args,
+                at: index,
+                tokenLimit: &tokenLimit,
+                refreshInterval: &refreshInterval,
+                sessionDuration: &sessionDuration
+            )
+            index += consumed
+        }
+
+        return ParsedArguments(
+            tokenLimit: tokenLimit,
+            refreshInterval: refreshInterval,
+            sessionDuration: sessionDuration,
+            shouldShowHelp: false
+        )
+    }
+
+    private static func containsHelpFlag(_ args: [String]) -> Bool {
+        args.contains { $0 == "-h" || $0 == "--help" }
+    }
+
+    private static func parseArgument(
+        args: [String],
+        at index: Int,
+        tokenLimit: inout Int?,
+        refreshInterval: inout TimeInterval,
+        sessionDuration: inout Double
+    ) -> Int {
+        let arg = args[index]
+        let nextValue = args.indices.contains(index + 1) ? args[index + 1] : nil
+
+        switch arg {
+        case "-t", "--token-limit":
+            tokenLimit = parseTokenLimit(nextValue)
+            return 2
+
+        case "-r", "--refresh":
+            refreshInterval = nextValue.flatMap { Double($0) } ?? refreshInterval
+            return 2
+
+        case "-s", "--session":
+            sessionDuration = nextValue.flatMap { Double($0) } ?? sessionDuration
+            return 2
+
+        default:
+            return 1
+        }
+    }
+
+    private static func parseTokenLimit(_ value: String?) -> Int? {
+        guard let value else { return nil }
+        return (value == "max" || value == "auto") ? nil : Int(value)
+    }
+}
+
+// MARK: - Path Discovery
+
+private enum PathDiscovery {
+    static func discoverClaudePaths() -> [String] {
+        environmentPaths() ?? defaultPaths()
+    }
+
+    static func filterExisting(_ paths: [String]) -> [String] {
+        paths.filter { FileManager.default.fileExists(atPath: $0) }
+    }
+
+    private static func environmentPaths() -> [String]? {
+        ProcessInfo.processInfo.environment[EnvironmentKey.claudeConfigDir]
+            .map { $0.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) } }
+    }
+
+    private static func defaultPaths() -> [String] {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        return [
+            "\(home)/.config/claude",
+            "\(home)/.claude"
+        ]
+    }
+}
+
+// MARK: - Terminal Control
+
+private enum Terminal {
+    static func hideCursor() {
+        print(ANSICode.hideCursor, terminator: "")
+    }
+
+    static func showCursor() {
+        print(ANSICode.showCursor)
+    }
+
+    static func printYellow(_ message: String) {
+        print("\(ANSICode.yellow)\(message)\(ANSICode.reset)")
+    }
+}
+
+// MARK: - Help Text
+
+private enum HelpText {
+    static let content = """
         Claude Live Token Usage Monitor
 
         Usage: claude-monitor [options]
@@ -36,138 +180,97 @@ struct CLI {
           CLAUDE_CONFIG_DIR  Comma-separated paths to Claude data directories
 
         Press Ctrl+C to stop monitoring.
-        """)
-    }
-    
-    static func parseArguments() -> (tokenLimit: Int?, refreshInterval: TimeInterval, sessionDuration: Double, shouldExit: Bool) {
-        let args = CommandLine.arguments
-        var tokenLimit: Int?
-        var refreshInterval: TimeInterval = 1.0
-        var sessionDuration: Double = 5.0
-        
-        var i = 1
-        while i < args.count {
-            let arg = args[i]
-            
-            switch arg {
-            case "-h", "--help":
-                return (nil, 0, 0, true)
-                
-            case "-t", "--token-limit":
-                i += 1
-                if i < args.count {
-                    let value = args[i]
-                    if value == "max" || value == "auto" {
-                        // Will be handled later
-                        tokenLimit = nil
-                    } else if let limit = Int(value) {
-                        tokenLimit = limit
-                    }
-                }
-                
-            case "-r", "--refresh":
-                i += 1
-                if i < args.count, let interval = Double(args[i]) {
-                    refreshInterval = interval
-                }
-                
-            case "-s", "--session":
-                i += 1
-                if i < args.count, let hours = Double(args[i]) {
-                    sessionDuration = hours
-                }
-                
-            default:
-                break
-            }
-            
-            i += 1
-        }
-        
-        return (tokenLimit, refreshInterval, sessionDuration, false)
+        """
+
+    static func print() {
+        Swift.print(content)
     }
 }
 
-// MARK: - Main
+// MARK: - Application
 
-func main() async {
-    // Parse command line arguments
-    let (tokenLimit, refreshInterval, sessionDuration, shouldExit) = CLI.parseArguments()
-    
-    if shouldExit {
-        CLI.printHelp()
-        exit(0)
+private enum Application {
+    static func run() async {
+        let args = ArgumentParser.parse(CommandLine.arguments)
+
+        if args.shouldShowHelp {
+            HelpText.print()
+            exit(0)
+        }
+
+        guard let paths = validatePaths() else {
+            exit(1)
+        }
+
+        let (monitor, renderer) = await createComponents(args: args, paths: paths)
+
+        setupGracefulExit()
+        Terminal.hideCursor()
+        await runLoop(renderer: renderer, interval: args.refreshInterval)
     }
-    
-    // Determine Claude paths
-    var claudePaths: [String] = []
-    
-    // Check environment variable first
-    if let envPaths = ProcessInfo.processInfo.environment["CLAUDE_CONFIG_DIR"] {
-        claudePaths = envPaths.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
-    } else {
-        // Default paths
-        let homeDir = FileManager.default.homeDirectoryForCurrentUser.path
-        claudePaths = [
-            "\(homeDir)/.config/claude",
-            "\(homeDir)/.claude"
-        ]
+
+    private static func validatePaths() -> [String]? {
+        let candidatePaths = PathDiscovery.discoverClaudePaths()
+        let existingPaths = PathDiscovery.filterExisting(candidatePaths)
+
+        guard !existingPaths.isEmpty else {
+            print("Error: No Claude data directories found.")
+            print("Searched paths:", candidatePaths.joined(separator: ", "))
+            return nil
+        }
+
+        print("Found Claude data directories:", existingPaths.joined(separator: ", "))
+        return existingPaths
     }
-    
-    // Filter existing paths
-    let existingPaths = claudePaths.filter { FileManager.default.fileExists(atPath: $0) }
-    
-    if existingPaths.isEmpty {
-        print("Error: No Claude data directories found.")
-        print("Searched paths:", claudePaths.joined(separator: ", "))
-        exit(1)
+
+    private static func createComponents(
+        args: ParsedArguments,
+        paths: [String]
+    ) async -> (LiveMonitor, LiveRenderer) {
+        let config = LiveMonitorConfig(
+            claudePaths: paths,
+            sessionDurationHours: args.sessionDuration,
+            tokenLimit: args.tokenLimit,
+            refreshInterval: args.refreshInterval,
+            order: .descending
+        )
+
+        let monitor = LiveMonitor(config: config)
+        let effectiveLimit = await resolveTokenLimit(args.tokenLimit, monitor: monitor)
+        let renderer = LiveRenderer(monitor: monitor, tokenLimit: effectiveLimit)
+
+        return (monitor, renderer)
     }
-    
-    print("Found Claude data directories:", existingPaths.joined(separator: ", "))
-    
-    // Create monitor configuration
-    let config = LiveMonitorConfig(
-        claudePaths: existingPaths,
-        sessionDurationHours: sessionDuration,
-        tokenLimit: tokenLimit,
-        refreshInterval: refreshInterval,
-        order: .descending
-    )
-    
-    // Create monitor and renderer
-    let monitor = LiveMonitor(config: config)
-    
-    // Determine effective token limit
-    var effectiveLimit = tokenLimit
-    if effectiveLimit == nil {
-        effectiveLimit = await monitor.getAutoTokenLimit()
-        if let limit = effectiveLimit {
-            print("\u{001B}[33mUsing max tokens from previous sessions: \(limit)\u{001B}[0m")
+
+    private static func resolveTokenLimit(_ explicit: Int?, monitor: LiveMonitor) async -> Int? {
+        if let explicit { return explicit }
+
+        let autoLimit = await monitor.getAutoTokenLimit()
+        if let limit = autoLimit {
+            Terminal.printYellow("Using max tokens from previous sessions: \(limit)")
+        }
+        return autoLimit
+    }
+
+    private static func setupGracefulExit() {
+        signal(SIGINT) { _ in
+            Terminal.showCursor()
+            print("\nMonitoring stopped.")
+            exit(0)
         }
     }
-    
-    let renderer = LiveRenderer(monitor: monitor, tokenLimit: effectiveLimit)
-    
-    // Hide cursor
-    print("\u{001B}[?25l", terminator: "")
-    
-    // Set up signal handler for graceful exit
-    signal(SIGINT) { _ in
-        // Show cursor
-        print("\u{001B}[?25h")
-        print("\nMonitoring stopped.")
-        exit(0)
-    }
-    
-    // Main loop
-    while true {
-        await renderer.render()
-        try? await Task.sleep(nanoseconds: UInt64(refreshInterval * 1_000_000_000))
+
+    private static func runLoop(renderer: LiveRenderer, interval: TimeInterval) async {
+        while true {
+            await renderer.render()
+            try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
+        }
     }
 }
 
-// Run the async main function
+// MARK: - Entry Point
+
 Task {
-    await main()
+    await Application.run()
 }
 RunLoop.main.run()
