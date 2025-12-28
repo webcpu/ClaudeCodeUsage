@@ -9,50 +9,6 @@ import ClaudeCodeUsageKit
 import struct ClaudeLiveMonitorLib.SessionBlock
 import struct ClaudeLiveMonitorLib.BurnRate
 
-// MARK: - View State
-
-enum ViewState {
-    case loading
-    case loadedToday(UsageStats)
-    case loaded(UsageStats)
-    case error(Error)
-
-    var isLoading: Bool {
-        if case .loading = self { return true }
-        return false
-    }
-
-    var hasLoaded: Bool {
-        switch self {
-        case .loadedToday, .loaded: return true
-        default: return false
-        }
-    }
-
-    var stats: UsageStats? {
-        if case .loaded(let stats) = self { return stats }
-        return nil
-    }
-}
-
-// MARK: - Pure Functions
-
-private func deriveThreshold(from stats: UsageStats?, default defaultThreshold: Double) -> Double {
-    guard let stats = stats, !stats.byDate.isEmpty else { return defaultThreshold }
-    let recentDays = stats.byDate.suffix(7)
-    let average = recentDays.reduce(0.0) { $0 + $1.totalCost } / Double(recentDays.count)
-    return average > 0 ? max(average * 1.5, 10.0) : defaultThreshold
-}
-
-private func filterToday(_ entries: [UsageEntry], referenceDate: Date) -> [UsageEntry] {
-    let calendar = Calendar.current
-    let today = calendar.startOfDay(for: referenceDate)
-    return entries.filter { entry in
-        guard let date = entry.date else { return false }
-        return calendar.startOfDay(for: date) == today
-    }
-}
-
 // MARK: - Usage Store
 
 @Observable
@@ -249,5 +205,49 @@ final class UsageStore {
 
     deinit {
         NotificationCenter.default.removeObserver(self)
+    }
+}
+
+// MARK: - Supporting Types
+
+enum ViewState {
+    case loading
+    case loadedToday(UsageStats)
+    case loaded(UsageStats)
+    case error(Error)
+
+    var isLoading: Bool {
+        if case .loading = self { return true }
+        return false
+    }
+
+    var hasLoaded: Bool {
+        switch self {
+        case .loadedToday, .loaded: return true
+        default: return false
+        }
+    }
+
+    var stats: UsageStats? {
+        if case .loaded(let stats) = self { return stats }
+        return nil
+    }
+}
+
+// MARK: - Pure Functions
+
+private func deriveThreshold(from stats: UsageStats?, default defaultThreshold: Double) -> Double {
+    guard let stats = stats, !stats.byDate.isEmpty else { return defaultThreshold }
+    let recentDays = stats.byDate.suffix(7)
+    let average = recentDays.reduce(0.0) { $0 + $1.totalCost } / Double(recentDays.count)
+    return average > 0 ? max(average * 1.5, 10.0) : defaultThreshold
+}
+
+private func filterToday(_ entries: [UsageEntry], referenceDate: Date) -> [UsageEntry] {
+    let calendar = Calendar.current
+    let today = calendar.startOfDay(for: referenceDate)
+    return entries.filter { entry in
+        guard let date = entry.date else { return false }
+        return calendar.startOfDay(for: date) == today
     }
 }
