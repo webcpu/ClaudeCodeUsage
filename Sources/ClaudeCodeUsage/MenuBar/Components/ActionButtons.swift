@@ -6,13 +6,6 @@
 import SwiftUI
 import ClaudeCodeUsageKit
 
-// MARK: - View Mode
-
-enum MenuBarViewMode {
-    case menuBar
-    case liveMetrics
-}
-
 // MARK: - ActionButtons
 
 struct ActionButtons: View {
@@ -110,4 +103,11 @@ private func findExistingDashboardWindow() -> NSWindow? {
 @MainActor
 private func isDashboardWindow(_ window: NSWindow) -> Bool {
     window.identifier?.rawValue == "main-window" || window.title == "Usage Dashboard"
+}
+
+// MARK: - Supporting Types
+
+enum MenuBarViewMode {
+    case menuBar
+    case liveMetrics
 }
