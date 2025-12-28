@@ -98,7 +98,9 @@ extension UsageRepository {
 
 enum DirectoryFilter {
     static func shouldSkip(_ name: String) -> Bool {
-        name.hasPrefix("-private-var-folders-") ||
+        // Only skip hidden directories (starting with .)
+        // Include all other directories including -private-var-folders-*
+        // to capture usage from RPLY/claude-kit and other integrations
         name.hasPrefix(".")
     }
 }

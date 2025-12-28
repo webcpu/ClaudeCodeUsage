@@ -227,5 +227,6 @@ struct CachedFile {
 enum CacheVersion {
     /// Current cache version - bump this when pricing or cost calculation changes
     /// v2: Fixed Haiku 4.5 pricing ($1/$5 instead of $0.80/$4)
-    static let current = 2
+    /// v3: Include -private-var-folders-* directories for complete cost tracking
+    static let current = 3
 }
