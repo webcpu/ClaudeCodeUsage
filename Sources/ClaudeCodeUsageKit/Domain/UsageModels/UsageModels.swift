@@ -118,12 +118,14 @@ public struct DailyUsage: Codable, Sendable {
     public let totalCost: Double
     public let totalTokens: Int
     public let modelsUsed: [String]
+    public let hourlyCosts: [Double]
 
-    public init(date: String, totalCost: Double, totalTokens: Int, modelsUsed: [String]) {
+    public init(date: String, totalCost: Double, totalTokens: Int, modelsUsed: [String], hourlyCosts: [Double] = []) {
         self.date = date
         self.totalCost = totalCost
         self.totalTokens = totalTokens
         self.modelsUsed = modelsUsed
+        self.hourlyCosts = hourlyCosts.isEmpty ? Array(repeating: 0, count: 24) : hourlyCosts
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -131,6 +133,7 @@ public struct DailyUsage: Codable, Sendable {
         case totalCost = "total_cost"
         case totalTokens = "total_tokens"
         case modelsUsed = "models_used"
+        case hourlyCosts = "hourly_costs"
     }
 
     /// Parsed date

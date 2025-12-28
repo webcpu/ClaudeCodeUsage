@@ -12,9 +12,10 @@ enum Aggregator {
     static func aggregate(_ entries: [UsageEntry], sessionCount: Int) -> UsageStats {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = RepositoryDateFormat.dayString
+        let calendar = Calendar.current
 
         let result = entries.reduce(into: AggregationState()) { state, entry in
-            state.addEntry(entry, dateFormatter: dateFormatter)
+            state.addEntry(entry, dateFormatter: dateFormatter, calendar: calendar)
         }
 
         return UsageStats(
@@ -26,7 +27,7 @@ enum Aggregator {
             totalCacheReadTokens: result.totalCacheReadTokens,
             totalSessions: sessionCount,
             byModel: Array(result.modelStats.values),
-            byDate: result.dailyStats.values.sorted { $0.date < $1.date },
+            byDate: result.buildDailyUsage(),
             byProject: Array(result.projectStats.values)
         )
     }
@@ -41,14 +42,14 @@ private struct AggregationState {
     var totalCacheWriteTokens: Int = 0
     var totalCacheReadTokens: Int = 0
     var modelStats: [String: ModelUsage] = [:]
-    var dailyStats: [String: DailyUsage] = [:]
+    var dailyStats: [String: DailyUsageBuilder] = [:]
     var projectStats: [String: ProjectUsage] = [:]
 
     var totalTokens: Int {
         totalInputTokens + totalOutputTokens + totalCacheWriteTokens + totalCacheReadTokens
     }
 
-    mutating func addEntry(_ entry: UsageEntry, dateFormatter: DateFormatter) {
+    mutating func addEntry(_ entry: UsageEntry, dateFormatter: DateFormatter, calendar: Calendar) {
         totalCost += entry.cost
         totalInputTokens += entry.inputTokens
         totalOutputTokens += entry.outputTokens
@@ -56,7 +57,7 @@ private struct AggregationState {
         totalCacheReadTokens += entry.cacheReadTokens
 
         updateModelStats(entry)
-        updateDailyStats(entry, dateFormatter: dateFormatter)
+        updateDailyStats(entry, dateFormatter: dateFormatter, calendar: calendar)
         updateProjectStats(entry)
     }
 
@@ -74,17 +75,17 @@ private struct AggregationState {
         )
     }
 
-    private mutating func updateDailyStats(_ entry: UsageEntry, dateFormatter: DateFormatter) {
+    private mutating func updateDailyStats(_ entry: UsageEntry, dateFormatter: DateFormatter, calendar: Calendar) {
         guard let date = entry.date else { return }
         let dateString = dateFormatter.string(from: date)
-        let existing = dailyStats[dateString]
+        let hour = calendar.component(.hour, from: date)
 
-        dailyStats[dateString] = DailyUsage(
-            date: dateString,
-            totalCost: (existing?.totalCost ?? 0) + entry.cost,
-            totalTokens: (existing?.totalTokens ?? 0) + entry.totalTokens,
-            modelsUsed: Array(Set((existing?.modelsUsed ?? []) + [entry.model]))
-        )
+        var builder = dailyStats[dateString] ?? DailyUsageBuilder()
+        builder.totalCost += entry.cost
+        builder.totalTokens += entry.totalTokens
+        builder.models.insert(entry.model)
+        builder.hourlyCosts[hour] += entry.cost
+        dailyStats[dateString] = builder
     }
 
     private mutating func updateProjectStats(_ entry: UsageEntry) {
@@ -98,6 +99,27 @@ private struct AggregationState {
             lastUsed: max(existing?.lastUsed ?? "", entry.timestamp)
         )
     }
+
+    func buildDailyUsage() -> [DailyUsage] {
+        dailyStats.map { date, builder in
+            DailyUsage(
+                date: date,
+                totalCost: builder.totalCost,
+                totalTokens: builder.totalTokens,
+                modelsUsed: Array(builder.models),
+                hourlyCosts: builder.hourlyCosts
+            )
+        }.sorted { $0.date < $1.date }
+    }
+}
+
+// MARK: - Daily Usage Builder
+
+private struct DailyUsageBuilder {
+    var totalCost: Double = 0
+    var totalTokens: Int = 0
+    var models: Set<String> = []
+    var hourlyCosts: [Double] = Array(repeating: 0, count: 24)
 }
 
 // MARK: - Filtering

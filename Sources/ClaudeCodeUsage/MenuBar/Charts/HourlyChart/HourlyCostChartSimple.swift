@@ -49,12 +49,14 @@ private extension HourlyCostChartSimple {
     }
 
     var chartWithTooltip: some View {
-        costChart
-            .frame(height: 60)
-            .padding(.trailing, 15)
-            .overlay(alignment: .top) {
-                tooltipOverlay
-            }
+        GeometryReader { geometry in
+            costChart
+                .overlay(alignment: .top) {
+                    tooltipOverlay(chartWidth: geometry.size.width - 15) // subtract trailing padding for y-axis
+                }
+        }
+        .frame(height: 60)
+        .padding(.trailing, 15)
     }
 
     var costChart: some View {
@@ -109,7 +111,7 @@ private extension HourlyCostChartSimple {
     }
 
     @ViewBuilder
-    var tooltipOverlay: some View {
+    func tooltipOverlay(chartWidth: CGFloat) -> some View {
         if let selectedHour,
            selectedHour >= 0 && selectedHour < hourlyData.count {
             HourlyTooltipView(
@@ -117,16 +119,17 @@ private extension HourlyCostChartSimple {
                 cost: hourlyData[selectedHour],
                 isCompact: true
             )
-            .offset(x: tooltipXOffset(for: selectedHour), y: -5)
+            .offset(x: tooltipXPosition(for: selectedHour, chartWidth: chartWidth), y: -5)
             .allowsHitTesting(false)
         }
     }
 
-    func tooltipXOffset(for hour: Int) -> CGFloat {
-        let chartWidth: CGFloat = 200
+    func tooltipXPosition(for hour: Int, chartWidth: CGFloat) -> CGFloat {
+        // With .top (center) alignment, offset is relative to chart center
         let barWidth = chartWidth / 24
-        let centerOffset = CGFloat(hour - 12) * barWidth
-        return min(max(centerOffset, -80), 80)
+        let barCenter = (CGFloat(hour) + 0.5) * barWidth
+        let chartCenter = chartWidth / 2
+        return barCenter - chartCenter
     }
 }
 

@@ -121,15 +121,26 @@ struct DailyCard: View {
     private var dateInfo: DateInfo { DateInfo.from(daily.date) }
 
     var body: some View {
+        VStack(spacing: 12) {
+            summaryRow
+            hourlyChart
+        }
+        .padding()
+        .background(Color(NSColor.controlBackgroundColor))
+        .cornerRadius(12)
+    }
+
+    private var summaryRow: some View {
         HStack(spacing: 16) {
             DateBadge(info: dateInfo)
             DateDetails(info: dateInfo, modelCount: daily.modelCount)
             Spacer()
             CostMetrics(cost: daily.totalCost, tokens: daily.totalTokens)
         }
-        .padding()
-        .background(Color(NSColor.controlBackgroundColor))
-        .cornerRadius(12)
+    }
+
+    private var hourlyChart: some View {
+        HourlyCostChartSimple(hourlyData: daily.hourlyCosts)
     }
 }
 
@@ -184,9 +195,8 @@ private struct DateDetails: View {
 
     @ViewBuilder
     private var todayBadge: some View {
-        if info.isToday {
-            Badge(text: "TODAY", color: .accentColor)
-        }
+        Badge(text: "TODAY", color: .accentColor)
+        .opacity(info.isToday ? 1 : 0)
     }
 
     private var modelCountText: some View {
