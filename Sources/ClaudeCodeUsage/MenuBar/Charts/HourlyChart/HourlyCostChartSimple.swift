@@ -7,99 +7,6 @@ import SwiftUI
 import Charts
 import ClaudeCodeUsageKit
 
-// MARK: - Cost Intensity
-
-enum CostIntensity {
-    case zero
-    case low
-    case medium
-    case high
-    case peak
-
-    init(cost: Double, maxValue: Double) {
-        guard cost > 0 else {
-            self = .zero
-            return
-        }
-        let intensity = min(cost / max(maxValue, 1.0), 1.0)
-        switch intensity {
-        case 0.8...: self = .peak
-        case 0.5...: self = .high
-        case 0.2...: self = .medium
-        default: self = .low
-        }
-    }
-
-    var color: Color {
-        switch self {
-        case .zero: .gray.opacity(0.2)
-        case .low: .mint
-        case .medium: .teal
-        case .high: .cyan
-        case .peak: .blue
-        }
-    }
-}
-
-// MARK: - Y-Axis Scale
-
-enum YAxisScale {
-    case small(max: Double)
-    case medium(max: Double)
-    case large(max: Double)
-    case extraLarge(max: Double)
-
-    init(maxValue: Double) {
-        switch maxValue {
-        case ...10: self = .small(max: maxValue)
-        case ...50: self = .medium(max: maxValue)
-        case ...100: self = .large(max: maxValue)
-        default: self = .extraLarge(max: maxValue)
-        }
-    }
-
-    var roundedMax: Double {
-        switch self {
-        case .small(let max): ceil(max)
-        case .medium(let max): ceil(max / 10) * 10
-        case .large(let max): ceil(max / 20) * 20
-        case .extraLarge(let max): ceil(max / 50) * 50
-        }
-    }
-
-    var tickValues: [Double] {
-        let max = roundedMax
-        switch self {
-        case .small: return [0, max / 2, max]
-        default: return [0, max / 3, max * 2 / 3, max]
-        }
-    }
-}
-
-// MARK: - Cost Formatting
-
-enum CostAxisFormat {
-    case zero
-    case decimal(Double)
-    case whole(Double)
-
-    init(_ value: Double) {
-        switch value {
-        case 0: self = .zero
-        case ..<10: self = .decimal(value)
-        default: self = .whole(value)
-        }
-    }
-
-    var formatted: String {
-        switch self {
-        case .zero: "$0"
-        case .decimal(let value): String(format: "$%.1f", value)
-        case .whole(let value): String(format: "$%.0f", value)
-        }
-    }
-}
-
 // MARK: - Simple Hourly Cost Chart
 
 struct HourlyCostChartSimple: View {
@@ -242,5 +149,100 @@ struct HourlyCostChartSimple_Previews: PreviewProvider {
             8.5, 7.2, 6.0, 9.5, 11.0, 8.0, 5.5, 3.0, 2.0, 1.5,
             0.5, 0, 0, 0
         ]
+    }
+}
+
+// MARK: - Supporting Types
+
+// MARK: Cost Intensity
+
+enum CostIntensity {
+    case zero
+    case low
+    case medium
+    case high
+    case peak
+
+    init(cost: Double, maxValue: Double) {
+        guard cost > 0 else {
+            self = .zero
+            return
+        }
+        let intensity = min(cost / max(maxValue, 1.0), 1.0)
+        switch intensity {
+        case 0.8...: self = .peak
+        case 0.5...: self = .high
+        case 0.2...: self = .medium
+        default: self = .low
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .zero: .gray.opacity(0.2)
+        case .low: .mint
+        case .medium: .teal
+        case .high: .cyan
+        case .peak: .blue
+        }
+    }
+}
+
+// MARK: Y-Axis Scale
+
+enum YAxisScale {
+    case small(max: Double)
+    case medium(max: Double)
+    case large(max: Double)
+    case extraLarge(max: Double)
+
+    init(maxValue: Double) {
+        switch maxValue {
+        case ...10: self = .small(max: maxValue)
+        case ...50: self = .medium(max: maxValue)
+        case ...100: self = .large(max: maxValue)
+        default: self = .extraLarge(max: maxValue)
+        }
+    }
+
+    var roundedMax: Double {
+        switch self {
+        case .small(let max): ceil(max)
+        case .medium(let max): ceil(max / 10) * 10
+        case .large(let max): ceil(max / 20) * 20
+        case .extraLarge(let max): ceil(max / 50) * 50
+        }
+    }
+
+    var tickValues: [Double] {
+        let max = roundedMax
+        switch self {
+        case .small: return [0, max / 2, max]
+        default: return [0, max / 3, max * 2 / 3, max]
+        }
+    }
+}
+
+// MARK: Cost Formatting
+
+enum CostAxisFormat {
+    case zero
+    case decimal(Double)
+    case whole(Double)
+
+    init(_ value: Double) {
+        switch value {
+        case 0: self = .zero
+        case ..<10: self = .decimal(value)
+        default: self = .whole(value)
+        }
+    }
+
+    var formatted: String {
+        switch self {
+        case .zero: "$0"
+        case .decimal(let value): String(format: "$%.1f", value)
+        case .whole(let value): String(format: "$%.0f", value)
+        }
     }
 }
