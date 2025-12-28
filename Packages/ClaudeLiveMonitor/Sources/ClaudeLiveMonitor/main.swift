@@ -15,8 +15,16 @@ struct CLI {
                                       Use 'max' or 'auto' to use maximum from previous sessions
                                       (default: auto)
           -r, --refresh <seconds>     Refresh interval (default: 1)
-          -s, --session <hours>       Session duration in hours (default: 5)
+          -s, --session <hours>       Session window duration in hours (default: 5)
           -h, --help                  Show this help message
+
+        Display Sections:
+          SESSION     Time progress within the current session window
+          USAGE       Tokens and cost accumulated in current session window
+          PROJECTION  Estimated totals if current burn rate continues
+
+        The session window (default 5h) aligns with Claude's rate limit reset period.
+        Cost shown is API cost within this window, not calendar day.
 
         Examples:
           claude-monitor                      # Auto-detect limit from history

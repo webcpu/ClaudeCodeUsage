@@ -91,7 +91,7 @@ extension LiveRenderer {
             percentage: usage.percentage,
             color: usage.percentage.progressColor
         )
-        printContentRow(" \(Layout.usageIcon)  USAGE    [\(progressBar)]  \(usage.percentage.formatted)% (\(usage.tokensShort)/\(usage.limitShort))")
+        printContentRow(" \(Layout.usageIcon)  USAGE (session)  [\(progressBar)]  \(usage.percentage.formatted)% (\(usage.tokensShort))")
         printContentRow("   Tokens: \(usage.tokensFormatted)  Burn Rate: \(usage.burnRateFormatted) token/min \(usage.burnIndicator)")
         printContentRow("   Cost: $\(String(format: "%.2f", block.costUSD))")
     }

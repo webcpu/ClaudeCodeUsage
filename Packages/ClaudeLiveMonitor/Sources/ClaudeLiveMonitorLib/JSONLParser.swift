@@ -31,7 +31,7 @@ public struct JSONLParser {
     ) -> UsageEntry? {
         guard let usageData = decodeUsageData(from: lineData),
               let validatedData = validateAssistantMessage(usageData),
-              isUniqueEntry(validatedData, processedHashes: &processedHashes),
+              isUniqueEntry(usageData, validatedData, processedHashes: &processedHashes),
               let timestamp = parseTimestamp(validatedData.timestampStr),
               let tokenCounts = createTokenCounts(from: validatedData.usage),
               tokenCounts.total > 0 else {
@@ -82,12 +82,13 @@ public struct JSONLParser {
     }
 
     private func isUniqueEntry(
+        _ usageData: JSONLUsageData,
         _ data: ValidatedUsageData,
         processedHashes: inout Set<String>
     ) -> Bool {
         guard let hash = createDeduplicationHash(
             messageId: data.message.id,
-            requestId: nil
+            requestId: usageData.requestId
         ) else {
             return true
         }

@@ -37,10 +37,10 @@ public struct ModelPricing: Sendable {
     /// Predefined pricing for Claude Haiku 4.5
     public static let haiku4 = ModelPricing(
         model: "claude-haiku-4-5-20251001",
-        inputPricePerMillion: 0.80,
-        outputPricePerMillion: 4.0,
-        cacheWritePricePerMillion: 1.0,
-        cacheReadPricePerMillion: 0.08
+        inputPricePerMillion: 1.0,
+        outputPricePerMillion: 5.0,
+        cacheWritePricePerMillion: 1.25,
+        cacheReadPricePerMillion: 0.10
     )
 
     /// All available model pricing

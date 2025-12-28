@@ -34,21 +34,31 @@ public struct ModelPricing: Sendable {
 // MARK: - ModelPricing Pricing Configurations
 
 public extension ModelPricing {
-    static let claudeOpus4 = ModelPricing(
-        inputCostPerToken: 0.000015,
-        outputCostPerToken: 0.000075,
-        cacheCreationCostPerToken: 0.00001875,
-        cacheReadCostPerToken: 0.0000015
+    /// Claude Opus 4.5 pricing (November 2025)
+    static let claudeOpus45 = ModelPricing(
+        inputCostPerToken: 0.000005,      // $5/MTok
+        outputCostPerToken: 0.000025,     // $25/MTok
+        cacheCreationCostPerToken: 0.00000625,  // $6.25/MTok
+        cacheReadCostPerToken: 0.0000005  // $0.50/MTok
     )
 
+    /// Claude Sonnet 4/4.5 pricing
     static let claudeSonnet4 = ModelPricing(
-        inputCostPerToken: 0.000003,
-        outputCostPerToken: 0.000015,
-        cacheCreationCostPerToken: 0.00000375,
-        cacheReadCostPerToken: 0.0000003
+        inputCostPerToken: 0.000003,      // $3/MTok
+        outputCostPerToken: 0.000015,     // $15/MTok
+        cacheCreationCostPerToken: 0.00000375,  // $3.75/MTok
+        cacheReadCostPerToken: 0.0000003  // $0.30/MTok
     )
 
-    static let `default` = claudeOpus4
+    /// Claude Haiku 4.5 pricing
+    static let claudeHaiku45 = ModelPricing(
+        inputCostPerToken: 0.000001,      // $1/MTok
+        outputCostPerToken: 0.000005,     // $5/MTok
+        cacheCreationCostPerToken: 0.00000125,  // $1.25/MTok
+        cacheReadCostPerToken: 0.0000001  // $0.10/MTok
+    )
+
+    static let `default` = claudeSonnet4
 }
 
 // MARK: - ModelPricing Lookup
@@ -88,6 +98,7 @@ private extension ModelPricing {
 private enum ModelFamily {
     case opus
     case sonnet
+    case haiku
     case unknown
 
     init(from modelName: String) {
@@ -96,8 +107,9 @@ private enum ModelFamily {
 
     var pricing: ModelPricing {
         switch self {
-        case .opus: .claudeOpus4
+        case .opus: .claudeOpus45
         case .sonnet: .claudeSonnet4
+        case .haiku: .claudeHaiku45
         case .unknown: .default
         }
     }
@@ -106,12 +118,13 @@ private enum ModelFamily {
 // MARK: - ModelFamily Matching
 
 private extension ModelFamily {
-    static let allKnownFamilies: [ModelFamily] = [.opus, .sonnet]
+    static let allKnownFamilies: [ModelFamily] = [.opus, .sonnet, .haiku]
 
     var identifier: String {
         switch self {
         case .opus: "opus"
         case .sonnet: "sonnet"
+        case .haiku: "haiku"
         case .unknown: ""
         }
     }
