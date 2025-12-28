@@ -17,18 +17,6 @@ protocol SessionMonitorService: Sendable {
     func getAutoTokenLimit() async -> Int?
 }
 
-// MARK: - Cache Configuration
-
-private enum CacheConfig {
-    static let ttl: TimeInterval = 2.0
-}
-
-// MARK: - Pure Functions
-
-private func isCacheValid(timestamp: Date, ttl: TimeInterval = CacheConfig.ttl) -> Bool {
-    Date().timeIntervalSince(timestamp) < ttl
-}
-
 // MARK: - Default Implementation
 
 actor DefaultSessionMonitorService: SessionMonitorService {
@@ -71,6 +59,18 @@ actor DefaultSessionMonitorService: SessionMonitorService {
         cachedTokenLimit = (result, Date())
         return result
     }
+}
+
+// MARK: - Supporting Types
+
+private enum CacheConfig {
+    static let ttl: TimeInterval = 2.0
+}
+
+// MARK: - Pure Functions
+
+private func isCacheValid(timestamp: Date, ttl: TimeInterval = CacheConfig.ttl) -> Bool {
+    Date().timeIntervalSince(timestamp) < ttl
 }
 
 // MARK: - Mock for Testing
