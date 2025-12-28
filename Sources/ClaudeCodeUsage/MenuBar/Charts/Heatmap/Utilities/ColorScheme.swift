@@ -9,23 +9,6 @@
 import SwiftUI
 import Foundation
 
-// MARK: - Intensity Level Calculation (Pure Functions)
-
-private enum IntensityLevel {
-    /// Intensity thresholds for each level
-    static let thresholds: [(range: PartialRangeFrom<Double>, level: Int)] = [
-        (0.75..., 4),  // High
-        (0.5..., 3),   // Medium-high
-        (0.25..., 2),  // Medium-low
-        (0.0..., 1)    // Low (anything > 0)
-    ]
-
-    /// Convert intensity (0.0-1.0) to discrete level (0-4)
-    static func fromIntensity(_ intensity: Double) -> Int {
-        intensity == 0 ? 0 : (thresholds.first { $0.range.contains(intensity) }?.level ?? 1)
-    }
-}
-
 // MARK: - Color Manager
 
 /// Advanced color management for heatmap visualizations
@@ -348,5 +331,22 @@ public extension Color {
     var hexString: String {
         // Simplified - real implementation would extract RGB components
         return "#000000"
+    }
+}
+
+// MARK: - Intensity Level Calculation (Pure Functions)
+
+private enum IntensityLevel {
+    /// Intensity thresholds for each level
+    static let thresholds: [(range: PartialRangeFrom<Double>, level: Int)] = [
+        (0.75..., 4),  // High
+        (0.5..., 3),   // Medium-high
+        (0.25..., 2),  // Medium-low
+        (0.0..., 1)    // Low (anything > 0)
+    ]
+
+    /// Convert intensity (0.0-1.0) to discrete level (0-4)
+    static func fromIntensity(_ intensity: Double) -> Int {
+        intensity == 0 ? 0 : (thresholds.first { $0.range.contains(intensity) }?.level ?? 1)
     }
 }
