@@ -5,6 +5,10 @@
 //  Modern SwiftUI heatmap component with MVVM architecture,
 //  comprehensive error handling, and performance optimizations.
 //
+//  Split into extensions for focused responsibilities:
+//    - +Factories: Static factory methods and legacy compatibility
+//    - +Preview: Preview provider for development
+//
 
 import SwiftUI
 import ClaudeCodeUsageKit
@@ -13,7 +17,7 @@ import Foundation
 // MARK: - Yearly Cost Heatmap
 
 /// GitHub-style contribution graph for daily cost visualization
-/// 
+///
 /// This component has been completely refactored to follow clean architecture principles:
 /// - MVVM architecture with dedicated ViewModel
 /// - Separated data models and business logic
@@ -23,26 +27,26 @@ import Foundation
 /// - Accessibility support
 /// - Backward compatibility maintained
 public struct YearlyCostHeatmap: View {
-    
+
     // MARK: - Properties
-    
+
     /// Usage statistics to visualize
     let stats: UsageStats
-    
+
     /// Year parameter (kept for backward compatibility, now ignored in favor of rolling year)
     let year: Int
-    
+
     /// Configuration for heatmap appearance and behavior
     let configuration: HeatmapConfiguration
-    
+
     /// View model managing data and state
     @State private var viewModel: HeatmapViewModel
-    
+
     /// Screen bounds for tooltip positioning
     @State private var screenBounds: CGRect = NSScreen.main?.frame ?? .zero
-    
+
     // MARK: - Initialization
-    
+
     /// Initialize with usage statistics and optional configuration
     /// - Parameters:
     ///   - stats: Usage statistics to display
@@ -56,13 +60,13 @@ public struct YearlyCostHeatmap: View {
         self.stats = stats
         self.year = year
         self.configuration = configuration
-        
+
         // Initialize view model with configuration
         self._viewModel = State(wrappedValue: HeatmapViewModel(configuration: configuration))
     }
-    
+
     // MARK: - Body
-    
+
     public var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             headerSection
@@ -87,7 +91,7 @@ public struct YearlyCostHeatmap: View {
             legendSection
         }
     }
-    
+
     // MARK: - Header Section
 
     @ViewBuilder
@@ -146,9 +150,9 @@ public struct YearlyCostHeatmap: View {
             }
         }
     }
-    
+
     // MARK: - Content Section
-    
+
     @ViewBuilder
     private var contentSection: some View {
         Group {
@@ -164,15 +168,15 @@ public struct YearlyCostHeatmap: View {
         }
         .overlay(tooltipOverlay, alignment: .topLeading)
     }
-    
+
     // MARK: - Loading View
-    
+
     @ViewBuilder
     private var loadingView: some View {
         VStack(spacing: 12) {
             ProgressView()
                 .scaleEffect(1.2)
-            
+
             Text("Generating heatmap...")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
@@ -180,25 +184,25 @@ public struct YearlyCostHeatmap: View {
         .frame(height: 120)
         .frame(maxWidth: .infinity)
     }
-    
+
     // MARK: - Error View
-    
+
     @ViewBuilder
     private func errorView(_ error: HeatmapError) -> some View {
         VStack(spacing: 12) {
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: 24))
                 .foregroundColor(.orange)
-            
+
             Text("Unable to Display Heatmap")
                 .font(.headline)
                 .foregroundColor(.primary)
-            
+
             Text(error.localizedDescription)
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
-            
+
             Button("Retry") {
                 Task {
                     await viewModel.updateStats(stats)
@@ -210,20 +214,20 @@ public struct YearlyCostHeatmap: View {
         .frame(maxWidth: .infinity)
         .padding()
     }
-    
+
     // MARK: - Empty State View
-    
+
     @ViewBuilder
     private var emptyStateView: some View {
         VStack(spacing: 12) {
             Image(systemName: "calendar")
                 .font(.system(size: 24))
                 .foregroundColor(.gray)
-            
+
             Text("No Usage Data")
                 .font(.headline)
                 .foregroundColor(.primary)
-            
+
             Text("Heatmap will appear once you have usage data.")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
@@ -232,13 +236,13 @@ public struct YearlyCostHeatmap: View {
         .frame(height: 120)
         .frame(maxWidth: .infinity)
     }
-    
+
     // MARK: - Heatmap Content
-    
+
     @ViewBuilder
     private func heatmapContent(_ dataset: HeatmapDataset) -> some View {
         let gridLayout = HeatmapGridLayout(configuration: configuration, dataset: dataset)
-        
+
         GeometryReader { geometry in
             HeatmapGrid(
                 dataset: dataset,
@@ -257,9 +261,9 @@ public struct YearlyCostHeatmap: View {
         .accessibilityLabel("Heatmap showing daily cost activity over the last 365 days")
         .accessibilityAddTraits(.allowsDirectInteraction)
     }
-    
+
     // MARK: - Legend Section
-    
+
     @ViewBuilder
     private var legendSection: some View {
         if let dataset = viewModel.dataset {
@@ -271,9 +275,9 @@ public struct YearlyCostHeatmap: View {
             )
         }
     }
-    
+
     // MARK: - Tooltip Overlay
-    
+
     @ViewBuilder
     private var tooltipOverlay: some View {
         if let hoveredDay = viewModel.hoveredDay,
@@ -284,252 +288,9 @@ public struct YearlyCostHeatmap: View {
                 style: .standard,
                 screenBounds: screenBounds
             )
-            .position(viewModel.tooltipPosition) // Position at calculated coordinates
+            .position(viewModel.tooltipPosition)
             .allowsHitTesting(false)
             .animation(.easeInOut(duration: 0.1), value: viewModel.tooltipPosition)
         }
     }
 }
-
-// MARK: - Legacy Compatibility
-
-/// Legacy extension providing the original interface for backward compatibility
-public extension YearlyCostHeatmap {
-    
-    /// Legacy initializer matching the original component interface
-    /// - Parameters:
-    ///   - stats: Usage statistics
-    ///   - year: Year (ignored, rolling year used instead)
-    /// - Returns: Configured heatmap with default settings
-    @available(*, deprecated, message: "Use init(stats:year:configuration:) with explicit configuration instead")
-    static func legacy(stats: UsageStats, year: Int) -> YearlyCostHeatmap {
-        return YearlyCostHeatmap(
-            stats: stats,
-            year: year,
-            configuration: .default
-        )
-    }
-    
-    /// Performance-optimized version for large datasets
-    /// - Parameters:
-    ///   - stats: Usage statistics
-    ///   - year: Year (ignored)
-    /// - Returns: Performance-optimized heatmap
-    static func performanceOptimized(stats: UsageStats, year: Int) -> YearlyCostHeatmap {
-        return YearlyCostHeatmap(
-            stats: stats,
-            year: year,
-            configuration: .performanceOptimized
-        )
-    }
-    
-    /// Compact version for limited space
-    /// - Parameters:
-    ///   - stats: Usage statistics
-    ///   - year: Year (ignored)
-    /// - Returns: Compact heatmap
-    static func compact(stats: UsageStats, year: Int) -> YearlyCostHeatmap {
-        return YearlyCostHeatmap(
-            stats: stats,
-            year: year,
-            configuration: .compact
-        )
-    }
-}
-
-// MARK: - Custom Configurations
-
-public extension YearlyCostHeatmap {
-    
-    /// Create heatmap with custom color theme
-    /// - Parameters:
-    ///   - stats: Usage statistics
-    ///   - year: Year (ignored)
-    ///   - colorTheme: Custom color theme
-    /// - Returns: Heatmap with custom colors
-    static func withColorTheme(
-        stats: UsageStats,
-        year: Int,
-        colorTheme: HeatmapColorTheme
-    ) -> YearlyCostHeatmap {
-        let config = HeatmapConfiguration.default
-        // Note: This would require modifying HeatmapConfiguration to be mutable
-        // For now, we'll use the default configuration
-        return YearlyCostHeatmap(stats: stats, year: year, configuration: config)
-    }
-    
-    /// Create heatmap with accessibility optimizations
-    /// - Parameters:
-    ///   - stats: Usage statistics
-    ///   - year: Year (ignored)
-    /// - Returns: Accessibility-optimized heatmap
-    static func accessible(stats: UsageStats, year: Int) -> YearlyCostHeatmap {
-        // Create configuration optimized for accessibility
-        let config = HeatmapConfiguration(
-            squareSize: 14, // Larger squares
-            spacing: 3,     // More spacing
-            cornerRadius: 2,
-            padding: EdgeInsets(top: 20, leading: 20, bottom: 20, trailing: 20),
-            colorScheme: .github, // High contrast theme would be better
-            showMonthLabels: true,
-            showDayLabels: true,
-            showLegend: true,
-            monthLabelFont: .body, // Larger font
-            dayLabelFont: .subheadline,
-            legendFont: .body,
-            enableTooltips: true,
-            tooltipDelay: 0.1,
-            highlightToday: true,
-            todayHighlightColor: .blue,
-            todayHighlightWidth: 3, // Thicker border
-            animationDuration: 0.0, // No animations for accessibility
-            animateColorTransitions: false,
-            scaleOnHover: false,
-            hoverScale: 1.0
-        )
-        
-        return YearlyCostHeatmap(stats: stats, year: year, configuration: config)
-    }
-}
-
-// MARK: - Migration Guide
-
-/*
- MIGRATION GUIDE: Upgrading from Legacy YearlyCostHeatmap
- 
- The YearlyCostHeatmap component has been completely refactored with clean architecture.
- While backward compatibility is maintained, consider migrating to the new API:
- 
- OLD (still works):
- ```swift
- YearlyCostHeatmap(stats: stats, year: 2024)
- ```
- 
- NEW (recommended):
- ```swift
- YearlyCostHeatmap(
-     stats: stats,
-     year: 2024,
-     configuration: .default // or .performanceOptimized, .compact
- )
- ```
- 
- PERFORMANCE OPTIMIZED:
- ```swift
- YearlyCostHeatmap.performanceOptimized(stats: stats, year: 2024)
- ```
- 
- COMPACT VERSION:
- ```swift
- YearlyCostHeatmap.compact(stats: stats, year: 2024)
- ```
- 
- ACCESSIBILITY OPTIMIZED:
- ```swift
- YearlyCostHeatmap.accessible(stats: stats, year: 2024)
- ```
- 
- BENEFITS OF MIGRATION:
- - Better performance with optimized configurations
- - Improved accessibility support
- - More customization options
- - Better error handling and loading states
- - Type-safe configuration
- - Easier testing with separated concerns
- */
-
-// MARK: - Preview
-
-#if DEBUG
-struct YearlyCostHeatmap_Previews: PreviewProvider {
-    static var previews: some View {
-        ScrollView {
-            VStack(spacing: 30) {
-                // Default configuration
-                YearlyCostHeatmap(stats: sampleStats, year: 2024)
-                
-                // Performance optimized
-                YearlyCostHeatmap.performanceOptimized(stats: sampleStats, year: 2024)
-                
-                // Compact version
-                YearlyCostHeatmap.compact(stats: sampleStats, year: 2024)
-                
-                // Accessibility optimized
-                YearlyCostHeatmap.accessible(stats: sampleStats, year: 2024)
-            }
-            .padding()
-        }
-        .background(Color(.windowBackgroundColor))
-    }
-    
-    static var sampleStats: UsageStats {
-        let dailyUsage = generateSampleDailyUsage()
-        return UsageStats(
-            totalCost: dailyUsage.reduce(0) { $0 + $1.totalCost },
-            totalTokens: dailyUsage.reduce(0) { $0 + $1.totalTokens },
-            totalInputTokens: 250000,
-            totalOutputTokens: 150000,
-            totalCacheCreationTokens: 0,
-            totalCacheReadTokens: 0,
-            totalSessions: 150,
-            byModel: [],
-            byDate: dailyUsage,
-            byProject: []
-        )
-    }
-
-    private static func generateSampleDailyUsage() -> [DailyUsage] {
-        let calendar = Calendar.current
-        let today = Date()
-        let dateFormatter = makeDateFormatter()
-
-        return (0..<365).map { dayOffset in
-            makeDailyUsage(
-                dayOffset: dayOffset,
-                today: today,
-                calendar: calendar,
-                dateFormatter: dateFormatter
-            )
-        }
-    }
-
-    private static func makeDateFormatter() -> DateFormatter {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter
-    }
-
-    private static func makeDailyUsage(
-        dayOffset: Int,
-        today: Date,
-        calendar: Calendar,
-        dateFormatter: DateFormatter
-    ) -> DailyUsage {
-        let date = calendar.date(byAdding: .day, value: -dayOffset, to: today)!
-        let cost = calculateSampleCost(for: date, dayOffset: dayOffset, calendar: calendar)
-        return DailyUsage(
-            date: dateFormatter.string(from: date),
-            totalCost: cost,
-            totalTokens: Int(cost * 1000),
-            modelsUsed: ["claude-sonnet-4"]
-        )
-    }
-
-    private static func calculateSampleCost(
-        for date: Date,
-        dayOffset: Int,
-        calendar: Calendar
-    ) -> Double {
-        let hasNoRecentActivity = dayOffset >= 300
-        guard !hasNoRecentActivity else { return 0 }
-
-        let weekday = calendar.component(.weekday, from: date)
-        let isWeekend = weekday == 1 || weekday == 7
-        let baseUsage = isWeekend ? 0.3 : 1.0
-        let randomFactor = Double.random(in: 0.2...1.8)
-        let rawCost = baseUsage * randomFactor * 3.0
-        let simulateNoUsageDay = rawCost > 2.8
-        return simulateNoUsageDay ? 0 : rawCost
-    }
-}
-#endif
