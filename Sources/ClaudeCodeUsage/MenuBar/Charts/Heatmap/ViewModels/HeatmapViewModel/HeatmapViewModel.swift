@@ -15,46 +15,6 @@ import Foundation
 import Observation
 import ClaudeCodeUsageKit
 
-// MARK: - Tooltip Position Calculator (Pure Functions)
-
-enum TooltipPositionCalculator {
-    /// Calculate tooltip position for a hovered day
-    /// - Parameters:
-    ///   - day: The day being hovered
-    ///   - cellSize: Size of each cell in the grid
-    ///   - squareSize: Size of the day square
-    ///   - gridContentPadding: Horizontal padding applied to grid content
-    /// - Returns: Position for the tooltip
-    static func position(
-        for day: HeatmapDay,
-        cellSize: CGFloat,
-        squareSize: CGFloat,
-        gridContentPadding: CGFloat = 4
-    ) -> CGPoint {
-        let squareCenterX = CGFloat(day.weekOfYear) * cellSize + (cellSize / 2) + gridContentPadding
-        let squareCenterY = CGFloat(day.dayOfWeek) * cellSize + (cellSize / 2)
-        return CGPoint(
-            x: squareCenterX,
-            y: squareCenterY - squareSize - 20
-        )
-    }
-}
-
-// MARK: - Date Validation (Pure Functions)
-
-enum DailyUsageValidator {
-    /// Validate daily usage dates and return invalid date strings
-    /// - Parameters:
-    ///   - dailyUsage: Array of daily usage records
-    ///   - dateFormatter: Formatter to validate dates
-    /// - Returns: Array of invalid date strings
-    static func findInvalidDates(in dailyUsage: [DailyUsage], using dateFormatter: DateFormatter) -> [String] {
-        dailyUsage
-            .map(\.date)
-            .filter { dateFormatter.date(from: $0) == nil }
-    }
-}
-
 // MARK: - Heatmap View Model
 
 /// View model managing heatmap data, state, and business logic
@@ -255,5 +215,45 @@ public extension HeatmapViewModel {
     /// Whether the heatmap is currently interactive (not loading, has data)
     var isInteractive: Bool {
         !isLoading && hasData && !hasError
+    }
+}
+
+// MARK: - Supporting Types
+
+/// Tooltip position calculation (pure functions)
+enum TooltipPositionCalculator {
+    /// Calculate tooltip position for a hovered day
+    /// - Parameters:
+    ///   - day: The day being hovered
+    ///   - cellSize: Size of each cell in the grid
+    ///   - squareSize: Size of the day square
+    ///   - gridContentPadding: Horizontal padding applied to grid content
+    /// - Returns: Position for the tooltip
+    static func position(
+        for day: HeatmapDay,
+        cellSize: CGFloat,
+        squareSize: CGFloat,
+        gridContentPadding: CGFloat = 4
+    ) -> CGPoint {
+        let squareCenterX = CGFloat(day.weekOfYear) * cellSize + (cellSize / 2) + gridContentPadding
+        let squareCenterY = CGFloat(day.dayOfWeek) * cellSize + (cellSize / 2)
+        return CGPoint(
+            x: squareCenterX,
+            y: squareCenterY - squareSize - 20
+        )
+    }
+}
+
+/// Date validation (pure functions)
+enum DailyUsageValidator {
+    /// Validate daily usage dates and return invalid date strings
+    /// - Parameters:
+    ///   - dailyUsage: Array of daily usage records
+    ///   - dateFormatter: Formatter to validate dates
+    /// - Returns: Array of invalid date strings
+    static func findInvalidDates(in dailyUsage: [DailyUsage], using dateFormatter: DateFormatter) -> [String] {
+        dailyUsage
+            .map(\.date)
+            .filter { dateFormatter.date(from: $0) == nil }
     }
 }

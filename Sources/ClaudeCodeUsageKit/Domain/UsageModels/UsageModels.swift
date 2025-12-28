@@ -11,23 +11,6 @@
 
 import Foundation
 
-// MARK: - Cached Date Formatters
-
-/// Static formatters to avoid re-allocation on every date parse (16,600+ calls)
-enum DateFormatters {
-    nonisolated(unsafe) static let withFractionalSeconds: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter
-    }()
-
-    nonisolated(unsafe) static let basic: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter
-    }()
-}
-
 // MARK: - Usage Entry
 
 /// Represents a single usage entry
@@ -270,4 +253,21 @@ extension DailyUsage: Identifiable {
 
 extension ProjectUsage: Identifiable {
     public var id: String { projectPath }
+}
+
+// MARK: - Cached Date Formatters
+
+/// Static formatters to avoid re-allocation on every date parse (16,600+ calls)
+enum DateFormatters {
+    nonisolated(unsafe) static let withFractionalSeconds: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+
+    nonisolated(unsafe) static let basic: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
 }

@@ -16,48 +16,6 @@ import OSLog
 
 private let logger = Logger(subsystem: "com.claudecodeusage", category: "Repository")
 
-// MARK: - Constants
-
-enum RepositoryThreshold {
-    static let parallelProcessing = 5
-    static let batchProcessing = 500
-    static let batchSize = 100
-}
-
-enum ByteValue {
-    static let openBrace: UInt8 = 0x7B   // '{'
-    static let closeBrace: UInt8 = 0x7D  // '}'
-    static let newline: Int32 = 0x0A     // '\n'
-}
-
-enum RepositoryDateFormat {
-    static let dayString = "yyyy-MM-dd"
-}
-
-// MARK: - File Metadata
-
-struct FileMetadata: Sendable {
-    let path: String
-    let projectDir: String
-    let earliestTimestamp: String
-    let modificationDate: Date
-}
-
-// MARK: - Entry Cache
-
-struct CachedFile {
-    let modificationDate: Date
-    let entries: [UsageEntry]
-}
-
-// MARK: - Public Types
-
-/// Sort order for queries
-public enum SortOrder: String, Sendable {
-    case ascending = "asc"
-    case descending = "desc"
-}
-
 // MARK: - Repository
 
 /// Repository for accessing and processing usage data.
@@ -190,13 +148,6 @@ public actor UsageRepository {
     }
 }
 
-// MARK: - Pipe Operator
-
-infix operator |>: AdditionPrecedence
-func |> <T, U>(value: T, transform: (T) -> U) -> U {
-    transform(value)
-}
-
 // MARK: - Extensions
 
 extension UsageStats {
@@ -224,4 +175,49 @@ extension Array where Element: Sendable {
         }
         return results
     }
+}
+
+// MARK: - Pipe Operator
+
+infix operator |>: AdditionPrecedence
+func |> <T, U>(value: T, transform: (T) -> U) -> U {
+    transform(value)
+}
+
+// MARK: - Constants
+
+enum RepositoryThreshold {
+    static let parallelProcessing = 5
+    static let batchProcessing = 500
+    static let batchSize = 100
+}
+
+enum ByteValue {
+    static let openBrace: UInt8 = 0x7B   // '{'
+    static let closeBrace: UInt8 = 0x7D  // '}'
+    static let newline: Int32 = 0x0A     // '\n'
+}
+
+enum RepositoryDateFormat {
+    static let dayString = "yyyy-MM-dd"
+}
+
+// MARK: - Supporting Types
+
+/// Sort order for queries
+public enum SortOrder: String, Sendable {
+    case ascending = "asc"
+    case descending = "desc"
+}
+
+struct FileMetadata: Sendable {
+    let path: String
+    let projectDir: String
+    let earliestTimestamp: String
+    let modificationDate: Date
+}
+
+struct CachedFile {
+    let modificationDate: Date
+    let entries: [UsageEntry]
 }
