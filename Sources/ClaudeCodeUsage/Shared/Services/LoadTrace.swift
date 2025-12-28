@@ -6,17 +6,6 @@
 import Foundation
 import OSLog
 
-// MARK: - Events
-
-enum LoadPhase: String {
-    case today = "Today"
-    case history = "History"
-}
-
-private enum Threshold {
-    static let slowLoad: TimeInterval = 2.0
-}
-
 // MARK: - Trace Collector
 
 actor LoadTrace {
@@ -168,4 +157,15 @@ actor LoadTrace {
         formatter.numberStyle = .decimal
         return formatter.string(from: NSNumber(value: n)) ?? "\(n)"
     }
+}
+
+// MARK: - Supporting Types
+
+enum LoadPhase: String {
+    case today = "Today"
+    case history = "History"
+}
+
+private enum Threshold {
+    static let slowLoad: TimeInterval = 2.0
 }
