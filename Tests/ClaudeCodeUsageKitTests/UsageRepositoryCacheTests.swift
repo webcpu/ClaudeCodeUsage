@@ -55,4 +55,48 @@ struct UsageRepositoryCacheTests {
         let stats = try await repository.getUsageStats()
         #expect(stats.totalTokens >= 0)
     }
+
+    @Test("Should detect modified files even after day rollover")
+    func testModifiedFileDetectionAfterDayRollover() async throws {
+        // This test verifies the fix for: "today's cost becomes $0 after day rollover"
+        // Bug scenario:
+        // 1. Day 1: File cached with modDate = Day 1
+        // 2. Day 2: File modified but cache still returns stale Day 1 metadata
+        // 3. filterFilesModifiedToday filters out the file → $0 cost
+
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("UsageRepoTest-\(UUID().uuidString)")
+        let projectsDir = tempDir.appendingPathComponent("projects")
+        let projectDir = projectsDir.appendingPathComponent("test-project")
+
+        try FileManager.default.createDirectory(at: projectDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let repository = UsageRepository(basePath: tempDir.path)
+        let sessionFile = projectDir.appendingPathComponent("test-session.jsonl")
+
+        // Create initial entry (simulates Day 1 usage)
+        let entry1 = createUsageEntry(cost: 5.0, timestamp: ISO8601DateFormatter().string(from: Date()))
+        try entry1.write(to: sessionFile, atomically: true, encoding: .utf8)
+
+        // First load - populates cache
+        let stats1 = try await repository.getUsageStats()
+        #expect(abs(stats1.totalCost - 5.0) < 0.01, "First load should see $5.00")
+
+        // Simulate file modification (Day 2 - file completely replaced with new entry)
+        // This simulates the real bug: cached file is modified, repository must detect it
+        try await Task.sleep(for: .milliseconds(100))  // Ensure modification time changes
+        let entry2 = createUsageEntry(cost: 20.0, timestamp: ISO8601DateFormatter().string(from: Date()))
+        try entry2.write(to: sessionFile, atomically: true, encoding: .utf8)
+
+        // Second load - should detect file modification and re-read the NEW content
+        let stats2 = try await repository.getUsageStats()
+        #expect(abs(stats2.totalCost - 20.0) < 0.01, "Should see new entry ($20.00) after file modification")
+    }
+
+    private func createUsageEntry(cost: Double, timestamp: String) -> String {
+        """
+        {"timestamp":"\(timestamp)","sessionId":"test-session","requestId":"req-\(UUID().uuidString)","message":{"id":"msg-\(UUID().uuidString)","model":"claude-3-5-sonnet-20241022","usage":{"input_tokens":1000,"output_tokens":500}},"costUSD":\(cost)}
+        """
+    }
 }

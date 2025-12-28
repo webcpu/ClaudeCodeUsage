@@ -224,6 +224,13 @@ public actor UsageRepository {
               cached.modificationDate < todayStart else {
             return nil
         }
+
+        // Validate cache: ensure file hasn't been modified since caching
+        guard let actualModDate = FileTimestamp.modificationDate(of: filePath),
+              actualModDate == cached.modificationDate else {
+            return nil
+        }
+
         return FileMetadata(
             path: filePath,
             projectDir: projectDir,
@@ -378,11 +385,19 @@ private enum PathDecoder {
 private enum FileTimestamp {
     /// Extract both timestamp string and modification date from file
     static func extract(from path: String) -> (timestamp: String, modificationDate: Date)? {
+        guard let modDate = modificationDate(of: path) else {
+            return nil
+        }
+        return (ISO8601DateFormatter().string(from: modDate), modDate)
+    }
+
+    /// Get modification date for cache validation
+    static func modificationDate(of path: String) -> Date? {
         guard let attributes = try? FileManager.default.attributesOfItem(atPath: path),
               let modDate = attributes[.modificationDate] as? Date else {
             return nil
         }
-        return (ISO8601DateFormatter().string(from: modDate), modDate)
+        return modDate
     }
 }
 
