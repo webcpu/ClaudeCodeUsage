@@ -6,15 +6,6 @@
 import SwiftUI
 import ClaudeCodeUsageKit
 
-// MARK: - Navigation Destination
-enum Destination: Hashable {
-    case overview
-    case models
-    case dailyUsage
-    case analytics
-    case liveMetrics
-}
-
 // MARK: - Main View
 struct MainView: View {
     @Environment(UsageStore.self) private var store
@@ -111,4 +102,13 @@ private struct DetailView: View {
                 .environment(store)
         }
     }
+}
+
+// MARK: - Navigation Destination
+enum Destination: Hashable {
+    case overview
+    case models
+    case dailyUsage
+    case analytics
+    case liveMetrics
 }
