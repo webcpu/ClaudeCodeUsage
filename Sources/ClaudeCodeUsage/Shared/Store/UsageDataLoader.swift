@@ -8,33 +8,7 @@ import ClaudeCodeUsageKit
 import struct ClaudeLiveMonitorLib.SessionBlock
 import struct ClaudeLiveMonitorLib.BurnRate
 
-// MARK: - Load Results
-
-/// Fast result from Phase 1 - today's data only
-struct TodayLoadResult {
-    let todayEntries: [UsageEntry]
-    let todayStats: UsageStats
-    let session: SessionBlock?
-    let burnRate: BurnRate?
-    let autoTokenLimit: Int?
-}
-
-/// Complete result including historical data
-struct FullLoadResult {
-    let fullStats: UsageStats
-}
-
-/// Combined result for backward compatibility
-struct UsageLoadResult {
-    let todayEntries: [UsageEntry]
-    let todayStats: UsageStats
-    let fullStats: UsageStats
-    let session: SessionBlock?
-    let burnRate: BurnRate?
-    let autoTokenLimit: Int?
-}
-
-// MARK: - Data Loader
+// MARK: - UsageDataLoader
 
 actor UsageDataLoader {
     private let repository: UsageRepository
@@ -140,4 +114,30 @@ actor UsageDataLoader {
             byProject: []
         )
     }
+}
+
+// MARK: - Supporting Types
+
+/// Fast result from Phase 1 - today's data only
+struct TodayLoadResult {
+    let todayEntries: [UsageEntry]
+    let todayStats: UsageStats
+    let session: SessionBlock?
+    let burnRate: BurnRate?
+    let autoTokenLimit: Int?
+}
+
+/// Complete result including historical data
+struct FullLoadResult {
+    let fullStats: UsageStats
+}
+
+/// Combined result for backward compatibility
+struct UsageLoadResult {
+    let todayEntries: [UsageEntry]
+    let todayStats: UsageStats
+    let fullStats: UsageStats
+    let session: SessionBlock?
+    let burnRate: BurnRate?
+    let autoTokenLimit: Int?
 }
