@@ -1,25 +1,31 @@
 import Foundation
 
-// MARK: - Data Models
+// MARK: - TokenCounts
 
 public struct TokenCounts: Sendable {
     public let inputTokens: Int
     public let outputTokens: Int
     public let cacheCreationInputTokens: Int
     public let cacheReadInputTokens: Int
-    
+
     public var total: Int {
         inputTokens + outputTokens + cacheCreationInputTokens + cacheReadInputTokens
     }
-    
-    public init(inputTokens: Int = 0, outputTokens: Int = 0, 
-                cacheCreationInputTokens: Int = 0, cacheReadInputTokens: Int = 0) {
+
+    public init(
+        inputTokens: Int = 0,
+        outputTokens: Int = 0,
+        cacheCreationInputTokens: Int = 0,
+        cacheReadInputTokens: Int = 0
+    ) {
         self.inputTokens = inputTokens
         self.outputTokens = outputTokens
         self.cacheCreationInputTokens = cacheCreationInputTokens
         self.cacheReadInputTokens = cacheReadInputTokens
     }
 }
+
+// MARK: - UsageEntry
 
 public struct UsageEntry: Sendable {
     public let timestamp: Date
@@ -30,10 +36,17 @@ public struct UsageEntry: Sendable {
     public let messageId: String?
     public let requestId: String?
     public let usageLimitResetTime: Date?
-    
-    public init(timestamp: Date, usage: TokenCounts, costUSD: Double, model: String,
-                sourceFile: String, messageId: String? = nil, requestId: String? = nil,
-                usageLimitResetTime: Date? = nil) {
+
+    public init(
+        timestamp: Date,
+        usage: TokenCounts,
+        costUSD: Double,
+        model: String,
+        sourceFile: String,
+        messageId: String? = nil,
+        requestId: String? = nil,
+        usageLimitResetTime: Date? = nil
+    ) {
         self.timestamp = timestamp
         self.usage = usage
         self.costUSD = costUSD
@@ -45,11 +58,13 @@ public struct UsageEntry: Sendable {
     }
 }
 
+// MARK: - BurnRate
+
 public struct BurnRate: Sendable {
     public let tokensPerMinute: Int
     public let tokensPerMinuteForIndicator: Int
     public let costPerHour: Double
-    
+
     public init(tokensPerMinute: Int, tokensPerMinuteForIndicator: Int, costPerHour: Double) {
         self.tokensPerMinute = tokensPerMinute
         self.tokensPerMinuteForIndicator = tokensPerMinuteForIndicator
@@ -57,17 +72,21 @@ public struct BurnRate: Sendable {
     }
 }
 
+// MARK: - ProjectedUsage
+
 public struct ProjectedUsage: Sendable {
     public let totalTokens: Int
     public let totalCost: Double
     public let remainingMinutes: Double
-    
+
     public init(totalTokens: Int, totalCost: Double, remainingMinutes: Double) {
         self.totalTokens = totalTokens
         self.totalCost = totalCost
         self.remainingMinutes = remainingMinutes
     }
 }
+
+// MARK: - SessionBlock
 
 public struct SessionBlock: Sendable {
     public let id: String
@@ -83,11 +102,22 @@ public struct SessionBlock: Sendable {
     public let usageLimitResetTime: Date?
     public let burnRate: BurnRate
     public let projectedUsage: ProjectedUsage
-    
-    public init(id: String, startTime: Date, endTime: Date, actualEndTime: Date?,
-                isActive: Bool, isGap: Bool, entries: [UsageEntry], tokenCounts: TokenCounts,
-                costUSD: Double, models: [String], usageLimitResetTime: Date?,
-                burnRate: BurnRate, projectedUsage: ProjectedUsage) {
+
+    public init(
+        id: String,
+        startTime: Date,
+        endTime: Date,
+        actualEndTime: Date?,
+        isActive: Bool,
+        isGap: Bool,
+        entries: [UsageEntry],
+        tokenCounts: TokenCounts,
+        costUSD: Double,
+        models: [String],
+        usageLimitResetTime: Date?,
+        burnRate: BurnRate,
+        projectedUsage: ProjectedUsage
+    ) {
         self.id = id
         self.startTime = startTime
         self.endTime = endTime
@@ -104,52 +134,117 @@ public struct SessionBlock: Sendable {
     }
 }
 
-// MARK: - Model Pricing
+// MARK: - ModelPricing
 
 public struct ModelPricing: Sendable {
     public let inputCostPerToken: Double
     public let outputCostPerToken: Double
     public let cacheCreationCostPerToken: Double
     public let cacheReadCostPerToken: Double
-    
-    // Default pricing for Claude models
-    public static let claudeOpus4 = ModelPricing(
+
+    public init(
+        inputCostPerToken: Double,
+        outputCostPerToken: Double,
+        cacheCreationCostPerToken: Double,
+        cacheReadCostPerToken: Double
+    ) {
+        self.inputCostPerToken = inputCostPerToken
+        self.outputCostPerToken = outputCostPerToken
+        self.cacheCreationCostPerToken = cacheCreationCostPerToken
+        self.cacheReadCostPerToken = cacheReadCostPerToken
+    }
+
+    public func calculateCost(tokens: TokenCounts) -> Double {
+        inputCost(for: tokens) + outputCost(for: tokens) + cacheCost(for: tokens)
+    }
+}
+
+// MARK: - ModelPricing Pricing Configurations
+
+public extension ModelPricing {
+    static let claudeOpus4 = ModelPricing(
         inputCostPerToken: 0.000015,
         outputCostPerToken: 0.000075,
         cacheCreationCostPerToken: 0.00001875,
         cacheReadCostPerToken: 0.0000015
     )
-    
-    public static let claudeSonnet4 = ModelPricing(
+
+    static let claudeSonnet4 = ModelPricing(
         inputCostPerToken: 0.000003,
         outputCostPerToken: 0.000015,
         cacheCreationCostPerToken: 0.00000375,
         cacheReadCostPerToken: 0.0000003
     )
-    
-    public static func getPricing(for model: String) -> ModelPricing {
-        if model.contains("opus") {
-            return .claudeOpus4
-        } else if model.contains("sonnet") {
-            return .claudeSonnet4
-        } else {
-            // Default to Opus pricing for unknown models
-            return .claudeOpus4
+
+    static let `default` = claudeOpus4
+}
+
+// MARK: - ModelPricing Lookup
+
+public extension ModelPricing {
+    static func getPricing(for model: String) -> ModelPricing {
+        ModelFamily(from: model).pricing
+    }
+}
+
+// MARK: - ModelPricing Cost Calculation
+
+private extension ModelPricing {
+    func inputCost(for tokens: TokenCounts) -> Double {
+        Double(tokens.inputTokens) * inputCostPerToken
+    }
+
+    func outputCost(for tokens: TokenCounts) -> Double {
+        Double(tokens.outputTokens) * outputCostPerToken
+    }
+
+    func cacheCost(for tokens: TokenCounts) -> Double {
+        cacheCreationCost(for: tokens) + cacheReadCost(for: tokens)
+    }
+
+    func cacheCreationCost(for tokens: TokenCounts) -> Double {
+        Double(tokens.cacheCreationInputTokens) * cacheCreationCostPerToken
+    }
+
+    func cacheReadCost(for tokens: TokenCounts) -> Double {
+        Double(tokens.cacheReadInputTokens) * cacheReadCostPerToken
+    }
+}
+
+// MARK: - ModelFamily
+
+private enum ModelFamily {
+    case opus
+    case sonnet
+    case unknown
+
+    init(from modelName: String) {
+        self = Self.allKnownFamilies.first { $0.matches(modelName) } ?? .unknown
+    }
+
+    var pricing: ModelPricing {
+        switch self {
+        case .opus: .claudeOpus4
+        case .sonnet: .claudeSonnet4
+        case .unknown: .default
         }
     }
-    
-    public func calculateCost(tokens: TokenCounts) -> Double {
-        return Double(tokens.inputTokens) * inputCostPerToken +
-               Double(tokens.outputTokens) * outputCostPerToken +
-               Double(tokens.cacheCreationInputTokens) * cacheCreationCostPerToken +
-               Double(tokens.cacheReadInputTokens) * cacheReadCostPerToken
+}
+
+// MARK: - ModelFamily Matching
+
+private extension ModelFamily {
+    static let allKnownFamilies: [ModelFamily] = [.opus, .sonnet]
+
+    var identifier: String {
+        switch self {
+        case .opus: "opus"
+        case .sonnet: "sonnet"
+        case .unknown: ""
+        }
     }
-    
-    public init(inputCostPerToken: Double, outputCostPerToken: Double,
-                cacheCreationCostPerToken: Double, cacheReadCostPerToken: Double) {
-        self.inputCostPerToken = inputCostPerToken
-        self.outputCostPerToken = outputCostPerToken
-        self.cacheCreationCostPerToken = cacheCreationCostPerToken
-        self.cacheReadCostPerToken = cacheReadCostPerToken
+
+    func matches(_ modelName: String) -> Bool {
+        modelName.lowercased().contains(identifier)
     }
 }
