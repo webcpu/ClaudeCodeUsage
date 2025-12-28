@@ -220,4 +220,12 @@ struct FileMetadata: Sendable {
 struct CachedFile {
     let modificationDate: Date
     let entries: [UsageEntry]
+    let version: Int
+}
+
+/// Cache version tracking - increment when pricing or parsing logic changes
+enum CacheVersion {
+    /// Current cache version - bump this when pricing or cost calculation changes
+    /// v2: Fixed Haiku 4.5 pricing ($1/$5 instead of $0.80/$4)
+    static let current = 2
 }

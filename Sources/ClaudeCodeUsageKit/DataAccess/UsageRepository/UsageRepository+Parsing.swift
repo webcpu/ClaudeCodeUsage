@@ -27,7 +27,8 @@ extension UsageRepository {
     }
 
     func isCacheHit(for file: FileMetadata) -> Bool {
-        fileCache[file.path]?.modificationDate == file.modificationDate
+        guard let cached = fileCache[file.path] else { return false }
+        return cached.modificationDate == file.modificationDate && cached.version == CacheVersion.current
     }
 
     func loadNewEntries(from files: [FileMetadata], deduplication: Deduplication) async -> [UsageEntry] {
@@ -72,7 +73,7 @@ extension UsageRepository {
 
     func cacheAndExtractEntries(from results: [(FileMetadata, [UsageEntry])]) -> [UsageEntry] {
         results.flatMap { file, entries in
-            fileCache[file.path] = CachedFile(modificationDate: file.modificationDate, entries: entries)
+            fileCache[file.path] = CachedFile(modificationDate: file.modificationDate, entries: entries, version: CacheVersion.current)
             return entries
         }
     }
@@ -93,7 +94,7 @@ extension UsageRepository {
 
     func parseFile(_ file: FileMetadata, deduplication: Deduplication) -> [UsageEntry] {
         let entries = FileParser.parse(file, deduplication: deduplication)
-        fileCache[file.path] = CachedFile(modificationDate: file.modificationDate, entries: entries)
+        fileCache[file.path] = CachedFile(modificationDate: file.modificationDate, entries: entries, version: CacheVersion.current)
         return entries
     }
 }
