@@ -33,18 +33,15 @@ enum TooltipPositioning {
         shouldFlipLeft: Bool
     ) -> CGSize {
         let size = estimatedSize(for: style)
-        let preferredY: CGFloat = -size.height - 10
+        let gap: CGFloat = 8
 
-        // Use shouldFlipLeft to determine X offset
+        // Position tooltip edge near cell center
+        // .position() places tooltip CENTER, so offset by half-width to align edge
         let adjustedX: CGFloat = shouldFlipLeft
-            ? -size.width - 10
-            : 10
+            ? -(size.width / 2) - gap  // Right edge near cell
+            : (size.width / 2) + gap   // Left edge near cell
 
-        let adjustedY = position.y + preferredY < screenBounds.minY
-            ? 10
-            : preferredY
-
-        return CGSize(width: adjustedX, height: adjustedY)
+        return CGSize(width: adjustedX, height: 0)
     }
 
     private static func adaptiveOffset(style: HeatmapTooltip.TooltipStyle, shouldFlipLeft: Bool) -> CGSize {

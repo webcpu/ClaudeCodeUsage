@@ -229,13 +229,16 @@ public extension HeatmapViewModel {
 
 /// Tooltip position calculation (pure functions)
 enum TooltipPositionCalculator {
+    /// Fixed Y position for tooltip (in header area)
+    private static let fixedY: CGFloat = 30
+
     /// Calculate tooltip position for a hovered day
     /// - Parameters:
     ///   - day: The day being hovered
     ///   - cellSize: Size of each cell in the grid
-    ///   - squareSize: Size of the day square
+    ///   - squareSize: Size of the day square (unused, kept for API compatibility)
     ///   - gridContentPadding: Horizontal padding applied to grid content
-    /// - Returns: Position for the tooltip
+    /// - Returns: Position for the tooltip (X follows column, Y fixed at header)
     static func position(
         for day: HeatmapDay,
         cellSize: CGFloat,
@@ -243,11 +246,10 @@ enum TooltipPositionCalculator {
         gridContentPadding: CGFloat = 4
     ) -> CGPoint {
         let squareCenterX = CGFloat(day.weekOfYear) * cellSize + (cellSize / 2) + gridContentPadding
-        let squareCenterY = CGFloat(day.dayOfWeek) * cellSize + (cellSize / 2)
 
         return CGPoint(
             x: squareCenterX,
-            y: squareCenterY - squareSize - 20
+            y: fixedY
         )
     }
 

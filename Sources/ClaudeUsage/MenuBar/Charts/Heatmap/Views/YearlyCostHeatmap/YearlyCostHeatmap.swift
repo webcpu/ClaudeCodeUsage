@@ -77,6 +77,7 @@ public struct YearlyCostHeatmap: View {
         .padding(configuration.padding)
         .background(Color(NSColor.controlBackgroundColor))
         .cornerRadius(12)
+        .overlay(tooltipOverlay, alignment: .topLeading)
         .task { await viewModel.updateStats(stats) }
         .onAppear { screenBounds = NSScreen.main?.frame ?? .zero }
     }
@@ -155,18 +156,15 @@ public struct YearlyCostHeatmap: View {
 
     @ViewBuilder
     private var contentSection: some View {
-        Group {
-            if viewModel.isLoading {
-                loadingView
-            } else if let error = viewModel.error {
-                errorView(error)
-            } else if let dataset = viewModel.dataset {
-                heatmapContent(dataset)
-            } else {
-                emptyStateView
-            }
+        if viewModel.isLoading {
+            loadingView
+        } else if let error = viewModel.error {
+            errorView(error)
+        } else if let dataset = viewModel.dataset {
+            heatmapContent(dataset)
+        } else {
+            emptyStateView
         }
-        .overlay(tooltipOverlay, alignment: .topLeading)
     }
 
     // MARK: - Loading View
