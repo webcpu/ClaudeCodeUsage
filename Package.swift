@@ -5,10 +5,7 @@ import PackageDescription
 let package = Package(
     name: "ClaudeCodeUsage",
     platforms: [
-        .iOS(.v17),
-        .macOS(.v14),
-        .tvOS(.v17),
-        .watchOS(.v10)
+        .macOS(.v15),
     ],
     products: [
         .library(

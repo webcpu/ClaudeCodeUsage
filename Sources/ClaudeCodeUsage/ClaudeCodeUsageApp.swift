@@ -12,26 +12,20 @@ import ClaudeCodeUsageKit
 struct ClaudeCodeUsageApp: App {
     @State private var store = UsageStore()
     @State private var lifecycleManager = AppLifecycleManager()
-    @State private var hasAppeared = false
     @State private var settingsService = AppSettingsService()
 
     var body: some Scene {
         Window(AppMetadata.name, id: "main") {
             MainView(settingsService: settingsService)
                 .environment(store)
-                .onAppear {
-                    guard !hasAppeared else { return }
-                    hasAppeared = true
-                    lifecycleManager.configure(with: store)
-                    Task { await store.initializeIfNeeded() }
-                }
         }
+        .defaultLaunchBehavior(.suppressed)
         .windowStyle(.automatic)
         .windowToolbarStyle(.unified)
         .defaultSize(width: 840, height: 600)
         .commands { AppCommands(settingsService: settingsService) }
 
-        MenuBarScene(store: store, settingsService: settingsService)
+        MenuBarScene(store: store, settingsService: settingsService, lifecycleManager: lifecycleManager)
     }
 }
 
@@ -39,6 +33,8 @@ struct ClaudeCodeUsageApp: App {
 struct MenuBarScene: Scene {
     let store: UsageStore
     let settingsService: AppSettingsService
+    let lifecycleManager: AppLifecycleManager
+    @State private var hasInitialized = false
 
     var body: some Scene {
         MenuBarExtra {
@@ -47,6 +43,12 @@ struct MenuBarScene: Scene {
         } label: {
             MenuBarLabel(store: store)
                 .environment(store)
+                .task {
+                    guard !hasInitialized else { return }
+                    hasInitialized = true
+                    lifecycleManager.configure(with: store)
+                    await store.initializeIfNeeded()
+                }
                 .contextMenu {
                     MenuBarContextMenu(settingsService: settingsService)
                         .environment(store)
