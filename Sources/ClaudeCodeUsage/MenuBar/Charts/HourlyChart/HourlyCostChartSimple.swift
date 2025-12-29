@@ -16,7 +16,7 @@ struct HourlyCostChartSimple: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let chartWidth = geometry.size.width - 15
+            let chartWidth = geometry.size.width - 25
             VStack(spacing: 4) {
                 headerRow
                 chart
@@ -54,7 +54,7 @@ private extension HourlyCostChartSimple {
     var chart: some View {
         costChart
             .frame(height: 60)
-            .padding(.trailing, 15)
+            .padding(.trailing, 25)
     }
 
     var costChart: some View {

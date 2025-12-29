@@ -84,6 +84,12 @@ private struct DetailView: View {
     let settingsService: AppSettingsService
 
     var body: some View {
+        content
+            .frame(minWidth: 700)
+    }
+
+    @ViewBuilder
+    private var content: some View {
         switch destination {
         case .overview:
             OverviewView()

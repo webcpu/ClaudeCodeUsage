@@ -99,17 +99,26 @@ private struct LoadingView: View {
     }
 }
 
-// MARK: - List
+// MARK: - Grid
 
 private struct DailyUsageList: View {
     let dates: [DailyUsage]
+
+    private enum Layout {
+        static let minColumnWidth: CGFloat = 300
+        static let spacing: CGFloat = 12
+    }
 
     private var globalMaxHourlyCost: Double {
         dates.flatMap(\.hourlyCosts).max() ?? 1.0
     }
 
+    private var gridItems: [GridItem] {
+        [GridItem(.adaptive(minimum: Layout.minColumnWidth), spacing: Layout.spacing)]
+    }
+
     var body: some View {
-        VStack(spacing: 12) {
+        LazyVGrid(columns: gridItems, spacing: Layout.spacing) {
             ForEach(dates.reversed()) { daily in
                 DailyCard(daily: daily, maxHourlyCost: globalMaxHourlyCost)
             }
@@ -194,6 +203,7 @@ private struct DateDetails: View {
         HStack {
             Text(info.dayOfWeek)
                 .font(.headline)
+                .lineLimit(1)
             todayBadge
         }
     }
@@ -232,6 +242,8 @@ private struct CostMetrics: View {
         Text("\(tokens.abbreviated) tokens")
             .font(.caption)
             .foregroundColor(.secondary)
+            .lineLimit(1)
+            .fixedSize()
     }
 }
 
@@ -243,6 +255,8 @@ private struct Badge: View {
         Text(text)
             .font(.caption2)
             .fontWeight(.semibold)
+            .lineLimit(1)
+            .fixedSize()
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .background(color.opacity(0.2))
