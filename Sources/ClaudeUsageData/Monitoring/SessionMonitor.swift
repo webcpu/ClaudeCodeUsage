@@ -30,10 +30,8 @@ public actor SessionMonitor: SessionDataSource {
         loadModifiedFiles()
         let blocks = identifySessionBlocks()
         cachedTokenLimit = maxTokensFromCompletedBlocks(blocks)
-
-        // Inject tokenLimit into active block (calculated after block creation)
-        guard let activeBlock = mostRecentActiveBlock(from: blocks) else { return nil }
-        return activeBlock.with(tokenLimit: cachedTokenLimit > 0 ? cachedTokenLimit : nil)
+        return mostRecentActiveBlock(from: blocks)?
+            .with(tokenLimit: cachedTokenLimit > 0 ? cachedTokenLimit : nil)
     }
 
     public func getBurnRate() async -> BurnRate? {
@@ -45,28 +43,21 @@ public actor SessionMonitor: SessionDataSource {
         return cachedTokenLimit > 0 ? cachedTokenLimit : nil
     }
 
+    // MARK: - Cache Management
+
+    public func clearCache() {
+        lastFileTimestamps.removeAll()
+        allEntries.removeAll()
+        cachedTokenLimit = 0
+    }
+
     // MARK: - File Loading
 
     private func loadModifiedFiles() {
         let files = findUsageFiles()
-
-        for file in files {
-            guard shouldReloadFile(file) else { continue }
-
-            // Parse entire file fresh (per-file deduplication only)
-            var fileHashes = Set<String>()
-            let newEntries = parser.parseFile(
-                at: file.path,
-                project: file.projectName,
-                processedHashes: &fileHashes
-            )
-
-            // Remove old entries from this file, add new ones
-            allEntries.removeAll { $0.sourceFile == file.path }
-            allEntries.append(contentsOf: newEntries)
-            lastFileTimestamps[file.path] = file.modificationDate
-        }
-
+        files
+            .filter(shouldReloadFile)
+            .forEach(reloadFile)
         allEntries.sort()
     }
 
@@ -74,8 +65,19 @@ public actor SessionMonitor: SessionDataSource {
         guard let allFiles = try? FileDiscovery.discoverFiles(in: basePath) else {
             return []
         }
-        // Only load files modified within the session window (+ buffer for overlap)
-        return FileDiscovery.filterFilesModifiedWithin(allFiles, hours: sessionDurationHours * 2)
+        return FileDiscovery.filterFilesModifiedWithin(allFiles, hours: sessionWindowHours)
+    }
+
+    private func reloadFile(_ file: FileMetadata) {
+        var fileHashes = Set<String>()
+        let newEntries = parser.parseFile(
+            at: file.path,
+            project: file.projectName,
+            processedHashes: &fileHashes
+        )
+        allEntries.removeAll { $0.sourceFile == file.path }
+        allEntries.append(contentsOf: newEntries)
+        lastFileTimestamps[file.path] = file.modificationDate
     }
 
     private func shouldReloadFile(_ file: FileMetadata) -> Bool {
@@ -89,42 +91,66 @@ public actor SessionMonitor: SessionDataSource {
 
     private func identifySessionBlocks() -> [SessionBlock] {
         guard !allEntries.isEmpty else { return [] }
+        return groupEntriesIntoBlocks(allEntries)
+    }
 
-        let sessionDuration = sessionDurationHours * 3600
+    private func groupEntriesIntoBlocks(_ entries: [UsageEntry]) -> [SessionBlock] {
         var blocks: [SessionBlock] = []
-        var currentBlockEntries: [UsageEntry] = []
-        var blockStartTime: Date?
+        var currentEntries: [UsageEntry] = []
+        var blockStart: Date?
 
-        for entry in allEntries {
-            if let start = blockStartTime {
-                let gap = entry.timestamp.timeIntervalSince(currentBlockEntries.last?.timestamp ?? start)
-                if gap > sessionDuration {
-                    // End current block, start new one
-                    if let block = createBlock(entries: currentBlockEntries, startTime: start, isActive: false) {
-                        blocks.append(block)
-                    }
-                    currentBlockEntries = [entry]
-                    blockStartTime = entry.timestamp
+        for entry in entries {
+            if let start = blockStart {
+                if hasSessionGap(from: currentEntries.last, to: entry) {
+                    appendBlock(entries: currentEntries, startTime: start, isActive: false, to: &blocks)
+                    currentEntries = [entry]
+                    blockStart = entry.timestamp
                 } else {
-                    currentBlockEntries.append(entry)
+                    currentEntries.append(entry)
                 }
             } else {
-                blockStartTime = entry.timestamp
-                currentBlockEntries = [entry]
+                blockStart = entry.timestamp
+                currentEntries = [entry]
             }
         }
 
-        // Handle final block
-        if let start = blockStartTime, !currentBlockEntries.isEmpty {
-            let lastEntryTime = currentBlockEntries.last?.timestamp ?? start
-            let isActive = Date().timeIntervalSince(lastEntryTime) < sessionDuration
-            if let block = createBlock(entries: currentBlockEntries, startTime: start, isActive: isActive) {
-                blocks.append(block)
-            }
-        }
-
+        appendFinalBlock(entries: currentEntries, startTime: blockStart, to: &blocks)
         return blocks
     }
+
+    private func hasSessionGap(from lastEntry: UsageEntry?, to entry: UsageEntry) -> Bool {
+        guard let lastEntry else { return false }
+        let gap = entry.timestamp.timeIntervalSince(lastEntry.timestamp)
+        return gap > sessionDurationSeconds
+    }
+
+    private func appendBlock(
+        entries: [UsageEntry],
+        startTime: Date,
+        isActive: Bool,
+        to blocks: inout [SessionBlock]
+    ) {
+        if let block = createBlock(entries: entries, startTime: startTime, isActive: isActive) {
+            blocks.append(block)
+        }
+    }
+
+    private func appendFinalBlock(
+        entries: [UsageEntry],
+        startTime: Date?,
+        to blocks: inout [SessionBlock]
+    ) {
+        guard let start = startTime, !entries.isEmpty else { return }
+        let isActive = isFinalBlockActive(entries: entries)
+        appendBlock(entries: entries, startTime: start, isActive: isActive, to: &blocks)
+    }
+
+    private func isFinalBlockActive(entries: [UsageEntry]) -> Bool {
+        guard let lastEntryTime = entries.last?.timestamp else { return false }
+        return Date().timeIntervalSince(lastEntryTime) < sessionDurationSeconds
+    }
+
+    // MARK: - Block Creation
 
     private func createBlock(entries: [UsageEntry], startTime: Date, isActive: Bool) -> SessionBlock? {
         guard !entries.isEmpty else { return nil }
@@ -133,11 +159,7 @@ public actor SessionMonitor: SessionDataSource {
         let cost = entries.reduce(0.0) { $0 + $1.costUSD }
         let models = Array(Set(entries.map(\.model)))
         let actualEndTime = entries.last?.timestamp
-
-        let burnRate = calculateBurnRate(entries: entries)
-        let endTime = isActive
-            ? Date().addingTimeInterval(sessionDurationHours * 3600)
-            : (actualEndTime ?? startTime)
+        let endTime = computeEndTime(isActive: isActive, actualEndTime: actualEndTime, startTime: startTime)
 
         return SessionBlock(
             id: UUID().uuidString,
@@ -149,36 +171,47 @@ public actor SessionMonitor: SessionDataSource {
             tokens: tokens,
             costUSD: cost,
             models: models,
-            burnRate: burnRate
+            burnRate: calculateBurnRate(entries: entries)
         )
     }
 
+    private func computeEndTime(isActive: Bool, actualEndTime: Date?, startTime: Date) -> Date {
+        isActive
+            ? Date().addingTimeInterval(sessionDurationSeconds)
+            : (actualEndTime ?? startTime)
+    }
+
+    // MARK: - Burn Rate Calculation
+
     private func calculateBurnRate(entries: [UsageEntry]) -> BurnRate {
-        guard entries.count >= 2,
-              let first = entries.first,
-              let last = entries.last else {
+        guard let duration = sessionDuration(from: entries), duration > TimeConstants.minimumDuration else {
             return .zero
         }
-
-        let duration = last.timestamp.timeIntervalSince(first.timestamp)
-        guard duration > 60 else { return .zero }  // Need at least 1 minute
 
         let totalTokens = entries.reduce(0) { $0 + $1.totalTokens }
         let totalCost = entries.reduce(0.0) { $0 + $1.costUSD }
 
-        let minutes = duration / 60.0
-        let tokensPerMinute = Int(Double(totalTokens) / minutes)
-        let costPerHour = (totalCost / duration) * 3600
-
-        return BurnRate(tokensPerMinute: tokensPerMinute, costPerHour: costPerHour)
+        return BurnRate(
+            tokensPerMinute: Int(Double(totalTokens) / duration.minutes),
+            costPerHour: totalCost / duration.hours
+        )
     }
 
-    // MARK: - Helpers
+    private func sessionDuration(from entries: [UsageEntry]) -> TimeInterval? {
+        guard entries.count >= 2,
+              let first = entries.first,
+              let last = entries.last else {
+            return nil
+        }
+        return last.timestamp.timeIntervalSince(first.timestamp)
+    }
+
+    // MARK: - Block Queries
 
     private func maxTokensFromCompletedBlocks(_ blocks: [SessionBlock]) -> Int {
         blocks
             .filter { !$0.isActive }
-            .map { $0.tokens.total }
+            .map(\.tokens.total)
             .max() ?? 0
     }
 
@@ -188,11 +221,29 @@ public actor SessionMonitor: SessionDataSource {
             .max { ($0.actualEndTime ?? $0.startTime) < ($1.actualEndTime ?? $1.startTime) }
     }
 
-    // MARK: - Cache Management
+    // MARK: - Time Constants
 
-    public func clearCache() {
-        lastFileTimestamps.removeAll()
-        allEntries.removeAll()
-        cachedTokenLimit = 0
+    private var sessionDurationSeconds: TimeInterval {
+        sessionDurationHours * TimeConstants.secondsPerHour
     }
+
+    private var sessionWindowHours: Double {
+        sessionDurationHours * TimeConstants.sessionWindowMultiplier
+    }
+}
+
+// MARK: - Time Constants
+
+private enum TimeConstants {
+    static let secondsPerHour: TimeInterval = 3600
+    static let secondsPerMinute: TimeInterval = 60
+    static let minimumDuration: TimeInterval = 60
+    static let sessionWindowMultiplier: Double = 2
+}
+
+// MARK: - TimeInterval Helpers
+
+private extension TimeInterval {
+    var minutes: Double { self / TimeConstants.secondsPerMinute }
+    var hours: Double { self / TimeConstants.secondsPerHour }
 }
