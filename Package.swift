@@ -19,11 +19,7 @@ let package = Package(
         // macOS menu bar app
         .executable(
             name: "ClaudeUsage",
-            targets: ["ClaudeUsage"]),
-        // CLI monitor
-        .executable(
-            name: "ClaudeMonitorCLI",
-            targets: ["ClaudeMonitorCLI"])
+            targets: ["ClaudeUsage"])
     ],
     dependencies: [],
     targets: [
@@ -50,13 +46,6 @@ let package = Package(
                 "ClaudeUsageData"
             ],
             path: "Sources/ClaudeUsage"),
-
-        // MARK: - CLI
-
-        .executableTarget(
-            name: "ClaudeMonitorCLI",
-            dependencies: ["ClaudeUsageData"],
-            path: "Sources/ClaudeMonitorCLI"),
 
         // MARK: - Tests
 
