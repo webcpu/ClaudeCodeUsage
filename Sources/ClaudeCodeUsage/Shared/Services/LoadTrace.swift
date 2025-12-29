@@ -24,6 +24,7 @@ actor LoadTrace {
     private var tokenLimit: Int?
     private var tokenLimitCached: Bool = false
     private var tokenLimitDuration: TimeInterval = 0
+    private var historySkipped: Bool = false
 
     func start() -> UUID {
         let id = UUID()
@@ -54,6 +55,10 @@ actor LoadTrace {
         tokenLimitDuration = duration
     }
 
+    func skipHistory() {
+        historySkipped = true
+    }
+
     func complete() {
         guard let startTime = loadStartTime else { return }
         let duration = Date().timeIntervalSince(startTime)
@@ -72,6 +77,7 @@ actor LoadTrace {
         tokenLimit = nil
         tokenLimitCached = false
         tokenLimitDuration = 0
+        historySkipped = false
     }
 
     // MARK: - Output
@@ -119,6 +125,9 @@ actor LoadTrace {
     }
 
     private var historyPhaseLine: String {
+        if historySkipped {
+            return "│ Phase 2: History (skipped - same day)"
+        }
         let duration = phaseDurations[.history].map { " (\(formatDuration($0)))" } ?? ""
         return "│ Phase 2: History\(duration)"
     }

@@ -75,6 +75,7 @@ final class UsageStore {
     private var isCurrentlyLoading = false
     private var lastLoadStartTime: Date?
     private var hasInitialized = false
+    private var lastHistoryLoadDate: Date?
 
     // MARK: - Initialization
 
@@ -129,13 +130,23 @@ final class UsageStore {
             let todayResult = try await dataLoader.loadToday()
             apply(todayResult)
 
-            let historyResult = try await dataLoader.loadHistory()
-            apply(historyResult)
+            if shouldLoadHistory() {
+                let historyResult = try await dataLoader.loadHistory()
+                apply(historyResult)
+                lastHistoryLoadDate = clock.now
+            } else {
+                await LoadTrace.shared.skipHistory()
+            }
 
             await LoadTrace.shared.complete()
         } catch {
             state = .error(error)
         }
+    }
+
+    private func shouldLoadHistory() -> Bool {
+        guard let lastDate = lastHistoryLoadDate else { return true }
+        return !Calendar.current.isDate(lastDate, inSameDayAs: clock.now)
     }
 
     // MARK: - State Transitions
