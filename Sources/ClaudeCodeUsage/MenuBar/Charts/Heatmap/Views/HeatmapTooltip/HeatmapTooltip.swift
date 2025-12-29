@@ -47,6 +47,9 @@ public struct HeatmapTooltip: View {
     /// Screen bounds for smart positioning
     let screenBounds: CGRect
 
+    /// Whether to flip tooltip to the left side
+    let shouldFlipLeft: Bool
+
     /// Configuration settings
     private let configuration: TooltipConfiguration
 
@@ -59,6 +62,7 @@ public struct HeatmapTooltip: View {
     ///   - style: Display style (default: standard)
     ///   - positioning: Positioning strategy (default: automatic)
     ///   - screenBounds: Screen bounds for positioning
+    ///   - shouldFlipLeft: Whether to flip tooltip to the left side
     ///   - configuration: Tooltip configuration
     ///   - customContent: Custom content builder (for .custom style)
     public init(
@@ -67,6 +71,7 @@ public struct HeatmapTooltip: View {
         style: TooltipStyle = .standard,
         positioning: PositioningStrategy = .automatic,
         screenBounds: CGRect = NSScreen.main?.frame ?? .zero,
+        shouldFlipLeft: Bool = false,
         configuration: TooltipConfiguration = .default,
         customContent: ((HeatmapDay) -> AnyView)? = nil
     ) {
@@ -75,6 +80,7 @@ public struct HeatmapTooltip: View {
         self.style = style
         self.positioning = positioning
         self.screenBounds = screenBounds
+        self.shouldFlipLeft = shouldFlipLeft
         self.configuration = configuration
         self.customContent = customContent
     }
@@ -326,7 +332,8 @@ public struct HeatmapTooltip: View {
             for: positioning,
             position: position,
             screenBounds: screenBounds,
-            style: style
+            style: style,
+            shouldFlipLeft: shouldFlipLeft
         )
     }
 

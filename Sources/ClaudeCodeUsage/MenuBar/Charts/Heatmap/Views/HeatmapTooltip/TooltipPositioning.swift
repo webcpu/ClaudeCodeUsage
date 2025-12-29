@@ -13,30 +13,32 @@ enum TooltipPositioning {
         for strategy: HeatmapTooltip.PositioningStrategy,
         position: CGPoint,
         screenBounds: CGRect,
-        style: HeatmapTooltip.TooltipStyle
+        style: HeatmapTooltip.TooltipStyle,
+        shouldFlipLeft: Bool = false
     ) -> CGSize {
         switch strategy {
         case .automatic:
-            smartOffset(position: position, screenBounds: screenBounds, style: style)
+            smartOffset(position: position, screenBounds: screenBounds, style: style, shouldFlipLeft: shouldFlipLeft)
         case .fixed:
-            CGSize(width: 10, height: -30)
+            CGSize(width: shouldFlipLeft ? -150 : 10, height: -30)
         case .adaptive:
-            adaptiveOffset(style: style)
+            adaptiveOffset(style: style, shouldFlipLeft: shouldFlipLeft)
         }
     }
 
     private static func smartOffset(
         position: CGPoint,
         screenBounds: CGRect,
-        style: HeatmapTooltip.TooltipStyle
+        style: HeatmapTooltip.TooltipStyle,
+        shouldFlipLeft: Bool
     ) -> CGSize {
         let size = estimatedSize(for: style)
-        let preferredX: CGFloat = 10
         let preferredY: CGFloat = -size.height - 10
 
-        let adjustedX = position.x + preferredX + size.width > screenBounds.maxX
+        // Use shouldFlipLeft to determine X offset
+        let adjustedX: CGFloat = shouldFlipLeft
             ? -size.width - 10
-            : preferredX
+            : 10
 
         let adjustedY = position.y + preferredY < screenBounds.minY
             ? 10
@@ -45,9 +47,10 @@ enum TooltipPositioning {
         return CGSize(width: adjustedX, height: adjustedY)
     }
 
-    private static func adaptiveOffset(style: HeatmapTooltip.TooltipStyle) -> CGSize {
+    private static func adaptiveOffset(style: HeatmapTooltip.TooltipStyle, shouldFlipLeft: Bool) -> CGSize {
         let size = estimatedSize(for: style)
-        return CGSize(width: -size.width / 2, height: -size.height - 15)
+        let xOffset = shouldFlipLeft ? -size.width - 10 : -size.width / 2
+        return CGSize(width: xOffset, height: -size.height - 15)
     }
 
     static func estimatedSize(for style: HeatmapTooltip.TooltipStyle) -> CGSize {

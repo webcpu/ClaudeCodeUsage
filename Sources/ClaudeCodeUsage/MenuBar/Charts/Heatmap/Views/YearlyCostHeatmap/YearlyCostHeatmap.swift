@@ -283,7 +283,8 @@ public struct YearlyCostHeatmap: View {
                 day: hoveredDay,
                 position: viewModel.tooltipPosition,
                 style: .standard,
-                screenBounds: screenBounds
+                screenBounds: screenBounds,
+                shouldFlipLeft: viewModel.tooltipShouldFlipLeft
             )
             .position(viewModel.tooltipPosition)
             .allowsHitTesting(false)

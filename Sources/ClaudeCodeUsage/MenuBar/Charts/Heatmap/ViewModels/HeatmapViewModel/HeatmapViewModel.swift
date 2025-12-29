@@ -33,6 +33,9 @@ public final class HeatmapViewModel {
     /// Tooltip position for hovered day
     public var tooltipPosition: CGPoint = .zero
 
+    /// Whether tooltip should flip to left side (near right edge)
+    public var tooltipShouldFlipLeft: Bool = false
+
     /// Loading state
     public private(set) var isLoading: Bool = false
 
@@ -146,6 +149,10 @@ public final class HeatmapViewModel {
                 cellSize: configuration.cellSize,
                 squareSize: configuration.squareSize
             )
+            tooltipShouldFlipLeft = TooltipPositionCalculator.shouldFlipLeft(
+                day: day,
+                totalWeeks: dataset.weeks.count
+            )
         }
     }
 
@@ -237,10 +244,17 @@ enum TooltipPositionCalculator {
     ) -> CGPoint {
         let squareCenterX = CGFloat(day.weekOfYear) * cellSize + (cellSize / 2) + gridContentPadding
         let squareCenterY = CGFloat(day.dayOfWeek) * cellSize + (cellSize / 2)
+
         return CGPoint(
             x: squareCenterX,
             y: squareCenterY - squareSize - 20
         )
+    }
+
+    /// Determine if tooltip should appear on the left side of the cell
+    static func shouldFlipLeft(day: HeatmapDay, totalWeeks: Int) -> Bool {
+        let weeksFromEnd = totalWeeks - day.weekOfYear
+        return weeksFromEnd < 8
     }
 }
 
