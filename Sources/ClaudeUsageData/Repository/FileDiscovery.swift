@@ -32,6 +32,12 @@ public enum FileDiscovery {
         }
     }
 
+    /// Filter files modified within the specified hours
+    public static func filterFilesModifiedWithin(_ files: [FileMetadata], hours: Double) -> [FileMetadata] {
+        let cutoff = Date().addingTimeInterval(-hours * 3600)
+        return files.filter { $0.modificationDate >= cutoff }
+    }
+
     // MARK: - Private
 
     private static func discoverProjectDirectories(in path: String) throws -> [String] {

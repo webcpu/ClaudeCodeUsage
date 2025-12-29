@@ -71,7 +71,11 @@ public actor SessionMonitor: SessionDataSource {
     }
 
     private func findUsageFiles() -> [FileMetadata] {
-        (try? FileDiscovery.discoverFiles(in: basePath)) ?? []
+        guard let allFiles = try? FileDiscovery.discoverFiles(in: basePath) else {
+            return []
+        }
+        // Only load files modified within the session window (+ buffer for overlap)
+        return FileDiscovery.filterFilesModifiedWithin(allFiles, hours: sessionDurationHours * 2)
     }
 
     private func shouldReloadFile(_ file: FileMetadata) -> Bool {
