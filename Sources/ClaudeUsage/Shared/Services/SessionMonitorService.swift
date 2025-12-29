@@ -19,9 +19,7 @@ protocol SessionMonitorService: Sendable {
 
 actor DefaultSessionMonitorService: SessionMonitorService {
     private let monitor: SessionMonitor
-
     private var cachedSession: (session: SessionBlock?, timestamp: Date)?
-    private var cachedTokenLimit: (limit: Int?, timestamp: Date)?
 
     init(configuration: AppConfiguration) {
         self.monitor = SessionMonitor(
@@ -45,13 +43,9 @@ actor DefaultSessionMonitorService: SessionMonitorService {
     }
 
     func getAutoTokenLimit() async -> Int? {
-        if let cached = cachedTokenLimit, isCacheValid(timestamp: cached.timestamp) {
-            return cached.limit
-        }
-
-        let result = await monitor.getAutoTokenLimit()
-        cachedTokenLimit = (result, Date())
-        return result
+        // Derive from session to avoid redundant monitor call
+        // (SessionBlock.tokenLimit is populated by getActiveSession)
+        await getActiveSession()?.tokenLimit
     }
 }
 
