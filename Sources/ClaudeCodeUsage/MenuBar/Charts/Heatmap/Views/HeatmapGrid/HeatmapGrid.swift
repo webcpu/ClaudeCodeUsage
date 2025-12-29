@@ -86,14 +86,24 @@ public struct HeatmapGrid: View {
 
     @ViewBuilder
     private var scrollableGridWithMonthLabels: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            VStack(spacing: 8) {
-                monthLabelsRowIfNeeded
-                gridWithHoverOverlay
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                VStack(spacing: 8) {
+                    monthLabelsRowIfNeeded
+                    gridWithHoverOverlay
+                }
+            }
+            .onAppear {
+                scrollToLastWeekWithData(proxy: proxy)
             }
         }
         .accessibilityElement(children: accessibility.groupAccessibilityElements ? .contain : .ignore)
         .accessibilityLabel("Heatmap grid showing daily usage over time")
+    }
+
+    private func scrollToLastWeekWithData(proxy: ScrollViewProxy) {
+        guard let lastWeekWithData = dataset.weeks.last(where: { $0.totalCost > 0 }) else { return }
+        proxy.scrollTo(lastWeekWithData.id, anchor: .trailing)
     }
 
     @ViewBuilder
@@ -179,6 +189,7 @@ public struct HeatmapGrid: View {
                     hoveredDay: hoveredDay,
                     accessibility: accessibility
                 )
+                .id(week.id)
             }
         }
         .padding(.horizontal, 4)
