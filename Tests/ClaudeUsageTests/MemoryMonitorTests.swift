@@ -1,13 +1,13 @@
 //
 //  MemoryMonitorTests.swift
-//  ClaudeCodeUsageTests
+//  ClaudeUsageTests
 //
 //  Tests for memory monitoring functionality
 //
 
 import Foundation
 import Testing
-@testable import ClaudeCodeUsage
+@testable import ClaudeUsage
 
 @Suite("Memory Monitor Tests")
 struct MemoryMonitorTests {
