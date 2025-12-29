@@ -68,7 +68,7 @@ public struct HeatmapGrid: View {
 
     @ViewBuilder
     private var mainGridLayout: some View {
-        HStack(alignment: .top, spacing: 2) {
+        HStack(alignment: .top, spacing: 8) {
             dayLabelsSidebar
             scrollableGridWithMonthLabels
         }

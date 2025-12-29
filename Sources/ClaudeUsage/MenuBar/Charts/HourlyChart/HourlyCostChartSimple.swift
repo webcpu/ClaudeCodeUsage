@@ -74,6 +74,7 @@ private extension HourlyCostChartSimple {
         .chartXAxis { xAxisMarks }
         .chartYAxis { yAxisMarks }
         .chartYScale(domain: 0...yAxisScale.roundedMax)
+        .chartXScale(range: .plotDimension(padding: 8))
     }
 
     var xAxisMarks: some AxisContent {
