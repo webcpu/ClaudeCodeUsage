@@ -28,12 +28,12 @@ struct ActionButtons: View {
     @ViewBuilder
     private var dashboardButton: some View {
         if viewMode == .menuBar {
-            Button("Dashboard") {
-                openDashboard()
+            Button("Overview") {
+                openMainWindow()
             }
             .buttonStyle(MenuButtonStyle(style: .primary))
             .keyboardShortcut("1", modifiers: .command)
-            .help("Open the main dashboard window (⌘1)")
+            .help("Open the main window (⌘1)")
         }
     }
 
@@ -74,11 +74,11 @@ struct ActionButtons: View {
 
     // MARK: - Actions
 
-    private func openDashboard() {
-        if let existingWindow = findExistingDashboardWindow() {
+    private func openMainWindow() {
+        if let existingWindow = findExistingMainWindow() {
             bringWindowToFront(existingWindow)
         } else {
-            openNewDashboardWindow()
+            openNewMainWindow()
         }
     }
 
@@ -90,7 +90,7 @@ struct ActionButtons: View {
         window.makeKeyAndOrderFront(nil)
     }
 
-    private func openNewDashboardWindow() {
+    private func openNewMainWindow() {
         openWindow(id: "main")
         // Delay activation to allow SwiftUI window to be created
         DispatchQueue.main.async {
@@ -102,13 +102,8 @@ struct ActionButtons: View {
 // MARK: - Window Helpers
 
 @MainActor
-private func findExistingDashboardWindow() -> NSWindow? {
-    NSApp.windows.first { isDashboardWindow($0) }
-}
-
-@MainActor
-private func isDashboardWindow(_ window: NSWindow) -> Bool {
-    window.identifier?.rawValue == "main-window" || window.title == "Usage Dashboard"
+private func findExistingMainWindow() -> NSWindow? {
+    NSApp.windows.first { $0.title == AppMetadata.name }
 }
 
 // MARK: - Supporting Types

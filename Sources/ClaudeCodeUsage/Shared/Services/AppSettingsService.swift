@@ -141,8 +141,8 @@ enum AppSettingsError: LocalizedError {
     }
 }
 
-private enum AppMetadata {
-    static let name = "Usage Dashboard"
+enum AppMetadata {
+    static let name = "Claude Usage"
     static let version = "1.0.0"
     static let credits = "Claude Code Usage Tracking"
 }

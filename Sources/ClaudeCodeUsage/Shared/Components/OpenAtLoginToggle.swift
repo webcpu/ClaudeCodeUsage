@@ -37,6 +37,6 @@ struct OpenAtLoginToggle: View {
                 _ = await settingsService.setOpenAtLogin(!settingsService.isOpenAtLoginEnabled)
             }
         }
-        .help("Launch Usage Dashboard automatically when you log in")
+        .help("Launch \(AppMetadata.name) automatically when you log in")
     }
 }

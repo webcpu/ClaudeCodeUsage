@@ -16,7 +16,7 @@ struct ClaudeCodeUsageApp: App {
     @State private var settingsService = AppSettingsService()
 
     var body: some Scene {
-        Window("Usage Dashboard", id: "main") {
+        Window(AppMetadata.name, id: "main") {
             MainView(settingsService: settingsService)
                 .environment(store)
                 .onAppear {
@@ -80,7 +80,7 @@ struct AppCommands: Commands {
 
     var body: some Commands {
         CommandGroup(replacing: .appInfo) {
-            Button("About Usage Dashboard") {
+            Button("About \(AppMetadata.name)") {
                 settingsService.showAboutPanel()
             }
         }
@@ -127,7 +127,7 @@ struct MenuBarContextMenu: View {
 
             Divider()
 
-            Button("Open Dashboard") {
+            Button("Overview") {
                 WindowActions.showMainWindow()
             }
 
@@ -183,7 +183,7 @@ private enum WindowActions {
     @MainActor
     static func showMainWindow() {
         NSApp.activate(ignoringOtherApps: true)
-        if let window = NSApp.windows.first(where: { $0.title == "Usage Dashboard" }) {
+        if let window = NSApp.windows.first(where: { $0.title == AppMetadata.name }) {
             if window.isMiniaturized {
                 window.deminiaturize(nil)
             }

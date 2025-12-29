@@ -71,7 +71,7 @@ private struct Sidebar: View {
                 Label("Live Metrics", systemImage: "arrow.triangle.2.circlepath")
             }
         }
-        .navigationTitle("Usage Dashboard")
+        .navigationTitle(AppMetadata.name)
         .frame(minWidth: 200)
         .listStyle(.sidebar)
     }
