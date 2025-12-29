@@ -2,92 +2,76 @@
 //  FileDiscovery.swift
 //  ClaudeUsageData
 //
-//  Discovers and manages Claude usage files
-//
 
 import Foundation
 
 // MARK: - FileDiscovery
 
 public enum FileDiscovery {
-    /// Discover all JSONL files in the projects directory
+
+    // MARK: - Public API
+
     public static func discoverFiles(in basePath: String) throws -> [FileMetadata] {
-        let projectsPath = basePath + "/projects"
+        let projectsPath = basePath + Constants.projectsSubpath
         guard FileManager.default.fileExists(atPath: projectsPath) else {
             return []
         }
 
         return try discoverProjectDirectories(in: projectsPath)
-            .flatMap { projectDir in
-                discoverJSONLFiles(in: projectDir)
-            }
+            .flatMap { discoverJSONLFiles(in: $0) }
     }
 
-    /// Filter files modified today
     public static func filterFilesModifiedToday(_ files: [FileMetadata]) -> [FileMetadata] {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
-        return files.filter { file in
-            calendar.startOfDay(for: file.modificationDate) >= today
-        }
+        return files.filter { wasModifiedOnOrAfter(file: $0, date: today, calendar: calendar) }
     }
 
-    /// Filter files modified within the specified hours
     public static func filterFilesModifiedWithin(_ files: [FileMetadata], hours: Double) -> [FileMetadata] {
-        let cutoff = Date().addingTimeInterval(-hours * 3600)
+        let cutoff = Date().addingTimeInterval(-hours * Constants.secondsPerHour)
         return files.filter { $0.modificationDate >= cutoff }
     }
 
-    // MARK: - Private
+    // MARK: - Directory Discovery
 
     private static func discoverProjectDirectories(in path: String) throws -> [String] {
-        let fileManager = FileManager.default
-        let contents = try fileManager.contentsOfDirectory(atPath: path)
-
-        return contents.compactMap { item in
-            let fullPath = path + "/" + item
-            var isDirectory: ObjCBool = false
-            guard fileManager.fileExists(atPath: fullPath, isDirectory: &isDirectory),
-                  isDirectory.boolValue else {
-                return nil
-            }
-            return fullPath
-        }
+        try FileManager.default.contentsOfDirectory(atPath: path)
+            .map { buildFullPath(directory: path, item: $0) }
+            .filter { isDirectory(at: $0) }
     }
 
     private static func discoverJSONLFiles(in projectDir: String) -> [FileMetadata] {
-        let fileManager = FileManager.default
-
-        guard let enumerator = fileManager.enumerator(
-            at: URL(fileURLWithPath: projectDir),
-            includingPropertiesForKeys: [.contentModificationDateKey, .isRegularFileKey],
-            options: [.skipsHiddenFiles]
-        ) else {
-            return []
-        }
-
-        var files: [FileMetadata] = []
-        let projectName = extractProjectName(from: projectDir)
-
-        for case let fileURL as URL in enumerator {
-            guard fileURL.pathExtension == "jsonl",
-                  let metadata = createMetadata(for: fileURL, projectDir: projectDir, projectName: projectName) else {
-                continue
-            }
-            files.append(metadata)
-        }
-
-        return files
+        createFileEnumerator(for: projectDir)
+            .map { collectJSONLMetadata(from: $0, projectDir: projectDir) }
+            ?? []
     }
+
+    // MARK: - File Enumeration
+
+    private static func createFileEnumerator(for directory: String) -> FileManager.DirectoryEnumerator? {
+        FileManager.default.enumerator(
+            at: URL(fileURLWithPath: directory),
+            includingPropertiesForKeys: Constants.fileResourceKeys,
+            options: [.skipsHiddenFiles]
+        )
+    }
+
+    private static func collectJSONLMetadata(from enumerator: FileManager.DirectoryEnumerator, projectDir: String) -> [FileMetadata] {
+        let projectName = extractLastPathComponent(from: projectDir)
+        return enumerator
+            .compactMap { $0 as? URL }
+            .filter { isJSONLFile($0) }
+            .compactMap { createMetadata(for: $0, projectDir: projectDir, projectName: projectName) }
+    }
+
+    // MARK: - Metadata Creation
 
     private static func createMetadata(
         for url: URL,
         projectDir: String,
         projectName: String
     ) -> FileMetadata? {
-        guard let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .isRegularFileKey]),
-              values.isRegularFile == true,
-              let modDate = values.contentModificationDate else {
+        guard let modificationDate = extractModificationDate(from: url) else {
             return nil
         }
 
@@ -95,19 +79,64 @@ public enum FileDiscovery {
             path: url.path,
             projectDir: projectDir,
             projectName: projectName,
-            modificationDate: modDate
+            modificationDate: modificationDate
         )
     }
 
-    private static func extractProjectName(from path: String) -> String {
-        // Project dirs are hashed, e.g., "/Users/Projects/MyApp" -> "-Users-Projects-MyApp"
-        // Extract the last meaningful component
-        let components = path.split(separator: "/")
-        guard let last = components.last else { return path }
+    private static func extractModificationDate(from url: URL) -> Date? {
+        guard let values = try? url.resourceValues(forKeys: Set(Constants.fileResourceKeys)),
+              values.isRegularFile == true else {
+            return nil
+        }
+        return values.contentModificationDate
+    }
 
-        // The hash format uses dashes as path separators
-        let parts = last.split(separator: "-")
-        return parts.last.map(String.init) ?? String(last)
+    // MARK: - Path Utilities
+
+    private static func extractLastPathComponent(from path: String) -> String {
+        path.split(separator: Constants.pathSeparator)
+            .last
+            .flatMap { extractLastDashComponent(from: String($0)) }
+            ?? path
+    }
+
+    private static func extractLastDashComponent(from segment: String) -> String {
+        segment.split(separator: Constants.hashPathSeparator)
+            .last
+            .map(String.init)
+            ?? segment
+    }
+
+    private static func buildFullPath(directory: String, item: String) -> String {
+        directory + String(Constants.pathSeparator) + item
+    }
+
+    // MARK: - Predicates
+
+    private static func isDirectory(at path: String) -> Bool {
+        var isDir: ObjCBool = false
+        return FileManager.default.fileExists(atPath: path, isDirectory: &isDir) && isDir.boolValue
+    }
+
+    private static func isJSONLFile(_ url: URL) -> Bool {
+        url.pathExtension == Constants.jsonlExtension
+    }
+
+    private static func wasModifiedOnOrAfter(file: FileMetadata, date: Date, calendar: Calendar) -> Bool {
+        calendar.startOfDay(for: file.modificationDate) >= date
+    }
+}
+
+// MARK: - Constants
+
+private extension FileDiscovery {
+    enum Constants {
+        static let projectsSubpath = "/projects"
+        static let jsonlExtension = "jsonl"
+        static let pathSeparator: Character = "/"
+        static let hashPathSeparator: Character = "-"
+        static let secondsPerHour: Double = 3600
+        static let fileResourceKeys: [URLResourceKey] = [.contentModificationDateKey, .isRegularFileKey]
     }
 }
 
