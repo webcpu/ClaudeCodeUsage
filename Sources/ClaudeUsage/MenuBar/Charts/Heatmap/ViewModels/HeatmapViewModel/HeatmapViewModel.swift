@@ -15,6 +15,18 @@ import Foundation
 import Observation
 import ClaudeUsageCore
 
+// MARK: - Constants
+
+private enum ViewModelConstants {
+    static let gridContentPadding: CGFloat = 4
+    static let daysPerWeek = 7
+}
+
+private enum AccessibilityStrings {
+    static let datePrefix = "Usage on"
+    static let costPrefix = "Cost:"
+}
+
 // MARK: - Heatmap View Model
 
 /// View model managing heatmap data, state, and business logic
@@ -106,76 +118,36 @@ public final class HeatmapViewModel {
     }
 
     /// Get accessibility label for a specific day
-    /// - Parameter day: The day to get accessibility info for
-    /// - Returns: Accessibility label string
     public func accessibilityLabel(for day: HeatmapDay) -> String {
-        let datePrefix = "Usage on"
-        let costPrefix = "Cost:"
-        return "\(datePrefix) \(day.dateString), \(costPrefix) \(day.costString)"
+        formatAccessibilityLabel(dateString: day.dateString, costString: day.costString)
     }
 
     /// Get summary statistics for the current dataset
     public var summaryStats: SummaryStats? {
-        guard let dataset = dataset else { return nil }
-
-        return SummaryStats(
-            totalCost: dataset.totalCost,
-            daysWithUsage: dataset.daysWithUsage,
-            totalDays: dataset.allDays.count,
-            maxDailyCost: dataset.maxCost,
-            averageDailyCost: dataset.totalCost / Double(max(1, dataset.allDays.count)),
-            dateRange: dataset.dateRange
-        )
+        dataset.map(buildSummaryStats)
     }
 
     // MARK: - Hover Handling
 
     /// Update hovered day based on location
     func updateHoveredDay(at location: CGPoint, in gridBounds: CGRect) {
-        guard let dataset = dataset else {
-            hoveredDay = nil
+        guard let dataset else {
+            clearHoveredDay()
             return
         }
 
-        let day = findDayAtLocation(location, in: gridBounds, dataset: dataset)
-
-        guard hoveredDay?.id != day?.id else { return }
+        let day = findDayAtLocation(location, in: dataset)
+        guard isNewHoveredDay(day) else { return }
 
         hoveredDay = day
-
-        if let day = day {
-            tooltipPosition = TooltipPositionCalculator.position(
-                for: day,
-                cellSize: configuration.cellSize,
-                squareSize: configuration.squareSize
-            )
-            tooltipShouldFlipLeft = TooltipPositionCalculator.shouldFlipLeft(
-                day: day,
-                totalWeeks: dataset.weeks.count
-            )
-        }
+        updateTooltipIfNeeded(for: day, in: dataset)
     }
 
     /// Find day at specific location in heatmap grid
-    func findDayAtLocation(
-        _ location: CGPoint,
-        in gridBounds: CGRect,
-        dataset: HeatmapDataset
-    ) -> HeatmapDay? {
-        let cellSize = configuration.cellSize
-        let gridContentPadding: CGFloat = 4
-
-        let weekIndex = Int((location.x - gridContentPadding) / cellSize)
-        let dayIndex = Int(location.y / cellSize)
-
-        guard weekIndex >= 0,
-              weekIndex < dataset.weeks.count,
-              dayIndex >= 0,
-              dayIndex < 7 else {
-            return nil
-        }
-
-        return dataset.weeks[weekIndex].days[dayIndex]
+    func findDayAtLocation(_ location: CGPoint, in dataset: HeatmapDataset) -> HeatmapDay? {
+        let indices = calculateGridIndices(from: location)
+        guard isValidGridPosition(indices, in: dataset) else { return nil }
+        return dataset.weeks[indices.week].days[indices.day]
     }
 
     // MARK: - Performance Tracking
@@ -205,7 +177,7 @@ public final class HeatmapViewModel {
     }
 }
 
-// MARK: - Extensions
+// MARK: - Public State Properties
 
 public extension HeatmapViewModel {
 
@@ -222,6 +194,87 @@ public extension HeatmapViewModel {
     /// Whether the heatmap is currently interactive (not loading, has data)
     var isInteractive: Bool {
         !isLoading && hasData && !hasError
+    }
+}
+
+// MARK: - Hover State Helpers
+
+private extension HeatmapViewModel {
+
+    func clearHoveredDay() {
+        hoveredDay = nil
+    }
+
+    func isNewHoveredDay(_ day: HeatmapDay?) -> Bool {
+        hoveredDay?.id != day?.id
+    }
+
+    func updateTooltipIfNeeded(for day: HeatmapDay?, in dataset: HeatmapDataset) {
+        guard let day else { return }
+        tooltipPosition = calculateTooltipPosition(for: day)
+        tooltipShouldFlipLeft = shouldFlipTooltipLeft(for: day, totalWeeks: dataset.weeks.count)
+    }
+
+    func calculateTooltipPosition(for day: HeatmapDay) -> CGPoint {
+        TooltipPositionCalculator.position(
+            for: day,
+            cellSize: configuration.cellSize,
+            squareSize: configuration.squareSize
+        )
+    }
+
+    func shouldFlipTooltipLeft(for day: HeatmapDay, totalWeeks: Int) -> Bool {
+        TooltipPositionCalculator.shouldFlipLeft(day: day, totalWeeks: totalWeeks)
+    }
+}
+
+// MARK: - Grid Index Calculations
+
+private extension HeatmapViewModel {
+
+    typealias GridIndices = (week: Int, day: Int)
+
+    func calculateGridIndices(from location: CGPoint) -> GridIndices {
+        let cellSize = configuration.cellSize
+        let weekIndex = Int((location.x - ViewModelConstants.gridContentPadding) / cellSize)
+        let dayIndex = Int(location.y / cellSize)
+        return (week: weekIndex, day: dayIndex)
+    }
+
+    func isValidGridPosition(_ indices: GridIndices, in dataset: HeatmapDataset) -> Bool {
+        isValidWeekIndex(indices.week, in: dataset) && isValidDayIndex(indices.day)
+    }
+
+    func isValidWeekIndex(_ index: Int, in dataset: HeatmapDataset) -> Bool {
+        index >= 0 && index < dataset.weeks.count
+    }
+
+    func isValidDayIndex(_ index: Int) -> Bool {
+        index >= 0 && index < ViewModelConstants.daysPerWeek
+    }
+}
+
+// MARK: - Pure Transformation Functions
+
+private extension HeatmapViewModel {
+
+    func buildSummaryStats(from dataset: HeatmapDataset) -> SummaryStats {
+        SummaryStats(
+            totalCost: dataset.totalCost,
+            daysWithUsage: dataset.daysWithUsage,
+            totalDays: dataset.allDays.count,
+            maxDailyCost: dataset.maxCost,
+            averageDailyCost: calculateAverageDailyCost(total: dataset.totalCost, days: dataset.allDays.count),
+            dateRange: dataset.dateRange
+        )
+    }
+
+    func calculateAverageDailyCost(total: Double, days: Int) -> Double {
+        total / Double(max(1, days))
+    }
+
+    func formatAccessibilityLabel(dateString: String, costString: String) -> String {
+        "\(AccessibilityStrings.datePrefix) \(dateString), \(AccessibilityStrings.costPrefix) \(costString)"
     }
 }
 
