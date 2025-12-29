@@ -25,9 +25,7 @@ let package = Package(
             name: "claude-usage",
             targets: ["ClaudeMonitorCLI"])
     ],
-    dependencies: [
-        .package(path: "Packages/ClaudeLiveMonitor")  // Transitional - will be merged into ClaudeUsageData
-    ],
+    dependencies: [],
     targets: [
         // MARK: - Domain Layer (no dependencies)
 
@@ -49,8 +47,7 @@ let package = Package(
             name: "ClaudeUsage",
             dependencies: [
                 "ClaudeUsageCore",
-                "ClaudeUsageData",
-                .product(name: "ClaudeLiveMonitorLib", package: "ClaudeLiveMonitor")
+                "ClaudeUsageData"
             ],
             path: "Sources/ClaudeUsage"),
 
