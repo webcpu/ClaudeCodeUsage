@@ -95,57 +95,42 @@ public actor SessionMonitor: SessionDataSource {
     }
 
     private func groupEntriesIntoBlocks(_ entries: [UsageEntry]) -> [SessionBlock] {
-        var blocks: [SessionBlock] = []
-        var currentEntries: [UsageEntry] = []
-        var blockStart: Date?
+        let entryGroups = splitAtSessionGaps(entries)
+        return mapGroupsToBlocks(entryGroups)
+    }
 
-        for entry in entries {
-            if let start = blockStart {
-                if hasSessionGap(from: currentEntries.last, to: entry) {
-                    appendBlock(entries: currentEntries, startTime: start, isActive: false, to: &blocks)
-                    currentEntries = [entry]
-                    blockStart = entry.timestamp
-                } else {
-                    currentEntries.append(entry)
-                }
+    private func splitAtSessionGaps(_ entries: [UsageEntry]) -> [[UsageEntry]] {
+        entries.reduce(into: [[UsageEntry]]()) { groups, entry in
+            if shouldStartNewGroup(groups: groups, entry: entry) {
+                groups.append([entry])
             } else {
-                blockStart = entry.timestamp
-                currentEntries = [entry]
+                groups[groups.count - 1].append(entry)
             }
         }
-
-        appendFinalBlock(entries: currentEntries, startTime: blockStart, to: &blocks)
-        return blocks
     }
 
-    private func hasSessionGap(from lastEntry: UsageEntry?, to entry: UsageEntry) -> Bool {
-        guard let lastEntry else { return false }
-        let gap = entry.timestamp.timeIntervalSince(lastEntry.timestamp)
-        return gap > sessionDurationSeconds
+    private func shouldStartNewGroup(groups: [[UsageEntry]], entry: UsageEntry) -> Bool {
+        guard let lastEntry = groups.last?.last else { return true }
+        return hasSessionGap(from: lastEntry, to: entry)
     }
 
-    private func appendBlock(
-        entries: [UsageEntry],
-        startTime: Date,
-        isActive: Bool,
-        to blocks: inout [SessionBlock]
-    ) {
-        if let block = createBlock(entries: entries, startTime: startTime, isActive: isActive) {
-            blocks.append(block)
+    private func hasSessionGap(from lastEntry: UsageEntry, to entry: UsageEntry) -> Bool {
+        entry.timestamp.timeIntervalSince(lastEntry.timestamp) > sessionDurationSeconds
+    }
+
+    private func mapGroupsToBlocks(_ groups: [[UsageEntry]]) -> [SessionBlock] {
+        groups.enumerated().compactMap { index, entries in
+            createBlockFromGroup(entries: entries, isLastGroup: index == groups.count - 1)
         }
     }
 
-    private func appendFinalBlock(
-        entries: [UsageEntry],
-        startTime: Date?,
-        to blocks: inout [SessionBlock]
-    ) {
-        guard let start = startTime, !entries.isEmpty else { return }
-        let isActive = isFinalBlockActive(entries: entries)
-        appendBlock(entries: entries, startTime: start, isActive: isActive, to: &blocks)
+    private func createBlockFromGroup(entries: [UsageEntry], isLastGroup: Bool) -> SessionBlock? {
+        guard let startTime = entries.first?.timestamp else { return nil }
+        let isActive = isLastGroup && isFinalGroupActive(entries: entries)
+        return createBlock(entries: entries, startTime: startTime, isActive: isActive)
     }
 
-    private func isFinalBlockActive(entries: [UsageEntry]) -> Bool {
+    private func isFinalGroupActive(entries: [UsageEntry]) -> Bool {
         guard let lastEntryTime = entries.last?.timestamp else { return false }
         return Date().timeIntervalSince(lastEntryTime) < sessionDurationSeconds
     }
@@ -155,41 +140,48 @@ public actor SessionMonitor: SessionDataSource {
     private func createBlock(entries: [UsageEntry], startTime: Date, isActive: Bool) -> SessionBlock? {
         guard !entries.isEmpty else { return nil }
 
-        let tokens = entries.reduce(TokenCounts.zero) { $0 + $1.tokens }
-        let cost = entries.reduce(0.0) { $0 + $1.costUSD }
-        let models = Array(Set(entries.map(\.model)))
-        let actualEndTime = entries.last?.timestamp
-
-        // For active sessions, use modulo to show time within current 5h window
-        // e.g., 11.5h session → 11.5 % 5 = 1.5h → shows "1.5h / 5h"
-        let displayStartTime = isActive
-            ? computeWindowStartTime(sessionStart: startTime)
-            : startTime
-        let endTime = computeEndTime(isActive: isActive, actualEndTime: actualEndTime, startTime: displayStartTime)
+        let displayStartTime = displayStartTime(for: startTime, isActive: isActive)
 
         return SessionBlock(
             id: UUID().uuidString,
             startTime: displayStartTime,
-            endTime: endTime,
-            actualEndTime: actualEndTime,
+            endTime: sessionWindowEndTime(from: displayStartTime),
+            actualEndTime: entries.last?.timestamp,
             isActive: isActive,
             entries: entries,
-            tokens: tokens,
-            costUSD: cost,
-            models: models,
+            tokens: aggregateTokens(from: entries),
+            costUSD: aggregateCost(from: entries),
+            models: uniqueModels(from: entries),
             burnRate: calculateBurnRate(entries: entries)
         )
     }
 
-    private func computeWindowStartTime(sessionStart: Date) -> Date {
-        let totalDuration = Date().timeIntervalSince(sessionStart)
-        let elapsedInWindow = totalDuration.truncatingRemainder(dividingBy: sessionDurationSeconds)
-        return Date().addingTimeInterval(-elapsedInWindow)
+    private func displayStartTime(for sessionStart: Date, isActive: Bool) -> Date {
+        isActive ? windowStartTimeUsingModulo(sessionStart: sessionStart) : sessionStart
     }
 
-    private func computeEndTime(isActive: Bool, actualEndTime: Date?, startTime: Date) -> Date {
-        // endTime = startTime + 5 hours (fixed session window)
+    private func windowStartTimeUsingModulo(sessionStart: Date) -> Date {
+        let totalDuration = Date().timeIntervalSince(sessionStart)
+        let elapsedInCurrentWindow = totalDuration.truncatingRemainder(dividingBy: sessionDurationSeconds)
+        return Date().addingTimeInterval(-elapsedInCurrentWindow)
+    }
+
+    private func sessionWindowEndTime(from startTime: Date) -> Date {
         startTime.addingTimeInterval(sessionDurationSeconds)
+    }
+
+    // MARK: - Pure Aggregations
+
+    private func aggregateTokens(from entries: [UsageEntry]) -> TokenCounts {
+        entries.reduce(TokenCounts.zero) { $0 + $1.tokens }
+    }
+
+    private func aggregateCost(from entries: [UsageEntry]) -> Double {
+        entries.reduce(0.0) { $0 + $1.costUSD }
+    }
+
+    private func uniqueModels(from entries: [UsageEntry]) -> [String] {
+        Array(Set(entries.map(\.model)))
     }
 
     // MARK: - Burn Rate Calculation
@@ -198,23 +190,25 @@ public actor SessionMonitor: SessionDataSource {
         guard let duration = sessionDuration(from: entries), duration > TimeConstants.minimumDuration else {
             return .zero
         }
+        return buildBurnRate(entries: entries, duration: duration)
+    }
 
-        let totalTokens = entries.reduce(0) { $0 + $1.totalTokens }
-        let totalCost = entries.reduce(0.0) { $0 + $1.costUSD }
-
-        return BurnRate(
-            tokensPerMinute: Int(Double(totalTokens) / duration.minutes),
-            costPerHour: totalCost / duration.hours
+    private func buildBurnRate(entries: [UsageEntry], duration: TimeInterval) -> BurnRate {
+        BurnRate(
+            tokensPerMinute: Int(Double(aggregateTotalTokens(from: entries)) / duration.minutes),
+            costPerHour: aggregateCost(from: entries) / duration.hours
         )
     }
 
     private func sessionDuration(from entries: [UsageEntry]) -> TimeInterval? {
-        guard entries.count >= 2,
-              let first = entries.first,
-              let last = entries.last else {
+        guard let first = entries.first, let last = entries.last, entries.count >= 2 else {
             return nil
         }
         return last.timestamp.timeIntervalSince(first.timestamp)
+    }
+
+    private func aggregateTotalTokens(from entries: [UsageEntry]) -> Int {
+        entries.reduce(0) { $0 + $1.totalTokens }
     }
 
     // MARK: - Block Queries
