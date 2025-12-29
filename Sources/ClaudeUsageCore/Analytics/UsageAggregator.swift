@@ -2,127 +2,206 @@
 //  UsageAggregator.swift
 //  ClaudeUsageCore
 //
-//  Pure functions for aggregating usage entries into statistics
-//
 
 import Foundation
 
-// MARK: - Usage Aggregator
+// MARK: - UsageAggregator
 
 public enum UsageAggregator {
-    /// Aggregate entries into usage statistics
+
+    // MARK: - Public Interface
+
     public static func aggregate(_ entries: [UsageEntry]) -> UsageStats {
         guard !entries.isEmpty else { return .empty }
 
-        let totalCost = entries.reduce(0.0) { $0 + $1.costUSD }
-        let tokens = entries.reduce(.zero) { $0 + $1.tokens }
-        let sessionCount = Set(entries.compactMap(\.sessionId)).count
-
         return UsageStats(
-            totalCost: totalCost,
-            tokens: tokens,
-            sessionCount: max(1, sessionCount),
+            totalCost: sumCosts(entries),
+            tokens: sumTokens(entries),
+            sessionCount: countUniqueSessions(entries),
             byModel: aggregateByModel(entries),
             byDate: aggregateByDate(entries),
             byProject: aggregateByProject(entries)
         )
     }
 
-    /// Aggregate entries by model
     public static func aggregateByModel(_ entries: [UsageEntry]) -> [ModelUsage] {
-        Dictionary(grouping: entries, by: \.model)
-            .map { model, modelEntries in
-                ModelUsage(
-                    model: model,
-                    totalCost: modelEntries.reduce(0.0) { $0 + $1.costUSD },
-                    tokens: modelEntries.reduce(.zero) { $0 + $1.tokens },
-                    sessionCount: Set(modelEntries.compactMap(\.sessionId)).count
-                )
-            }
-            .sorted { $0.totalCost > $1.totalCost }
+        groupByModel(entries)
+            .map(buildModelUsage)
+            .sortedByTotalCostDescending()
     }
 
-    /// Aggregate entries by date
     public static func aggregateByDate(_ entries: [UsageEntry]) -> [DailyUsage] {
-        let calendar = Calendar.current
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd"
-
-        let grouped = Dictionary(grouping: entries) { entry in
-            dateFormatter.string(from: entry.timestamp)
-        }
-
-        return grouped.map { date, dayEntries in
-            let hourlyCosts = calculateHourlyCosts(dayEntries, calendar: calendar)
-            return DailyUsage(
-                date: date,
-                totalCost: dayEntries.reduce(0.0) { $0 + $1.costUSD },
-                totalTokens: dayEntries.reduce(0) { $0 + $1.totalTokens },
-                modelsUsed: Array(Set(dayEntries.map(\.model))),
-                hourlyCosts: hourlyCosts
-            )
-        }
-        .sorted { $0.date < $1.date }
+        groupByDateString(entries)
+            .map(buildDailyUsage)
+            .sortedByDateAscending()
     }
 
-    /// Aggregate entries by project
     public static func aggregateByProject(_ entries: [UsageEntry]) -> [ProjectUsage] {
-        Dictionary(grouping: entries, by: \.project)
-            .map { project, projectEntries in
-                let lastUsed = projectEntries.map(\.timestamp).max() ?? Date()
-                let projectName = extractProjectName(from: project)
-                return ProjectUsage(
-                    projectPath: project,
-                    projectName: projectName,
-                    totalCost: projectEntries.reduce(0.0) { $0 + $1.costUSD },
-                    totalTokens: projectEntries.reduce(0) { $0 + $1.totalTokens },
-                    sessionCount: Set(projectEntries.compactMap(\.sessionId)).count,
-                    lastUsed: lastUsed
-                )
-            }
-            .sorted { $0.totalCost > $1.totalCost }
+        groupByProject(entries)
+            .map(buildProjectUsage)
+            .sortedByTotalCostDescending()
     }
 
-    // MARK: - Helpers
+    // MARK: - Today Filtering
 
-    private static func calculateHourlyCosts(
+    public static func filterToday(
         _ entries: [UsageEntry],
-        calendar: Calendar
-    ) -> [Double] {
-        var hourlyCosts = Array(repeating: 0.0, count: 24)
-        for entry in entries {
-            let hour = calendar.component(.hour, from: entry.timestamp)
-            hourlyCosts[hour] += entry.costUSD
-        }
-        return hourlyCosts
+        referenceDate: Date = Date()
+    ) -> [UsageEntry] {
+        let today = Calendar.current.startOfDay(for: referenceDate)
+        return entries.filter { isOnDate($0, targetDate: today) }
     }
 
-    private static func extractProjectName(from path: String) -> String {
-        // Extract the last path component as project name
-        let components = path.split(separator: "/")
-        return components.last.map(String.init) ?? path
-    }
-}
-
-// MARK: - Today Filtering
-
-public extension UsageAggregator {
-    /// Filter entries to today only
-    static func filterToday(_ entries: [UsageEntry], referenceDate: Date = Date()) -> [UsageEntry] {
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: referenceDate)
-        return entries.filter { entry in
-            calendar.startOfDay(for: entry.timestamp) == today
-        }
-    }
-
-    /// Calculate hourly costs for today
-    static func todayHourlyCosts(
+    public static func todayHourlyCosts(
         from entries: [UsageEntry],
         referenceDate: Date = Date()
     ) -> [Double] {
-        let calendar = Calendar.current
-        let todayEntries = filterToday(entries, referenceDate: referenceDate)
-        return calculateHourlyCosts(todayEntries, calendar: calendar)
+        filterToday(entries, referenceDate: referenceDate)
+            |> calculateHourlyCosts
     }
+}
+
+// MARK: - Aggregation Helpers
+
+private extension UsageAggregator {
+    static func sumCosts(_ entries: [UsageEntry]) -> Double {
+        entries.reduce(0.0) { $0 + $1.costUSD }
+    }
+
+    static func sumTokens(_ entries: [UsageEntry]) -> TokenCounts {
+        entries.reduce(.zero) { $0 + $1.tokens }
+    }
+
+    static func countUniqueSessions(_ entries: [UsageEntry]) -> Int {
+        max(Constants.minimumSessionCount, Set(entries.compactMap(\.sessionId)).count)
+    }
+
+    static func calculateHourlyCosts(_ entries: [UsageEntry]) -> [Double] {
+        entries.reduce(into: emptyHourlyCostsArray()) { costs, entry in
+            costs[hourOfDay(from: entry.timestamp)] += entry.costUSD
+        }
+    }
+
+    static func emptyHourlyCostsArray() -> [Double] {
+        Array(repeating: 0.0, count: Constants.hoursPerDay)
+    }
+
+    static func hourOfDay(from date: Date) -> Int {
+        Calendar.current.component(.hour, from: date)
+    }
+
+    static func isOnDate(_ entry: UsageEntry, targetDate: Date) -> Bool {
+        Calendar.current.startOfDay(for: entry.timestamp) == targetDate
+    }
+}
+
+// MARK: - Grouping Functions
+
+private extension UsageAggregator {
+    static func groupByModel(_ entries: [UsageEntry]) -> [String: [UsageEntry]] {
+        Dictionary(grouping: entries, by: \.model)
+    }
+
+    static func groupByDateString(_ entries: [UsageEntry]) -> [String: [UsageEntry]] {
+        Dictionary(grouping: entries) { formatDateString($0.timestamp) }
+    }
+
+    static func groupByProject(_ entries: [UsageEntry]) -> [String: [UsageEntry]] {
+        Dictionary(grouping: entries, by: \.project)
+    }
+
+    static func formatDateString(_ date: Date) -> String {
+        DateFormatters.yearMonthDay.string(from: date)
+    }
+}
+
+// MARK: - Builder Functions
+
+private extension UsageAggregator {
+    static func buildModelUsage(_ pair: (key: String, value: [UsageEntry])) -> ModelUsage {
+        ModelUsage(
+            model: pair.key,
+            totalCost: sumCosts(pair.value),
+            tokens: sumTokens(pair.value),
+            sessionCount: Set(pair.value.compactMap(\.sessionId)).count
+        )
+    }
+
+    static func buildDailyUsage(_ pair: (key: String, value: [UsageEntry])) -> DailyUsage {
+        DailyUsage(
+            date: pair.key,
+            totalCost: sumCosts(pair.value),
+            totalTokens: pair.value.reduce(0) { $0 + $1.totalTokens },
+            modelsUsed: uniqueModels(from: pair.value),
+            hourlyCosts: calculateHourlyCosts(pair.value)
+        )
+    }
+
+    static func buildProjectUsage(_ pair: (key: String, value: [UsageEntry])) -> ProjectUsage {
+        ProjectUsage(
+            projectPath: pair.key,
+            projectName: extractProjectName(from: pair.key),
+            totalCost: sumCosts(pair.value),
+            totalTokens: pair.value.reduce(0) { $0 + $1.totalTokens },
+            sessionCount: Set(pair.value.compactMap(\.sessionId)).count,
+            lastUsed: latestTimestamp(from: pair.value)
+        )
+    }
+
+    static func uniqueModels(from entries: [UsageEntry]) -> [String] {
+        Array(Set(entries.map(\.model)))
+    }
+
+    static func latestTimestamp(from entries: [UsageEntry]) -> Date {
+        entries.map(\.timestamp).max() ?? Date()
+    }
+
+    static func extractProjectName(from path: String) -> String {
+        path.split(separator: "/").last.map(String.init) ?? path
+    }
+}
+
+// MARK: - Sorting Extensions
+
+private extension Array where Element == ModelUsage {
+    func sortedByTotalCostDescending() -> [ModelUsage] {
+        sorted { $0.totalCost > $1.totalCost }
+    }
+}
+
+private extension Array where Element == DailyUsage {
+    func sortedByDateAscending() -> [DailyUsage] {
+        sorted { $0.date < $1.date }
+    }
+}
+
+private extension Array where Element == ProjectUsage {
+    func sortedByTotalCostDescending() -> [ProjectUsage] {
+        sorted { $0.totalCost > $1.totalCost }
+    }
+}
+
+// MARK: - Pipe Operator
+
+infix operator |>: AdditionPrecedence
+
+private func |> <T, U>(value: T, function: (T) -> U) -> U {
+    function(value)
+}
+
+// MARK: - Constants
+
+private enum Constants {
+    static let hoursPerDay = 24
+    static let minimumSessionCount = 1
+}
+
+// MARK: - Date Formatters
+
+private enum DateFormatters {
+    static let yearMonthDay: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
 }
