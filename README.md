@@ -17,15 +17,31 @@ Reads usage data from `~/.claude/projects/` (Claude Code's local storage).
 
 ## Build & Run
 
+### Terminal
+
 ```bash
 swift build
 swift run ClaudeCodeUsage
 ```
 
+### Xcode
+
+1. Open `Package.swift` in Xcode
+2. Select **ClaudeCodeUsage** scheme (top toolbar)
+3. Press **⌘R** to build and run
+
+## Architecture
+
+```
+ClaudeUsageCore   → Pure types, protocols, analytics
+ClaudeUsageData   → Repository, parsing, session monitoring
+ClaudeCodeUsage   → SwiftUI menu bar app (executable)
+```
+
 ## Requirements
 
-- macOS 14.0+
-- Swift 5.9+
+- macOS 15.0+
+- Swift 6.0+
 
 ## License
 

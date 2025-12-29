@@ -18,7 +18,7 @@ let package = Package(
             targets: ["ClaudeUsageData"]),
         // macOS menu bar app
         .executable(
-            name: "ClaudeUsage",
+            name: "ClaudeCodeUsage",
             targets: ["ClaudeUsage"])
     ],
     dependencies: [],
