@@ -16,21 +16,17 @@ let package = Package(
         .library(
             name: "ClaudeUsageData",
             targets: ["ClaudeUsageData"]),
-        // Legacy SDK (deprecated, use ClaudeUsageData)
-        .library(
-            name: "ClaudeCodeUsageKit",
-            targets: ["ClaudeCodeUsageKit"]),
         // macOS menu bar app
         .executable(
             name: "ClaudeUsage",
             targets: ["ClaudeUsage"]),
-        // CLI monitor (new unified CLI)
+        // CLI monitor
         .executable(
             name: "claude-usage",
             targets: ["ClaudeMonitorCLI"])
     ],
     dependencies: [
-        .package(path: "Packages/TimingMacro")
+        .package(path: "Packages/ClaudeLiveMonitor")  // Transitional - will be merged into ClaudeUsageData
     ],
     targets: [
         // MARK: - Domain Layer (no dependencies)
@@ -47,16 +43,6 @@ let package = Package(
             dependencies: ["ClaudeUsageCore"],
             path: "Sources/ClaudeUsageData"),
 
-        // MARK: - Legacy SDK (transitional, will be removed)
-
-        .target(
-            name: "ClaudeCodeUsageKit",
-            dependencies: [
-                "ClaudeUsageCore",
-                .product(name: "TimingMacro", package: "TimingMacro")
-            ],
-            path: "Sources/ClaudeCodeUsageKit"),
-
         // MARK: - Presentation Layer
 
         .executableTarget(
@@ -64,7 +50,7 @@ let package = Package(
             dependencies: [
                 "ClaudeUsageCore",
                 "ClaudeUsageData",
-                .product(name: "ClaudeLiveMonitorLib", package: "ClaudeLiveMonitor")  // Transitional - for SessionMonitorService
+                .product(name: "ClaudeLiveMonitorLib", package: "ClaudeLiveMonitor")
             ],
             path: "Sources/ClaudeUsage"),
 
@@ -88,15 +74,6 @@ let package = Package(
             path: "Tests/ClaudeUsageDataTests"),
 
         .testTarget(
-            name: "ClaudeCodeUsageKitTests",
-            dependencies: ["ClaudeCodeUsageKit"],
-            path: "Tests/ClaudeCodeUsageKitTests",
-            swiftSettings: [
-                .unsafeFlags(["-enable-testing"]),
-                .define("ENABLE_CODE_COVERAGE", .when(configuration: .debug))
-            ]),
-
-        .testTarget(
             name: "ClaudeUsageTests",
             dependencies: [
                 "ClaudeUsage",
@@ -109,6 +86,3 @@ let package = Package(
             ]),
     ]
 )
-
-// Add ClaudeLiveMonitor as local dependency (transitional - will be merged into ClaudeUsageData)
-package.dependencies.append(.package(path: "Packages/ClaudeLiveMonitor"))
