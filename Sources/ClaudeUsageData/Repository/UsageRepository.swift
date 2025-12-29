@@ -1,10 +1,3 @@
-//
-//  UsageRepository.swift
-//  ClaudeUsageData
-//
-//  Repository for accessing Claude usage data
-//
-
 import Foundation
 import ClaudeUsageCore
 import OSLog
@@ -14,16 +7,21 @@ private let logger = Logger(subsystem: "com.claudeusage", category: "Repository"
 // MARK: - UsageRepository
 
 public actor UsageRepository: UsageDataSource {
+
+    // MARK: - Properties
+
     public let basePath: String
 
     private let parser = JSONLParser()
     private var fileCache: [String: CachedFile] = [:]
 
+    // MARK: - Initialization
+
     public init(basePath: String = NSHomeDirectory() + "/.claude") {
         self.basePath = basePath
     }
 
-    // MARK: - UsageDataSource
+    // MARK: - UsageDataSource Protocol
 
     public func getTodayEntries() async throws -> [UsageEntry] {
         let allFiles = try FileDiscovery.discoverFiles(in: basePath)
@@ -45,48 +43,60 @@ public actor UsageRepository: UsageDataSource {
         return await loadEntries(from: files)
     }
 
-    // MARK: - Additional Methods
+    // MARK: - Cache Management
 
     public func clearCache() {
         fileCache.removeAll()
     }
 
-    // MARK: - Private Loading
+    // MARK: - Entry Loading
 
     private func loadEntries(from files: [FileMetadata]) async -> [UsageEntry] {
-        var allEntries: [UsageEntry] = []
-
-        for file in files {
-            let entries = loadEntriesFromFile(file)
-            allEntries.append(contentsOf: entries)
-        }
-
-        return allEntries.sorted()
+        files
+            .flatMap(loadEntriesFromFile)
+            .sorted()
     }
 
     private func loadEntriesFromFile(_ file: FileMetadata) -> [UsageEntry] {
-        // Check cache
-        if let cached = fileCache[file.path],
-           cached.modificationDate >= file.modificationDate,
-           cached.version == CachedFile.currentVersion {
-            return cached.entries
+        if let cachedEntries = validCachedEntries(for: file) {
+            return cachedEntries
         }
+        return parseAndCacheEntries(from: file)
+    }
 
-        // Parse file with fresh deduplication set (per-file scope)
+    // MARK: - Caching
+
+    private func validCachedEntries(for file: FileMetadata) -> [UsageEntry]? {
+        guard let cached = fileCache[file.path],
+              cached.modificationDate >= file.modificationDate,
+              cached.version == CachedFile.currentVersion else {
+            return nil
+        }
+        return cached.entries
+    }
+
+    private func parseAndCacheEntries(from file: FileMetadata) -> [UsageEntry] {
+        let entries = parseEntries(from: file)
+        cacheEntries(entries, for: file)
+        return entries
+    }
+
+    // MARK: - Parsing
+
+    private func parseEntries(from file: FileMetadata) -> [UsageEntry] {
         var fileHashes = Set<String>()
-        let entries = parser.parseFile(
+        return parser.parseFile(
             at: file.path,
             project: file.projectName,
             processedHashes: &fileHashes
         )
+    }
 
-        // Cache results
+    private func cacheEntries(_ entries: [UsageEntry], for file: FileMetadata) {
         fileCache[file.path] = CachedFile(
             modificationDate: file.modificationDate,
             entries: entries,
             version: CachedFile.currentVersion
         )
-
-        return entries
     }
 }
