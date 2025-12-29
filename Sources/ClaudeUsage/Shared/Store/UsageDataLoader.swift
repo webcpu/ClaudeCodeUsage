@@ -17,43 +17,64 @@ actor UsageDataLoader {
         self.sessionMonitorService = sessionMonitorService
     }
 
-    /// Load today's data only - fast path for immediate UI display
     func loadToday() async throws -> TodayLoadResult {
-        await LoadTrace.shared.phaseStart(.today)
+        try await tracePhase(.today) {
+            try await fetchTodayData()
+        }
+    }
 
-        // Load entries and session in parallel (tokenLimit derived from session)
-        async let todayEntriesTask = repository.getTodayEntries()
-        async let sessionTask = fetchSession()
+    func loadHistory() async throws -> FullLoadResult {
+        try await tracePhase(.history) {
+            FullLoadResult(fullStats: try await repository.getUsageStats())
+        }
+    }
 
-        let todayEntries = try await todayEntriesTask
-        let todayStats = deriveStats(from: todayEntries)
+    func loadAll() async throws -> UsageLoadResult {
+        let today = try await loadToday()
+        let history = try await loadHistory()
+        return combineResults(today: today, history: history)
+    }
+}
+
+// MARK: - Data Fetching
+
+private extension UsageDataLoader {
+    func fetchTodayData() async throws -> TodayLoadResult {
+        async let entriesTask = repository.getTodayEntries()
+        async let sessionTask = fetchSessionWithTracing()
+
+        let entries = try await entriesTask
         let (session, burnRate) = await sessionTask
 
-        await LoadTrace.shared.phaseComplete(.today)
+        return buildTodayResult(entries: entries, session: session, burnRate: burnRate)
+    }
 
-        return TodayLoadResult(
-            todayEntries: todayEntries,
-            todayStats: todayStats,
+    func fetchSessionWithTracing() async -> (SessionBlock?, BurnRate?) {
+        let (session, timing) = await timed { await sessionMonitorService.getActiveSession() }
+        await recordSessionTrace(session: session, timing: timing)
+        return (session, session?.burnRate)
+    }
+}
+
+// MARK: - Result Building
+
+private extension UsageDataLoader {
+    func buildTodayResult(
+        entries: [UsageEntry],
+        session: SessionBlock?,
+        burnRate: BurnRate?
+    ) -> TodayLoadResult {
+        TodayLoadResult(
+            todayEntries: entries,
+            todayStats: UsageAggregator.aggregate(entries),
             session: session,
             burnRate: burnRate,
             autoTokenLimit: session?.tokenLimit
         )
     }
 
-    /// Load full historical data - slower path for complete stats
-    func loadHistory() async throws -> FullLoadResult {
-        await LoadTrace.shared.phaseStart(.history)
-        let fullStats = try await repository.getUsageStats()
-        await LoadTrace.shared.phaseComplete(.history)
-        return FullLoadResult(fullStats: fullStats)
-    }
-
-    /// Load all data at once (backward compatible)
-    func loadAll() async throws -> UsageLoadResult {
-        let today = try await loadToday()
-        let history = try await loadHistory()
-
-        return UsageLoadResult(
+    func combineResults(today: TodayLoadResult, history: FullLoadResult) -> UsageLoadResult {
+        UsageLoadResult(
             todayEntries: today.todayEntries,
             todayStats: today.todayStats,
             fullStats: history.fullStats,
@@ -62,28 +83,35 @@ actor UsageDataLoader {
             autoTokenLimit: today.autoTokenLimit
         )
     }
+}
 
-    // MARK: - Session Fetching with Tracing
+// MARK: - Tracing Infrastructure
 
-    private func fetchSession() async -> (SessionBlock?, BurnRate?) {
-        let start = Date()
-        let session = await sessionMonitorService.getActiveSession()
-        let duration = Date().timeIntervalSince(start)
-
-        await LoadTrace.shared.recordSession(
-            found: session != nil,
-            cached: duration < 0.05,
-            duration: duration,
-            tokenLimit: session?.tokenLimit
-        )
-
-        return (session, session?.burnRate)
+private extension UsageDataLoader {
+    private enum TracingThreshold {
+        static let cachedResponseTime: TimeInterval = 0.05
     }
 
-    // MARK: - Stats Derivation
+    func tracePhase<T>(_ phase: LoadPhase, operation: () async throws -> T) async rethrows -> T {
+        await LoadTrace.shared.phaseStart(phase)
+        let result = try await operation()
+        await LoadTrace.shared.phaseComplete(phase)
+        return result
+    }
 
-    private func deriveStats(from entries: [UsageEntry]) -> UsageStats {
-        UsageAggregator.aggregate(entries)
+    func recordSessionTrace(session: SessionBlock?, timing: TimeInterval) async {
+        await LoadTrace.shared.recordSession(
+            found: session != nil,
+            cached: timing < TracingThreshold.cachedResponseTime,
+            duration: timing,
+            tokenLimit: session?.tokenLimit
+        )
+    }
+
+    func timed<T>(_ operation: () async -> T) async -> (T, TimeInterval) {
+        let start = Date()
+        let result = await operation()
+        return (result, Date().timeIntervalSince(start))
     }
 }
 
