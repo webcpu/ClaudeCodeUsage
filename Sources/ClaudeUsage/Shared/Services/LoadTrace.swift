@@ -22,8 +22,6 @@ actor LoadTrace {
     private var sessionCached: Bool = false
     private var sessionDuration: TimeInterval = 0
     private var tokenLimit: Int?
-    private var tokenLimitCached: Bool = false
-    private var tokenLimitDuration: TimeInterval = 0
     private var historySkipped: Bool = false
 
     func start() -> UUID {
@@ -43,16 +41,11 @@ actor LoadTrace {
         }
     }
 
-    func recordSession(found: Bool, cached: Bool, duration: TimeInterval) {
+    func recordSession(found: Bool, cached: Bool, duration: TimeInterval, tokenLimit: Int?) {
         sessionFound = found
         sessionCached = cached
         sessionDuration = duration
-    }
-
-    func recordTokenLimit(limit: Int?, cached: Bool, duration: TimeInterval) {
-        tokenLimit = limit
-        tokenLimitCached = cached
-        tokenLimitDuration = duration
+        self.tokenLimit = tokenLimit
     }
 
     func skipHistory() {
@@ -75,8 +68,6 @@ actor LoadTrace {
         sessionCached = false
         sessionDuration = 0
         tokenLimit = nil
-        tokenLimitCached = false
-        tokenLimitDuration = 0
         historySkipped = false
     }
 
@@ -92,7 +83,6 @@ actor LoadTrace {
             headerLine,
             todayPhaseLine,
             sessionLine,
-            tokenLimitLine,
             historyPhaseLine,
             footerLine(duration: duration)
         ]
@@ -113,14 +103,8 @@ actor LoadTrace {
         sessionFound.map { found in
             let status = found ? "active" : "none"
             let timing = sessionCached ? "cached" : formatDuration(sessionDuration)
-            return "│   Session: \(status) [\(timing)]"
-        }
-    }
-
-    private var tokenLimitLine: String? {
-        tokenLimit.map { limit in
-            let timing = tokenLimitCached ? "cached" : formatDuration(tokenLimitDuration)
-            return "│   TokenLimit: \(formatNumber(limit)) [\(timing)]"
+            let limitInfo = tokenLimit.map { ", limit: \(formatNumber($0))" } ?? ""
+            return "│   Session: \(status) [\(timing)]\(limitInfo)"
         }
     }
 

@@ -21,15 +21,13 @@ actor UsageDataLoader {
     func loadToday() async throws -> TodayLoadResult {
         await LoadTrace.shared.phaseStart(.today)
 
-        // Load entries once, derive stats from them (avoid duplicate fetch)
+        // Load entries and session in parallel (tokenLimit derived from session)
         async let todayEntriesTask = repository.getTodayEntries()
         async let sessionTask = fetchSession()
-        async let tokenLimitTask = fetchTokenLimit()
 
         let todayEntries = try await todayEntriesTask
         let todayStats = deriveStats(from: todayEntries)
         let (session, burnRate) = await sessionTask
-        let tokenLimit = await tokenLimitTask
 
         await LoadTrace.shared.phaseComplete(.today)
 
@@ -38,7 +36,7 @@ actor UsageDataLoader {
             todayStats: todayStats,
             session: session,
             burnRate: burnRate,
-            autoTokenLimit: tokenLimit
+            autoTokenLimit: session?.tokenLimit
         )
     }
 
@@ -75,24 +73,11 @@ actor UsageDataLoader {
         await LoadTrace.shared.recordSession(
             found: session != nil,
             cached: duration < 0.05,
-            duration: duration
+            duration: duration,
+            tokenLimit: session?.tokenLimit
         )
 
         return (session, session?.burnRate)
-    }
-
-    private func fetchTokenLimit() async -> Int? {
-        let start = Date()
-        let limit = await sessionMonitorService.getAutoTokenLimit()
-        let duration = Date().timeIntervalSince(start)
-
-        await LoadTrace.shared.recordTokenLimit(
-            limit: limit,
-            cached: duration < 0.05,
-            duration: duration
-        )
-
-        return limit
     }
 
     // MARK: - Stats Derivation
