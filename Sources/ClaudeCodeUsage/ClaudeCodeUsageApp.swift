@@ -183,9 +183,12 @@ private enum WindowActions {
     @MainActor
     static func showMainWindow() {
         NSApp.activate(ignoringOtherApps: true)
-        NSApp.windows
-            .first { $0.identifier?.rawValue == "main" }?
-            .makeKeyAndOrderFront(nil)
+        if let window = NSApp.windows.first(where: { $0.title == "Usage Dashboard" }) {
+            if window.isMiniaturized {
+                window.deminiaturize(nil)
+            }
+            window.makeKeyAndOrderFront(nil)
+        }
     }
 }
 

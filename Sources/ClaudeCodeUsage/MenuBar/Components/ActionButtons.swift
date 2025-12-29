@@ -83,13 +83,19 @@ struct ActionButtons: View {
     }
 
     private func bringWindowToFront(_ window: NSWindow) {
-        window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+        if window.isMiniaturized {
+            window.deminiaturize(nil)
+        }
+        window.makeKeyAndOrderFront(nil)
     }
 
     private func openNewDashboardWindow() {
         openWindow(id: "main")
-        NSApp.activate(ignoringOtherApps: true)
+        // Delay activation to allow SwiftUI window to be created
+        DispatchQueue.main.async {
+            NSApp.activate(ignoringOtherApps: true)
+        }
     }
 }
 
