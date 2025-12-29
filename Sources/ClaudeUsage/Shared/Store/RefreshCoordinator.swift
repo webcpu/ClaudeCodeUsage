@@ -5,6 +5,15 @@
 
 import Foundation
 import AppKit
+import ClaudeUsageData
+
+// MARK: - Timing Constants
+
+private enum Timing {
+    static let fallbackInterval: TimeInterval = 300.0
+    static let debounceInterval: TimeInterval = 1.0
+    static let refreshThreshold: TimeInterval = 2.0
+}
 
 // MARK: - Refresh Coordinator
 
@@ -18,10 +27,6 @@ final class RefreshCoordinator {
     private let monitoredPath: String
     private let directoryMonitor: DirectoryMonitor
 
-    /// Fallback interval when file monitoring might miss changes (5 minutes)
-    private let fallbackInterval: TimeInterval = 300.0
-
-    /// Callback for refresh - set after init to avoid capturing self before initialization
     var onRefresh: (() async -> Void)?
 
     private static let dayFormatter: DateFormatter = {
@@ -30,6 +35,8 @@ final class RefreshCoordinator {
         return formatter
     }()
 
+    // MARK: - Initialization
+
     init(
         clock: any ClockProtocol = SystemClock(),
         refreshInterval: TimeInterval,
@@ -37,22 +44,18 @@ final class RefreshCoordinator {
     ) {
         self.clock = clock
         self.lastRefreshTime = clock.now
-        self.lastKnownDay = Self.dayFormatter.string(from: clock.now)
+        self.lastKnownDay = Self.formatDay(clock.now)
         self.monitoredPath = basePath + "/projects"
-        self.directoryMonitor = DirectoryMonitor(path: monitoredPath, debounceInterval: 1.0)
+        self.directoryMonitor = DirectoryMonitor(path: monitoredPath, debounceInterval: Timing.debounceInterval)
 
         setupDirectoryMonitor()
     }
 
-    private func setupDirectoryMonitor() {
-        directoryMonitor.onChange = { [weak self] in
-            Task { @MainActor [weak self] in
-                self?.handleFileChange()
-            }
-        }
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 
-    // MARK: - Monitoring Management
+    // MARK: - Public API
 
     func start() {
         stop()
@@ -63,41 +66,12 @@ final class RefreshCoordinator {
 
     func stop() {
         directoryMonitor.stop()
-        fallbackTimerTask?.cancel()
-        fallbackTimerTask = nil
+        stopFallbackTimer()
         stopDayChangeMonitoring()
     }
 
-    private func startFallbackTimer() {
-        fallbackTimerTask = Task { @MainActor in
-            while !Task.isCancelled {
-                do {
-                    try await Task.sleep(for: .seconds(fallbackInterval))
-                    guard !Task.isCancelled else { break }
-                    lastRefreshTime = clock.now
-                    await onRefresh?()
-                } catch {
-                    break
-                }
-            }
-        }
-    }
-
-    // MARK: - File Change Handling
-
-    private func handleFileChange() {
-        guard shouldRefresh() else { return }
-        lastRefreshTime = clock.now
-        Task { await onRefresh?() }
-    }
-
-    // MARK: - Lifecycle Events
-
     func handleAppBecameActive() {
-        if shouldRefresh() {
-            lastRefreshTime = clock.now
-            Task { await onRefresh?() }
-        }
+        triggerRefreshIfNeeded()
         start()
     }
 
@@ -106,34 +80,82 @@ final class RefreshCoordinator {
     }
 
     func handleWindowFocus() {
-        if shouldRefresh() {
-            lastRefreshTime = clock.now
-            Task { await onRefresh?() }
+        triggerRefreshIfNeeded()
+    }
+
+    // MARK: - Refresh Logic
+
+    private func triggerRefreshIfNeeded() {
+        guard shouldRefresh() else { return }
+        triggerRefresh()
+    }
+
+    private func triggerRefresh() {
+        lastRefreshTime = clock.now
+        Task { await onRefresh?() }
+    }
+
+    private func shouldRefresh() -> Bool {
+        clock.now.timeIntervalSince(lastRefreshTime) > Timing.refreshThreshold
+    }
+
+    // MARK: - Directory Monitoring
+
+    private func setupDirectoryMonitor() {
+        directoryMonitor.onChange = { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.triggerRefreshIfNeeded()
+            }
         }
     }
 
-    // MARK: - Private
+    // MARK: - Fallback Timer
 
-    private func shouldRefresh() -> Bool {
-        clock.now.timeIntervalSince(lastRefreshTime) > 2.0
+    private func startFallbackTimer() {
+        fallbackTimerTask = Task { @MainActor in
+            while !Task.isCancelled {
+                do {
+                    try await Task.sleep(for: .seconds(Timing.fallbackInterval))
+                    guard !Task.isCancelled else { break }
+                    triggerRefresh()
+                } catch {
+                    break
+                }
+            }
+        }
     }
+
+    private func stopFallbackTimer() {
+        fallbackTimerTask?.cancel()
+        fallbackTimerTask = nil
+    }
+
+    // MARK: - Day Change Monitoring
 
     private func startDayChangeMonitoring() {
         stopDayChangeMonitoring()
+        observeCalendarDayChange()
+        observeSystemClockChange()
+    }
 
+    private func stopDayChangeMonitoring() {
+        dayChangeObserver.map { NotificationCenter.default.removeObserver($0) }
+        dayChangeObserver = nil
+    }
+
+    private func observeCalendarDayChange() {
         dayChangeObserver = NotificationCenter.default.addObserver(
             forName: .NSCalendarDayChanged,
             object: nil,
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
-                guard let self else { return }
-                self.updateLastKnownDay()
-                self.lastRefreshTime = self.clock.now
-                await self.onRefresh?()
+                self?.handleDayChange()
             }
         }
+    }
 
+    private func observeSystemClockChange() {
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleSignificantTimeChange),
@@ -142,30 +164,23 @@ final class RefreshCoordinator {
         )
     }
 
-    private func stopDayChangeMonitoring() {
-        if let observer = dayChangeObserver {
-            NotificationCenter.default.removeObserver(observer)
-            dayChangeObserver = nil
-        }
-    }
-
-    private func updateLastKnownDay() {
-        lastKnownDay = Self.dayFormatter.string(from: clock.now)
+    private func handleDayChange() {
+        lastKnownDay = Self.formatDay(clock.now)
+        triggerRefresh()
     }
 
     @objc private func handleSignificantTimeChange() {
         Task { @MainActor in
-            let currentDay = Self.dayFormatter.string(from: clock.now)
-
-            if currentDay != lastKnownDay {
-                lastKnownDay = currentDay
-                lastRefreshTime = clock.now
-                await onRefresh?()
-            }
+            let currentDay = Self.formatDay(clock.now)
+            guard currentDay != lastKnownDay else { return }
+            lastKnownDay = currentDay
+            triggerRefresh()
         }
     }
 
-    deinit {
-        NotificationCenter.default.removeObserver(self)
+    // MARK: - Pure Functions
+
+    private static func formatDay(_ date: Date) -> String {
+        dayFormatter.string(from: date)
     }
 }

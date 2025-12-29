@@ -60,6 +60,7 @@ public final class DirectoryMonitor: @unchecked Sendable {
         }
 
         source?.resume()
+        logger.debug("Started watching \(self.path)")
     }
 
     public func stop() {
