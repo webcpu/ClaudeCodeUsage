@@ -68,12 +68,13 @@ public struct ModelPricing: Sendable, Hashable {
         self.cacheReadPerToken = cacheReadPerMillion / 1_000_000
     }
 
-    // Current pricing as of 2024
+    // Claude 4/4.5 pricing (December 2025)
+    // Cache: write = 1.25x input, read = 0.1x input
     public static let opus = ModelPricing(
-        inputPerMillion: 15.0,
-        outputPerMillion: 75.0,
-        cacheWritePerMillion: 18.75,
-        cacheReadPerMillion: 1.50
+        inputPerMillion: 5.0,
+        outputPerMillion: 25.0,
+        cacheWritePerMillion: 6.25,
+        cacheReadPerMillion: 0.50
     )
 
     public static let sonnet = ModelPricing(
@@ -84,9 +85,9 @@ public struct ModelPricing: Sendable, Hashable {
     )
 
     public static let haiku = ModelPricing(
-        inputPerMillion: 0.25,
-        outputPerMillion: 1.25,
-        cacheWritePerMillion: 0.30,
-        cacheReadPerMillion: 0.03
+        inputPerMillion: 1.0,
+        outputPerMillion: 5.0,
+        cacheWritePerMillion: 1.25,
+        cacheReadPerMillion: 0.10
     )
 }
