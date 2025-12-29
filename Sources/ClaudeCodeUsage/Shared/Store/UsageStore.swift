@@ -200,7 +200,7 @@ final class UsageStore {
 
     private var isLoadedRecently: Bool {
         guard let lastTime = lastLoadStartTime else { return false }
-        return clock.now.timeIntervalSince(lastTime) < 0.5
+        return clock.now.timeIntervalSince(lastTime) < 2.0
     }
 
     deinit {

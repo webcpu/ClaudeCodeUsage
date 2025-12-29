@@ -48,6 +48,7 @@ final class RefreshCoordinator {
                 do {
                     try await Task.sleep(until: nextFireTime, clock: .continuous)
                     guard !Task.isCancelled else { break }
+                    lastRefreshTime = clock.now
                     await onRefresh?()
                     nextFireTime = nextFireTime + .seconds(refreshInterval)
                 } catch {
@@ -103,6 +104,7 @@ final class RefreshCoordinator {
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.updateLastKnownDay()
+                self.lastRefreshTime = self.clock.now
                 await self.onRefresh?()
             }
         }
@@ -132,6 +134,7 @@ final class RefreshCoordinator {
 
             if currentDay != lastKnownDay {
                 lastKnownDay = currentDay
+                lastRefreshTime = clock.now
                 await onRefresh?()
             }
         }
