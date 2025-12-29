@@ -1,24 +1,31 @@
-//
-//  JSONLParser.swift
-//  ClaudeUsageData
-//
-//  Parses Claude JSONL usage files into UsageEntry models
-//
-
 import Foundation
 import ClaudeUsageCore
 
 // MARK: - JSONLParser
 
 public struct JSONLParser: Sendable {
-    public init() {}
 
-    // Thread-safe cached formatter (read-only after init)
+    // MARK: - Constants
+
+    private enum ByteValue {
+        static let newline: Int32 = 0x0A
+    }
+
+    private enum DefaultValue {
+        static let syntheticModel = "<synthetic>"
+    }
+
+    // MARK: - Static Configuration
+
     nonisolated(unsafe) private static let dateFormatter: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter
     }()
+
+    // MARK: - Initialization
+
+    public init() {}
 
     // MARK: - Public API
 
@@ -28,10 +35,8 @@ public struct JSONLParser: Sendable {
         processedHashes: inout Set<String>
     ) -> [UsageEntry] {
         guard let fileData = loadFileData(at: path) else { return [] }
-        let lines = extractLines(from: fileData)
-        return lines.compactMap { lineData in
-            parseEntry(from: lineData, path: path, project: project, processedHashes: &processedHashes)
-        }
+        return extractLines(from: fileData)
+            .compactMap { parseEntry(from: $0, path: path, project: project, processedHashes: &processedHashes) }
     }
 
     // MARK: - Entry Parsing
@@ -49,10 +54,26 @@ public struct JSONLParser: Sendable {
             return nil
         }
 
-        let tokens = createTokenCounts(from: validated.usage)
-        guard tokens.total > 0 else { return nil }
+        return buildUsageEntry(
+            from: rawData,
+            validated: validated,
+            timestamp: timestamp,
+            project: project,
+            path: path
+        )
+    }
 
-        let model = validated.message.model ?? "<synthetic>"
+    private func buildUsageEntry(
+        from rawData: RawJSONLData,
+        validated: ValidatedData,
+        timestamp: Date,
+        project: String,
+        path: String
+    ) -> UsageEntry? {
+        let tokens = createTokenCounts(from: validated.usage)
+        guard hasTokenUsage(tokens) else { return nil }
+
+        let model = validated.message.model ?? DefaultValue.syntheticModel
         let cost = rawData.costUSD ?? PricingCalculator.calculateCost(tokens: tokens, model: model)
 
         return UsageEntry(
@@ -69,26 +90,7 @@ public struct JSONLParser: Sendable {
         )
     }
 
-    // MARK: - File I/O
-
-    private func loadFileData(at path: String) -> Data? {
-        try? Data(contentsOf: URL(fileURLWithPath: path))
-    }
-
-    private func extractLines(from data: Data) -> [Data] {
-        guard !data.isEmpty else { return [] }
-        return [UInt8](data).withUnsafeBufferPointer { buffer in
-            guard let ptr = buffer.baseAddress else { return [] }
-            return buildLineRanges(ptr: ptr, count: data.count).map { data[$0] }
-        }
-    }
-
-    // MARK: - Decoding
-
-    private func decodeRawData(from lineData: Data) -> RawJSONLData? {
-        guard !lineData.isEmpty else { return nil }
-        return try? JSONDecoder().decode(RawJSONLData.self, from: lineData)
-    }
+    // MARK: - Validation
 
     private func validateAssistantMessage(_ raw: RawJSONLData) -> ValidatedData? {
         guard let message = raw.message,
@@ -109,6 +111,10 @@ public struct JSONLParser: Sendable {
             return true
         }
         return processedHashes.insert(hash).inserted
+    }
+
+    private func hasTokenUsage(_ tokens: TokenCounts) -> Bool {
+        tokens.total > 0
     }
 
     // MARK: - Transformations
@@ -138,29 +144,47 @@ public struct JSONLParser: Sendable {
         return "\(timestamp.timeIntervalSince1970)-\(UUID().uuidString)"
     }
 
-    // MARK: - Line Extraction
+    // MARK: - File I/O
 
-    private func buildLineRanges(ptr: UnsafePointer<UInt8>, count: Int) -> [Range<Data.Index>] {
-        var ranges: [Range<Data.Index>] = []
-        var offset = 0
-
-        while offset < count {
-            let lineEnd = findLineEnd(ptr: ptr, offset: offset, count: count)
-            if lineEnd > offset {
-                ranges.append(offset..<lineEnd)
-            }
-            offset = lineEnd + 1
-        }
-
-        return ranges
+    private func loadFileData(at path: String) -> Data? {
+        try? Data(contentsOf: URL(fileURLWithPath: path))
     }
 
-    private func findLineEnd(ptr: UnsafePointer<UInt8>, offset: Int, count: Int) -> Int {
-        let remaining = count - offset
-        if let found = memchr(ptr + offset, 0x0A, remaining) {
-            return UnsafePointer(found.assumingMemoryBound(to: UInt8.self)) - ptr
+    private func extractLines(from data: Data) -> [Data] {
+        guard !data.isEmpty else { return [] }
+        return [UInt8](data).withUnsafeBufferPointer { buffer in
+            guard let baseAddress = buffer.baseAddress else { return [] }
+            return findLineRanges(in: baseAddress, count: data.count)
+                .map { data[$0] }
         }
-        return count
+    }
+
+    // MARK: - Decoding
+
+    private func decodeRawData(from lineData: Data) -> RawJSONLData? {
+        guard !lineData.isEmpty else { return nil }
+        return try? JSONDecoder().decode(RawJSONLData.self, from: lineData)
+    }
+
+    // MARK: - Line Extraction
+
+    private func findLineRanges(in ptr: UnsafePointer<UInt8>, count: Int) -> [Range<Data.Index>] {
+        sequence(state: 0) { offset -> Range<Data.Index>? in
+            guard offset < count else { return nil }
+            let lineEnd = findLineEnd(in: ptr, from: offset, count: count)
+            let range = offset..<lineEnd
+            offset = lineEnd + 1
+            return range
+        }
+        .filter { !$0.isEmpty }
+    }
+
+    private func findLineEnd(in ptr: UnsafePointer<UInt8>, from offset: Int, count: Int) -> Int {
+        let remaining = count - offset
+        guard let found = memchr(ptr + offset, ByteValue.newline, remaining) else {
+            return count
+        }
+        return UnsafePointer(found.assumingMemoryBound(to: UInt8.self)) - ptr
     }
 }
 
