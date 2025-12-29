@@ -39,20 +39,15 @@ final class UsageStore {
     }
 
     var todaysCostProgress: Double {
-        min(todaysCost / dailyCostThreshold, 1.5)
+        progressCapped(todaysCost / dailyCostThreshold)
     }
 
     var sessionTimeProgress: Double {
-        guard let session = activeSession else { return 0 }
-        let elapsed = clock.now.timeIntervalSince(session.startTime)
-        let total = session.endTime.timeIntervalSince(session.startTime)
-        return min(elapsed / total, 1.5)
+        activeSession.map { sessionProgress($0, now: clock.now) } ?? 0
     }
 
     var averageDailyCost: Double {
-        guard let stats = stats, !stats.byDate.isEmpty else { return 0 }
-        let recentDays = stats.byDate.suffix(7)
-        return recentDays.reduce(0.0) { $0 + $1.totalCost } / Double(recentDays.count)
+        stats.flatMap { recentDaysAverage($0.byDate) } ?? 0
     }
 
     var todayHourlyCosts: [Double] {
@@ -118,33 +113,47 @@ final class UsageStore {
     }
 
     func loadData() async {
-        guard !isCurrentlyLoading, !isLoadedRecently else { return }
+        guard canStartLoad else { return }
+        await trackLoadExecution { try await executeLoad() }
+    }
 
+    // MARK: - Load Execution
+
+    private var canStartLoad: Bool {
+        !isCurrentlyLoading && !isLoadedRecently
+    }
+
+    private func trackLoadExecution(_ load: () async throws -> Void) async {
         isCurrentlyLoading = true
-        defer { isCurrentlyLoading = false }
-
         lastLoadStartTime = clock.now
         _ = await LoadTrace.shared.start()
+        defer { isCurrentlyLoading = false }
 
         do {
-            let todayResult = try await dataLoader.loadToday()
-            apply(todayResult)
-
-            if shouldLoadHistory() {
-                let historyResult = try await dataLoader.loadHistory()
-                apply(historyResult)
-                lastHistoryLoadDate = clock.now
-            } else {
-                await LoadTrace.shared.skipHistory()
-            }
-
+            try await load()
             await LoadTrace.shared.complete()
         } catch {
             state = .error(error)
         }
     }
 
-    private func shouldLoadHistory() -> Bool {
+    private func executeLoad() async throws {
+        let todayResult = try await dataLoader.loadToday()
+        apply(todayResult)
+        try await loadHistoryIfNeeded()
+    }
+
+    private func loadHistoryIfNeeded() async throws {
+        guard shouldLoadHistory else {
+            await LoadTrace.shared.skipHistory()
+            return
+        }
+        let historyResult = try await dataLoader.loadHistory()
+        apply(historyResult)
+        lastHistoryLoadDate = clock.now
+    }
+
+    private var shouldLoadHistory: Bool {
         guard let lastDate = lastHistoryLoadDate else { return true }
         return !Calendar.current.isDate(lastDate, inSameDayAs: clock.now)
     }
@@ -250,9 +259,25 @@ enum ViewState {
 
 private func deriveThreshold(from stats: UsageStats?, default defaultThreshold: Double) -> Double {
     guard let stats = stats, !stats.byDate.isEmpty else { return defaultThreshold }
-    let recentDays = stats.byDate.suffix(7)
-    let average = recentDays.reduce(0.0) { $0 + $1.totalCost } / Double(recentDays.count)
+    let average = recentDaysAverage(stats.byDate) ?? 0
     return average > 0 ? max(average * 1.5, 10.0) : defaultThreshold
+}
+
+private func recentDaysAverage(_ byDate: [DailyUsage]) -> Double? {
+    guard !byDate.isEmpty else { return nil }
+    let recentDays = byDate.suffix(7)
+    return recentDays.reduce(0.0) { $0 + $1.totalCost } / Double(recentDays.count)
+}
+
+private func progressCapped(_ value: Double) -> Double {
+    min(value, 1.5)
+}
+
+private func sessionProgress(_ session: SessionBlock, now: Date) -> Double {
+    let elapsed = now.timeIntervalSince(session.startTime)
+    let total = session.endTime.timeIntervalSince(session.startTime)
+    guard total > 0 else { return 0 }
+    return min(elapsed / total, 1.0)
 }
 
 private func filterToday(_ entries: [UsageEntry], referenceDate: Date) -> [UsageEntry] {
