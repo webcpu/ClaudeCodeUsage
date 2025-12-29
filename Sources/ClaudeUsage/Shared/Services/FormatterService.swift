@@ -27,6 +27,18 @@ struct FormatterService {
         return String(format: "%.1fh / %.0fh", hours, totalHours)
     }
 
+    /// Format countdown time like "Resets in 3 hr 24 min"
+    static func formatCountdown(_ interval: TimeInterval) -> String {
+        guard interval > 0 else { return "Resetting..." }
+        let hours = Int(interval / TimeConstants.secondsPerHour)
+        let minutes = Int((interval.truncatingRemainder(dividingBy: TimeConstants.secondsPerHour)) / TimeConstants.secondsPerMinute)
+        if hours > 0 {
+            return "Resets in \(hours) hr \(minutes) min"
+        } else {
+            return "Resets in \(minutes) min"
+        }
+    }
+
     // MARK: - Currency Formatting
 
     static func formatCurrency(_ amount: Double) -> String {

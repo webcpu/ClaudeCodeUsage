@@ -159,11 +159,17 @@ public actor SessionMonitor: SessionDataSource {
         let cost = entries.reduce(0.0) { $0 + $1.costUSD }
         let models = Array(Set(entries.map(\.model)))
         let actualEndTime = entries.last?.timestamp
-        let endTime = computeEndTime(isActive: isActive, actualEndTime: actualEndTime, startTime: startTime)
+
+        // For active sessions, use modulo to show time within current 5h window
+        // e.g., 11.5h session → 11.5 % 5 = 1.5h → shows "1.5h / 5h"
+        let displayStartTime = isActive
+            ? computeWindowStartTime(sessionStart: startTime)
+            : startTime
+        let endTime = computeEndTime(isActive: isActive, actualEndTime: actualEndTime, startTime: displayStartTime)
 
         return SessionBlock(
             id: UUID().uuidString,
-            startTime: startTime,
+            startTime: displayStartTime,
             endTime: endTime,
             actualEndTime: actualEndTime,
             isActive: isActive,
@@ -175,10 +181,15 @@ public actor SessionMonitor: SessionDataSource {
         )
     }
 
+    private func computeWindowStartTime(sessionStart: Date) -> Date {
+        let totalDuration = Date().timeIntervalSince(sessionStart)
+        let elapsedInWindow = totalDuration.truncatingRemainder(dividingBy: sessionDurationSeconds)
+        return Date().addingTimeInterval(-elapsedInWindow)
+    }
+
     private func computeEndTime(isActive: Bool, actualEndTime: Date?, startTime: Date) -> Date {
-        isActive
-            ? Date().addingTimeInterval(sessionDurationSeconds)
-            : (actualEndTime ?? startTime)
+        // endTime = startTime + 5 hours (fixed session window)
+        startTime.addingTimeInterval(sessionDurationSeconds)
     }
 
     // MARK: - Burn Rate Calculation

@@ -273,6 +273,7 @@ private func progressCapped(_ value: Double) -> Double {
 }
 
 private func sessionProgress(_ session: SessionBlock, now: Date) -> Double {
+    // Progress = time since session started / 5h window
     let elapsed = now.timeIntervalSince(session.startTime)
     let total = session.endTime.timeIntervalSince(session.startTime)
     guard total > 0 else { return 0 }

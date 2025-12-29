@@ -12,7 +12,7 @@ struct SessionMetricsSection: View {
     var body: some View {
         VStack(spacing: MenuBarTheme.Layout.sectionSpacing) {
             if let session = store.activeSession {
-                // Time progress only
+                // Time since session started / 5h window
                 MetricRow(
                     title: "Time",
                     value: FormatterService.formatTimeInterval(
