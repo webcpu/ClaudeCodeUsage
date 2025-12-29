@@ -74,13 +74,13 @@ final class UsageStore {
     // MARK: - Initialization
 
     init(
-        repository: (any UsageRepository)? = nil,
+        repository: (any UsageDataSource)? = nil,
         sessionMonitorService: SessionMonitorService? = nil,
         configurationService: ConfigurationService? = nil,
         clock: any ClockProtocol = SystemClock()
     ) {
         let config = configurationService ?? DefaultConfigurationService()
-        let repo = repository ?? UsageRepositoryImpl(basePath: config.configuration.basePath)
+        let repo = repository ?? UsageRepository(basePath: config.configuration.basePath)
         let sessionService = sessionMonitorService ?? DefaultSessionMonitorService(configuration: config.configuration)
 
         self.dataLoader = UsageDataLoader(repository: repo, sessionMonitorService: sessionService)

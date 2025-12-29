@@ -14,8 +14,8 @@ struct ClaudeMonitorCLI {
         print("Claude Usage Monitor")
         print("====================")
 
-        let repository = UsageRepositoryImpl()
-        let sessionMonitor = SessionMonitorImpl()
+        let repository = UsageRepository()
+        let sessionMonitor = SessionMonitor()
 
         do {
             // Get today's stats

@@ -1,15 +1,16 @@
 //
-//  UsageRepository.swift
+//  UsageDataSource.swift
 //  ClaudeUsageCore
 //
-//  Protocol defining usage data access
+//  Protocols defining usage data access capabilities
 //
 
 import Foundation
 
-// MARK: - UsageRepository Protocol
+// MARK: - UsageDataSource
 
-public protocol UsageRepository: Sendable {
+/// Provides access to usage data
+public protocol UsageDataSource: Sendable {
     /// Get all usage entries for today
     func getTodayEntries() async throws -> [UsageEntry]
 
@@ -20,9 +21,10 @@ public protocol UsageRepository: Sendable {
     func getAllEntries() async throws -> [UsageEntry]
 }
 
-// MARK: - SessionMonitor Protocol
+// MARK: - SessionDataSource
 
-public protocol SessionMonitor: Sendable {
+/// Provides access to live session data
+public protocol SessionDataSource: Sendable {
     /// Get the currently active session block, if any
     func getActiveSession() async -> SessionBlock?
 

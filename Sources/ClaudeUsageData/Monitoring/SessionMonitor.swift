@@ -1,16 +1,16 @@
 //
-//  SessionMonitorImpl.swift
+//  SessionMonitor.swift
 //  ClaudeUsageData
 //
-//  Implementation of SessionMonitor protocol for live session detection
+//  Monitor for detecting active Claude sessions
 //
 
 import Foundation
 import ClaudeUsageCore
 
-// MARK: - SessionMonitorImpl
+// MARK: - SessionMonitor
 
-public actor SessionMonitorImpl: SessionMonitor {
+public actor SessionMonitor: SessionDataSource {
     private let basePath: String
     private let sessionDurationHours: Double
     private let parser = JSONLParser()
@@ -25,7 +25,7 @@ public actor SessionMonitorImpl: SessionMonitor {
         self.sessionDurationHours = sessionDurationHours
     }
 
-    // MARK: - SessionMonitor Protocol
+    // MARK: - SessionDataSource
 
     public func getActiveSession() async -> SessionBlock? {
         loadModifiedFiles()

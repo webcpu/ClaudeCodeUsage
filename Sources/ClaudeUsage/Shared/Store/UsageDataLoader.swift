@@ -9,10 +9,10 @@ import ClaudeUsageCore
 // MARK: - UsageDataLoader
 
 actor UsageDataLoader {
-    private let repository: any UsageRepository
+    private let repository: any UsageDataSource
     private let sessionMonitorService: SessionMonitorService
 
-    init(repository: any UsageRepository, sessionMonitorService: SessionMonitorService) {
+    init(repository: any UsageDataSource, sessionMonitorService: SessionMonitorService) {
         self.repository = repository
         self.sessionMonitorService = sessionMonitorService
     }

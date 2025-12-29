@@ -6,9 +6,9 @@
 //  Provides repository implementation, file parsing, and session monitoring.
 //
 //  Components:
-//    - Repository: UsageRepositoryImpl
+//    - Repository: UsageRepository
 //    - Parsing: JSONLParser
-//    - Monitoring: DirectoryMonitor, SessionMonitorImpl
+//    - Monitoring: DirectoryMonitor, SessionMonitor
 //
 
 import Foundation

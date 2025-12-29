@@ -1,8 +1,8 @@
 //
-//  UsageRepositoryImpl.swift
+//  UsageRepository.swift
 //  ClaudeUsageData
 //
-//  Implementation of UsageRepository protocol
+//  Repository for accessing Claude usage data
 //
 
 import Foundation
@@ -11,9 +11,9 @@ import OSLog
 
 private let logger = Logger(subsystem: "com.claudeusage", category: "Repository")
 
-// MARK: - UsageRepositoryImpl
+// MARK: - UsageRepository
 
-public actor UsageRepositoryImpl: UsageRepository {
+public actor UsageRepository: UsageDataSource {
     public let basePath: String
 
     private let parser = JSONLParser()
@@ -24,7 +24,7 @@ public actor UsageRepositoryImpl: UsageRepository {
         self.basePath = basePath
     }
 
-    // MARK: - UsageRepository Protocol
+    // MARK: - UsageDataSource
 
     public func getTodayEntries() async throws -> [UsageEntry] {
         let allFiles = try FileDiscovery.discoverFiles(in: basePath)

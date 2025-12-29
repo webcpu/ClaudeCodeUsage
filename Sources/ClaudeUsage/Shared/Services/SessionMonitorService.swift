@@ -18,13 +18,13 @@ protocol SessionMonitorService: Sendable {
 // MARK: - Default Implementation
 
 actor DefaultSessionMonitorService: SessionMonitorService {
-    private let monitor: SessionMonitorImpl
+    private let monitor: SessionMonitor
 
     private var cachedSession: (session: SessionBlock?, timestamp: Date)?
     private var cachedTokenLimit: (limit: Int?, timestamp: Date)?
 
     init(configuration: AppConfiguration) {
-        self.monitor = SessionMonitorImpl(
+        self.monitor = SessionMonitor(
             basePath: configuration.basePath,
             sessionDurationHours: configuration.sessionDurationHours
         )

@@ -7,7 +7,7 @@
 //
 //  Modules:
 //    - Models: UsageEntry, TokenCounts, SessionBlock, UsageStats, etc.
-//    - Protocols: UsageRepository, SessionMonitor
+//    - Protocols: UsageDataSource, SessionDataSource
 //    - Analytics: PricingCalculator, UsageAggregator
 //
 
