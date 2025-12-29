@@ -4,6 +4,9 @@
 //
 
 import Foundation
+import OSLog
+
+private let logger = Logger(subsystem: "com.claudecodeusage", category: "DirectoryMonitor")
 
 // MARK: - Directory Monitor
 
@@ -35,7 +38,7 @@ final class DirectoryMonitor: @unchecked Sendable {
 
         fileDescriptor = open(path, O_EVTONLY)
         guard fileDescriptor >= 0 else {
-            print("[DirectoryMonitor] Failed to open \(path)")
+            logger.error("Failed to open \(self.path)")
             return
         }
 
@@ -56,7 +59,7 @@ final class DirectoryMonitor: @unchecked Sendable {
         }
 
         source?.resume()
-        print("[DirectoryMonitor] Started watching \(path)")
+        logger.debug("Started watching \(self.path)")
     }
 
     func stop() {

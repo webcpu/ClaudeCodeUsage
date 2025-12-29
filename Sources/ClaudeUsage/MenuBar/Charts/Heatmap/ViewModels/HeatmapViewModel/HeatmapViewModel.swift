@@ -14,6 +14,9 @@ import SwiftUI
 import Foundation
 import Observation
 import ClaudeUsageCore
+import OSLog
+
+private let logger = Logger(subsystem: "com.claudecodeusage", category: "HeatmapViewModel")
 
 // MARK: - Constants
 
@@ -167,7 +170,7 @@ public final class HeatmapViewModel {
     func recordDatasetGenerationTime(since startTime: CFAbsoluteTime) {
         let duration = CFAbsoluteTimeGetCurrent() - startTime
         performanceMetrics.datasetGenerationTime = duration
-        print("Generated heatmap dataset in \(String(format: "%.3f", duration))s")
+        logger.debug("Generated heatmap dataset in \(String(format: "%.3f", duration))s")
     }
 
     /// Handle dataset generation error

@@ -127,10 +127,6 @@ actor LoadTrace {
         } else {
             logger.info("\(output)")
         }
-
-        #if DEBUG
-        print(output)
-        #endif
     }
 
     // MARK: - Formatting

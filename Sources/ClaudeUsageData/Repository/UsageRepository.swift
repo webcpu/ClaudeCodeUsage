@@ -2,7 +2,7 @@ import Foundation
 import ClaudeUsageCore
 import OSLog
 
-private let logger = Logger(subsystem: "com.claudeusage", category: "Repository")
+private let logger = Logger(subsystem: "com.claudecodeusage", category: "Repository")
 
 // MARK: - UsageRepository
 

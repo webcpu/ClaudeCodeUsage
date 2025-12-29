@@ -13,7 +13,7 @@ import Foundation
 import Observation
 import os.log
 
-private let logger = Logger(subsystem: "com.claudecodeusage.app", category: "MemoryMonitor")
+private let logger = Logger(subsystem: "com.claudecodeusage", category: "MemoryMonitor")
 
 // MARK: - Memory Monitor
 

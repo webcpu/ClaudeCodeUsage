@@ -7,6 +7,9 @@ import Foundation
 import ServiceManagement
 import SwiftUI
 import Observation
+import OSLog
+
+private let logger = Logger(subsystem: "com.claudecodeusage", category: "AppSettings")
 
 // MARK: - Protocol
 
@@ -46,7 +49,7 @@ final class AppSettingsService: AppSettingsServiceProtocol {
             refreshLoginStatus()
             return .success(())
         } catch {
-            print("[AppSettings] Failed to set launch at login: \(error)")
+            logger.error("Failed to set launch at login: \(error.localizedDescription)")
             return .failure(.serviceManagementFailed(error))
         }
     }
@@ -106,7 +109,7 @@ final class MockAppSettingsService: AppSettingsServiceProtocol {
     }
 
     func showAboutPanel() {
-        print("[Mock] About panel shown")
+        logger.debug("About panel shown")
     }
 }
 #endif
