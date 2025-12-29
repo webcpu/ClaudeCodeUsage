@@ -28,7 +28,7 @@ struct ActionButtons: View {
     @ViewBuilder
     private var dashboardButton: some View {
         if viewMode == .menuBar {
-            Button("Overview") {
+            Button("Main") {
                 openMainWindow()
             }
             .buttonStyle(MenuButtonStyle(style: .primary))
@@ -75,26 +75,29 @@ struct ActionButtons: View {
     // MARK: - Actions
 
     private func openMainWindow() {
-        if let existingWindow = findExistingMainWindow() {
-            bringWindowToFront(existingWindow)
-        } else {
-            openNewMainWindow()
-        }
-    }
+        // Capture screen at click time (before async operations)
+        let targetScreen = screenAtMouseLocation()
 
-    private func bringWindowToFront(_ window: NSWindow) {
-        NSApp.activate(ignoringOtherApps: true)
-        if window.isMiniaturized {
-            window.deminiaturize(nil)
-        }
-        window.makeKeyAndOrderFront(nil)
-    }
-
-    private func openNewMainWindow() {
+        // Always call openWindow - SwiftUI handles create vs activate
         openWindow(id: "main")
-        // Delay activation to allow SwiftUI window to be created
-        DispatchQueue.main.async {
-            NSApp.activate(ignoringOtherApps: true)
+        NSApp.activate(ignoringOtherApps: true)
+
+        // Wait for window to be created, then position
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            guard let window = findMainWindow() else { return }
+
+            // Move window to current Space (not just current screen)
+            window.collectionBehavior.insert(.moveToActiveSpace)
+
+            if window.isMiniaturized {
+                window.deminiaturize(nil)
+            }
+            window.makeKeyAndOrderFront(nil)
+
+            // Set frame AFTER makeKeyAndOrderFront to override SwiftUI positioning
+            DispatchQueue.main.async {
+                centerWindow(window, on: targetScreen)
+            }
         }
     }
 }
@@ -102,8 +105,25 @@ struct ActionButtons: View {
 // MARK: - Window Helpers
 
 @MainActor
-private func findExistingMainWindow() -> NSWindow? {
+private func findMainWindow() -> NSWindow? {
     NSApp.windows.first { $0.title == AppMetadata.name }
+}
+
+@MainActor
+private func screenAtMouseLocation() -> NSScreen? {
+    let mouseLocation = NSEvent.mouseLocation
+    return NSScreen.screens.first { NSMouseInRect(mouseLocation, $0.frame, false) }
+        ?? NSScreen.main
+}
+
+@MainActor
+private func centerWindow(_ window: NSWindow, on screen: NSScreen?) {
+    guard let screen = screen else { return }
+    let screenFrame = screen.visibleFrame
+    let windowSize = window.frame.size
+    let x = screenFrame.midX - windowSize.width / 2
+    let y = screenFrame.midY - windowSize.height / 2
+    window.setFrame(NSRect(x: x, y: y, width: windowSize.width, height: windowSize.height), display: true)
 }
 
 // MARK: - Supporting Types

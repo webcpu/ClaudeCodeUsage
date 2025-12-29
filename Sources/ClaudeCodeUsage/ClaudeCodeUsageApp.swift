@@ -127,7 +127,7 @@ struct MenuBarContextMenu: View {
 
             Divider()
 
-            Button("Overview") {
+            Button("Main") {
                 WindowActions.showMainWindow()
             }
 
@@ -182,13 +182,43 @@ private enum MenuBarAppearance {
 private enum WindowActions {
     @MainActor
     static func showMainWindow() {
+        // Capture screen at click time
+        let targetScreen = screenAtMouseLocation()
+
         NSApp.activate(ignoringOtherApps: true)
+
+        // Find and show window
         if let window = NSApp.windows.first(where: { $0.title == AppMetadata.name }) {
+            // Move window to current Space (not just current screen)
+            window.collectionBehavior.insert(.moveToActiveSpace)
+
             if window.isMiniaturized {
                 window.deminiaturize(nil)
             }
             window.makeKeyAndOrderFront(nil)
+
+            // Set frame AFTER makeKeyAndOrderFront
+            DispatchQueue.main.async {
+                centerWindow(window, on: targetScreen)
+            }
         }
+    }
+
+    @MainActor
+    private static func screenAtMouseLocation() -> NSScreen? {
+        let mouseLocation = NSEvent.mouseLocation
+        return NSScreen.screens.first { NSMouseInRect(mouseLocation, $0.frame, false) }
+            ?? NSScreen.main
+    }
+
+    @MainActor
+    private static func centerWindow(_ window: NSWindow, on screen: NSScreen?) {
+        guard let screen = screen else { return }
+        let screenFrame = screen.visibleFrame
+        let windowSize = window.frame.size
+        let x = screenFrame.midX - windowSize.width / 2
+        let y = screenFrame.midY - windowSize.height / 2
+        window.setFrame(NSRect(x: x, y: y, width: windowSize.width, height: windowSize.height), display: true)
     }
 }
 
