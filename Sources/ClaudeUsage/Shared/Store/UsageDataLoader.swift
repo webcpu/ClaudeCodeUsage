@@ -4,17 +4,15 @@
 //
 
 import Foundation
-import ClaudeCodeUsageKit
-import struct ClaudeLiveMonitorLib.SessionBlock
-import struct ClaudeLiveMonitorLib.BurnRate
+import ClaudeUsageCore
 
 // MARK: - UsageDataLoader
 
 actor UsageDataLoader {
-    private let repository: UsageRepository
+    private let repository: any UsageRepository
     private let sessionMonitorService: SessionMonitorService
 
-    init(repository: UsageRepository, sessionMonitorService: SessionMonitorService) {
+    init(repository: any UsageRepository, sessionMonitorService: SessionMonitorService) {
         self.repository = repository
         self.sessionMonitorService = sessionMonitorService
     }
@@ -24,7 +22,7 @@ actor UsageDataLoader {
         await LoadTrace.shared.phaseStart(.today)
 
         // Load entries once, derive stats from them (avoid duplicate fetch)
-        async let todayEntriesTask = repository.getTodayUsageEntries()
+        async let todayEntriesTask = repository.getTodayEntries()
         async let sessionTask = fetchSession()
         async let tokenLimitTask = fetchTokenLimit()
 
@@ -100,19 +98,7 @@ actor UsageDataLoader {
     // MARK: - Stats Derivation
 
     private func deriveStats(from entries: [UsageEntry]) -> UsageStats {
-        let sessionCount = Set(entries.compactMap(\.sessionId)).count
-        return UsageStats(
-            totalCost: entries.reduce(0) { $0 + $1.cost },
-            totalTokens: entries.reduce(0) { $0 + $1.totalTokens },
-            totalInputTokens: entries.reduce(0) { $0 + $1.inputTokens },
-            totalOutputTokens: entries.reduce(0) { $0 + $1.outputTokens },
-            totalCacheCreationTokens: entries.reduce(0) { $0 + $1.cacheWriteTokens },
-            totalCacheReadTokens: entries.reduce(0) { $0 + $1.cacheReadTokens },
-            totalSessions: sessionCount,
-            byModel: [],
-            byDate: [],
-            byProject: []
-        )
+        UsageAggregator.aggregate(entries)
     }
 }
 

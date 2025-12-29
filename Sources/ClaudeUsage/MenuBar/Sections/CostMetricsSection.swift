@@ -1,6 +1,6 @@
 import SwiftUI
 import Charts
-import ClaudeCodeUsageKit
+import ClaudeUsageCore
 
 struct CostMetricsSection: View {
     @Environment(UsageStore.self) private var store

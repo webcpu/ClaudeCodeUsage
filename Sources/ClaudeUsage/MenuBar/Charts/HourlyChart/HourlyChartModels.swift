@@ -4,7 +4,7 @@
 //
 
 import Foundation
-import ClaudeCodeUsageKit
+import ClaudeUsageCore
 
 // MARK: - TDD Hourly Chart Data Models
 

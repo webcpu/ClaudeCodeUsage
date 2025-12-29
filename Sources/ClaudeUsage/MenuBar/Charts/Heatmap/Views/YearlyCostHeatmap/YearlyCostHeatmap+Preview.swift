@@ -5,7 +5,7 @@
 //
 
 import SwiftUI
-import ClaudeCodeUsageKit
+import ClaudeUsageCore
 
 // MARK: - Preview
 

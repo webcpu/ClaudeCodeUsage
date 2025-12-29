@@ -5,7 +5,7 @@
 //
 
 import Foundation
-import ClaudeCodeUsageKit
+import ClaudeUsageCore
 
 // MARK: - Data Generation
 

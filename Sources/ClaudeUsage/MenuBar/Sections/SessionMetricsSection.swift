@@ -4,8 +4,7 @@
 //
 
 import SwiftUI
-import ClaudeCodeUsageKit
-import ClaudeLiveMonitorLib
+import ClaudeUsageCore
 
 struct SessionMetricsSection: View {
     @Environment(UsageStore.self) private var store

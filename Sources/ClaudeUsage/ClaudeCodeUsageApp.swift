@@ -5,7 +5,7 @@
 
 import SwiftUI
 import Observation
-import ClaudeCodeUsageKit
+import ClaudeUsageCore
 
 // MARK: - App Entry Point
 @main

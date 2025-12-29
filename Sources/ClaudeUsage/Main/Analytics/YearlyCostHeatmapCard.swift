@@ -4,7 +4,7 @@
 //
 
 import SwiftUI
-import ClaudeCodeUsageKit
+import ClaudeUsageCore
 
 struct YearlyCostHeatmapCard: View {
     let stats: UsageStats

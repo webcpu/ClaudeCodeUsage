@@ -5,9 +5,8 @@
 
 import SwiftUI
 import Observation
-import ClaudeCodeUsageKit
-import struct ClaudeLiveMonitorLib.SessionBlock
-import struct ClaudeLiveMonitorLib.BurnRate
+import ClaudeUsageCore
+import ClaudeUsageData
 
 // MARK: - Usage Store
 
@@ -51,7 +50,7 @@ final class UsageStore {
     }
 
     var todayHourlyCosts: [Double] {
-        UsageAnalytics.todayHourlyCosts(from: todayEntries, referenceDate: clock.now)
+        UsageAggregator.todayHourlyCosts(from: todayEntries, referenceDate: clock.now)
     }
 
     var formattedTodaysCost: String {
@@ -75,13 +74,13 @@ final class UsageStore {
     // MARK: - Initialization
 
     init(
-        repository: UsageRepository? = nil,
+        repository: (any UsageRepository)? = nil,
         sessionMonitorService: SessionMonitorService? = nil,
         configurationService: ConfigurationService? = nil,
         clock: any ClockProtocol = SystemClock()
     ) {
         let config = configurationService ?? DefaultConfigurationService()
-        let repo = repository ?? UsageRepository(basePath: config.configuration.basePath)
+        let repo = repository ?? UsageRepositoryImpl(basePath: config.configuration.basePath)
         let sessionService = sessionMonitorService ?? DefaultSessionMonitorService(configuration: config.configuration)
 
         self.dataLoader = UsageDataLoader(repository: repo, sessionMonitorService: sessionService)

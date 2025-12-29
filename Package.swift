@@ -62,9 +62,9 @@ let package = Package(
         .executableTarget(
             name: "ClaudeUsage",
             dependencies: [
+                "ClaudeUsageCore",
                 "ClaudeUsageData",
-                "ClaudeCodeUsageKit",  // Transitional
-                .product(name: "ClaudeLiveMonitorLib", package: "ClaudeLiveMonitor")  // Transitional
+                .product(name: "ClaudeLiveMonitorLib", package: "ClaudeLiveMonitor")  // Transitional - for SessionMonitorService
             ],
             path: "Sources/ClaudeUsage"),
 

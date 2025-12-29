@@ -4,7 +4,7 @@
 //
 
 import SwiftUI
-import ClaudeCodeUsageKit
+import ClaudeUsageCore
 
 struct DailyUsageView: View {
     @Environment(UsageStore.self) private var store

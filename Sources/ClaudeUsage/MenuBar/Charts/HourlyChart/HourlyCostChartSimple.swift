@@ -5,7 +5,7 @@
 
 import SwiftUI
 import Charts
-import ClaudeCodeUsageKit
+import ClaudeUsageCore
 
 // MARK: - Simple Hourly Cost Chart
 

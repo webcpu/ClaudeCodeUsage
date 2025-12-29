@@ -4,8 +4,7 @@
 //
 
 import SwiftUI
-import ClaudeCodeUsageKit
-import ClaudeLiveMonitorLib
+import ClaudeUsageCore
 
 struct UsageMetricsSection: View {
     @Environment(UsageStore.self) private var store
@@ -16,7 +15,7 @@ struct UsageMetricsSection: View {
                 // Token usage - show raw count only (no fake percentage)
                 // Claude's actual rate limit is not exposed in usage data
                 if let session = store.activeSession {
-                    TokenDisplay(tokens: session.tokenCounts.total)
+                    TokenDisplay(tokens: session.tokens.total)
                 }
 
                 // Burn rate

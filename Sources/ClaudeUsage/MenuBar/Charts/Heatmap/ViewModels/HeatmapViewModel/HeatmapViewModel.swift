@@ -13,7 +13,7 @@
 import SwiftUI
 import Foundation
 import Observation
-import ClaudeCodeUsageKit
+import ClaudeUsageCore
 
 // MARK: - Heatmap View Model
 

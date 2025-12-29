@@ -11,7 +11,7 @@
 //
 
 import SwiftUI
-import ClaudeCodeUsageKit
+import ClaudeUsageCore
 import Foundation
 
 // MARK: - Yearly Cost Heatmap

@@ -4,16 +4,14 @@
 //
 
 import Foundation
-import struct ClaudeLiveMonitorLib.SessionBlock
-import struct ClaudeLiveMonitorLib.BurnRate
-import class ClaudeLiveMonitorLib.LiveMonitor
-import struct ClaudeLiveMonitorLib.LiveMonitorConfig
+import ClaudeUsageCore
+import ClaudeLiveMonitorLib
 
 // MARK: - Protocol
 
 protocol SessionMonitorService: Sendable {
-    func getActiveSession() async -> SessionBlock?
-    func getBurnRate() async -> BurnRate?
+    func getActiveSession() async -> ClaudeUsageCore.SessionBlock?
+    func getBurnRate() async -> ClaudeUsageCore.BurnRate?
     func getAutoTokenLimit() async -> Int?
 }
 
@@ -22,7 +20,7 @@ protocol SessionMonitorService: Sendable {
 actor DefaultSessionMonitorService: SessionMonitorService {
     private let monitor: LiveMonitor
 
-    private var cachedSession: (session: SessionBlock?, timestamp: Date)?
+    private var cachedSession: (session: ClaudeUsageCore.SessionBlock?, timestamp: Date)?
     private var cachedTokenLimit: (limit: Int?, timestamp: Date)?
 
     init(configuration: AppConfiguration) {
@@ -36,17 +34,18 @@ actor DefaultSessionMonitorService: SessionMonitorService {
         self.monitor = LiveMonitor(config: config)
     }
 
-    func getActiveSession() async -> SessionBlock? {
+    func getActiveSession() async -> ClaudeUsageCore.SessionBlock? {
         if let cached = cachedSession, isCacheValid(timestamp: cached.timestamp) {
             return cached.session
         }
 
-        let result = await monitor.getActiveBlock()
-        cachedSession = (result, Date())
-        return result
+        let lmSession = await monitor.getActiveBlock()
+        let session = lmSession.map { ClaudeUsageCore.SessionBlock(from: $0) }
+        cachedSession = (session, Date())
+        return session
     }
 
-    func getBurnRate() async -> BurnRate? {
+    func getBurnRate() async -> ClaudeUsageCore.BurnRate? {
         await getActiveSession()?.burnRate
     }
 
@@ -77,12 +76,12 @@ private func isCacheValid(timestamp: Date, ttl: TimeInterval = CacheConfig.ttl) 
 
 #if DEBUG
 final class MockSessionMonitorService: SessionMonitorService, @unchecked Sendable {
-    var mockSession: SessionBlock?
-    var mockBurnRate: BurnRate?
+    var mockSession: ClaudeUsageCore.SessionBlock?
+    var mockBurnRate: ClaudeUsageCore.BurnRate?
     var mockTokenLimit: Int?
 
-    func getActiveSession() async -> SessionBlock? { mockSession }
-    func getBurnRate() async -> BurnRate? { mockBurnRate }
+    func getActiveSession() async -> ClaudeUsageCore.SessionBlock? { mockSession }
+    func getBurnRate() async -> ClaudeUsageCore.BurnRate? { mockBurnRate }
     func getAutoTokenLimit() async -> Int? { mockTokenLimit }
 }
 #endif
