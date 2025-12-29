@@ -5,6 +5,15 @@
 
 import SwiftUI
 
+// MARK: - Constants
+
+private enum Constants {
+    static let coordinatePadding: CGFloat = 4
+    static let uniformNormalizedValue: Double = 0.5
+}
+
+// MARK: - GraphView
+
 struct GraphView: View {
     let dataPoints: [Double]
     let color: Color
@@ -19,26 +28,30 @@ struct GraphView: View {
         }
         .frame(height: MenuBarTheme.Layout.graphHeight)
     }
+}
 
-    // MARK: - Background
+// MARK: - Background
 
-    private var backgroundView: some View {
+private extension GraphView {
+    var backgroundView: some View {
         RoundedRectangle(cornerRadius: MenuBarTheme.Layout.graphCornerRadius)
             .fill(MenuBarTheme.Colors.UI.background)
             .overlay(backgroundBorder)
     }
 
-    private var backgroundBorder: some View {
+    var backgroundBorder: some View {
         RoundedRectangle(cornerRadius: MenuBarTheme.Layout.graphCornerRadius)
             .stroke(MenuBarTheme.Colors.UI.trackBorder, lineWidth: MenuBarTheme.Graph.strokeWidth)
     }
+}
 
-    // MARK: - Chart Content
+// MARK: - Chart Content
 
+private extension GraphView {
     @ViewBuilder
-    private func chartContentView(in geometry: GeometryProxy) -> some View {
+    func chartContentView(in geometry: GeometryProxy) -> some View {
         if hasEnoughDataPoints {
-            let normalizedData = normalizeDataPoints(dataPoints)
+            let normalizedData = normalizedDataPoints
             gridLinesView(in: geometry)
             areaFillView(for: normalizedData, in: geometry)
             lineGraphView(for: normalizedData, in: geometry)
@@ -46,49 +59,90 @@ struct GraphView: View {
         }
     }
 
-    private var hasEnoughDataPoints: Bool {
+    var hasEnoughDataPoints: Bool {
         dataPoints.count > 1
     }
 
     @ViewBuilder
-    private func dataDotsView(for normalizedData: [Double], in geometry: GeometryProxy) -> some View {
+    func dataDotsView(for normalizedData: [Double], in geometry: GeometryProxy) -> some View {
         if showDots {
             dataDots(for: normalizedData, in: geometry)
         }
     }
+}
 
-    // MARK: - Data Processing
+// MARK: - Data Normalization
 
-    private func normalizeDataPoints(_ points: [Double]) -> [Double] {
-        guard !points.isEmpty else { return [] }
-
-        let maxValue = points.max() ?? 1.0
-        let minValue = points.min() ?? 0.0
-        let range = maxValue - minValue
-
-        guard range != 0 else {
-            return Array(repeating: 0.5, count: points.count)
-        }
-
-        return points.map { ($0 - minValue) / range }
+private extension GraphView {
+    var normalizedDataPoints: [Double] {
+        guard !dataPoints.isEmpty else { return [] }
+        return normalizeToRange(dataPoints, range: dataRange)
     }
 
-    private func calculateCoordinates(for normalizedData: [Double], in size: CGSize) -> [CGPoint] {
+    var dataRange: DataRange {
+        DataRange(
+            minimum: dataPoints.min() ?? 0.0,
+            maximum: dataPoints.max() ?? 1.0
+        )
+    }
+
+    func normalizeToRange(_ points: [Double], range: DataRange) -> [Double] {
+        guard range.span > 0 else {
+            return uniformNormalizedValues(count: points.count)
+        }
+        return points.map { range.normalize($0) }
+    }
+
+    func uniformNormalizedValues(count: Int) -> [Double] {
+        Array(repeating: Constants.uniformNormalizedValue, count: count)
+    }
+}
+
+// MARK: - Data Range
+
+private struct DataRange {
+    let minimum: Double
+    let maximum: Double
+
+    var span: Double { maximum - minimum }
+
+    func normalize(_ value: Double) -> Double {
+        (value - minimum) / span
+    }
+}
+
+// MARK: - Coordinate Calculation
+
+private extension GraphView {
+    func calculateCoordinates(for normalizedData: [Double], in size: CGSize) -> [CGPoint] {
         guard normalizedData.count > 1 else { return [] }
-
-        let xStep = size.width / CGFloat(normalizedData.count - 1)
-        let padding: CGFloat = 4
-
+        let xStep = calculateXStep(for: normalizedData.count, width: size.width)
         return normalizedData.enumerated().map { index, value in
-            let x = CGFloat(index) * xStep
-            let y = padding + (1.0 - CGFloat(value)) * (size.height - padding * 2)
-            return CGPoint(x: x, y: y)
+            calculatePoint(at: index, value: value, xStep: xStep, size: size)
         }
     }
 
-    // MARK: - Grid Lines
+    func calculateXStep(for count: Int, width: CGFloat) -> CGFloat {
+        width / CGFloat(count - 1)
+    }
 
-    private func gridLinesView(in geometry: GeometryProxy) -> some View {
+    func calculatePoint(at index: Int, value: Double, xStep: CGFloat, size: CGSize) -> CGPoint {
+        let x = CGFloat(index) * xStep
+        let y = calculateY(for: value, height: size.height)
+        return CGPoint(x: x, y: y)
+    }
+
+    func calculateY(for normalizedValue: Double, height: CGFloat) -> CGFloat {
+        let padding = Constants.coordinatePadding
+        let availableHeight = height - padding * 2
+        return padding + (1.0 - normalizedValue) * availableHeight
+    }
+}
+
+// MARK: - Grid Lines
+
+private extension GraphView {
+    func gridLinesView(in geometry: GeometryProxy) -> some View {
         Path { path in
             gridLineYPositions(in: geometry.size).forEach { y in
                 path.addHorizontalLine(at: y, width: geometry.size.width)
@@ -97,24 +151,32 @@ struct GraphView: View {
         .stroke(MenuBarTheme.Colors.UI.gridLines, lineWidth: MenuBarTheme.Graph.strokeWidth)
     }
 
-    private func gridLineYPositions(in size: CGSize) -> [CGFloat] {
+    func gridLineYPositions(in size: CGSize) -> [CGFloat] {
         (1..<MenuBarTheme.Layout.gridLineCount).map { index in
-            size.height * (CGFloat(index) / CGFloat(MenuBarTheme.Layout.gridLineCount))
+            calculateGridLineY(at: index, height: size.height)
         }
     }
 
-    // MARK: - Line Graph
+    func calculateGridLineY(at index: Int, height: CGFloat) -> CGFloat {
+        height * (CGFloat(index) / CGFloat(MenuBarTheme.Layout.gridLineCount))
+    }
+}
 
-    private func lineGraphView(for normalizedData: [Double], in geometry: GeometryProxy) -> some View {
+// MARK: - Line Graph
+
+private extension GraphView {
+    func lineGraphView(for normalizedData: [Double], in geometry: GeometryProxy) -> some View {
         Path { path in
             path.addLineGraph(through: calculateCoordinates(for: normalizedData, in: geometry.size))
         }
         .stroke(color, lineWidth: MenuBarTheme.Graph.lineWidth)
     }
+}
 
-    // MARK: - Area Fill
+// MARK: - Area Fill
 
-    private func areaFillView(for normalizedData: [Double], in geometry: GeometryProxy) -> some View {
+private extension GraphView {
+    func areaFillView(for normalizedData: [Double], in geometry: GeometryProxy) -> some View {
         Path { path in
             path.addClosedArea(
                 through: calculateCoordinates(for: normalizedData, in: geometry.size),
@@ -125,35 +187,37 @@ struct GraphView: View {
         .fill(areaGradient)
     }
 
-    private var areaGradient: LinearGradient {
+    var areaGradient: LinearGradient {
         LinearGradient(
-            colors: [
-                color.opacity(MenuBarTheme.Graph.areaGradientTopOpacity),
-                color.opacity(MenuBarTheme.Graph.areaGradientBottomOpacity)
-            ],
+            colors: areaGradientColors,
             startPoint: .top,
             endPoint: .bottom
         )
     }
 
-    // MARK: - Data Dots
+    var areaGradientColors: [Color] {
+        [
+            color.opacity(MenuBarTheme.Graph.areaGradientTopOpacity),
+            color.opacity(MenuBarTheme.Graph.areaGradientBottomOpacity)
+        ]
+    }
+}
 
-    private func dataDots(for normalizedData: [Double], in geometry: GeometryProxy) -> some View {
+// MARK: - Data Dots
+
+private extension GraphView {
+    func dataDots(for normalizedData: [Double], in geometry: GeometryProxy) -> some View {
         let coordinates = calculateCoordinates(for: normalizedData, in: geometry.size)
-
         return ForEach(coordinates.indices, id: \.self) { index in
             dataDot(at: coordinates[index])
         }
     }
 
-    private func dataDot(at point: CGPoint) -> some View {
+    func dataDot(at point: CGPoint) -> some View {
         Circle()
             .fill(color)
-            .frame(
-                width: MenuBarTheme.Layout.dataDotSize,
-                height: MenuBarTheme.Layout.dataDotSize
-            )
-            .position(x: point.x, y: point.y)
+            .frame(width: MenuBarTheme.Layout.dataDotSize, height: MenuBarTheme.Layout.dataDotSize)
+            .position(point)
     }
 }
 
