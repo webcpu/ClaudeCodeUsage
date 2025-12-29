@@ -50,9 +50,9 @@ struct HourlyTooltipView: View {
         .padding(.vertical, 4)
         .background(
             RoundedRectangle(cornerRadius: 4)
-                .fill(.background.opacity(0.95))
+                .fill(.regularMaterial)
                 .stroke(.tertiary, lineWidth: 0.5)
-                .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+                .shadow(color: .black.opacity(0.15), radius: 3, x: 0, y: 1)
         )
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Hour \(formattedHour), cost \(formattedCost)")

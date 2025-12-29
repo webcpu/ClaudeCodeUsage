@@ -104,10 +104,14 @@ private struct LoadingView: View {
 private struct DailyUsageList: View {
     let dates: [DailyUsage]
 
+    private var globalMaxHourlyCost: Double {
+        dates.flatMap(\.hourlyCosts).max() ?? 1.0
+    }
+
     var body: some View {
         VStack(spacing: 12) {
             ForEach(dates.reversed()) { daily in
-                DailyCard(daily: daily)
+                DailyCard(daily: daily, maxHourlyCost: globalMaxHourlyCost)
             }
         }
     }
@@ -117,6 +121,7 @@ private struct DailyUsageList: View {
 
 struct DailyCard: View {
     let daily: DailyUsage
+    var maxHourlyCost: Double? = nil // Shared scale for comparing charts
 
     private var dateInfo: DateInfo { DateInfo.from(daily.date) }
 
@@ -140,7 +145,7 @@ struct DailyCard: View {
     }
 
     private var hourlyChart: some View {
-        HourlyCostChartSimple(hourlyData: daily.hourlyCosts)
+        HourlyCostChartSimple(hourlyData: daily.hourlyCosts, maxScale: maxHourlyCost)
     }
 }
 

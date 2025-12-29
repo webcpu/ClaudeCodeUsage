@@ -11,13 +11,21 @@ import ClaudeCodeUsageKit
 
 struct HourlyCostChartSimple: View {
     let hourlyData: [Double]
+    var maxScale: Double? = nil // Optional shared scale for comparing multiple charts
     @State private var selectedHour: Int? = nil
 
     var body: some View {
-        VStack(spacing: 4) {
-            headerRow
-            chartWithTooltip
+        GeometryReader { geometry in
+            let chartWidth = geometry.size.width - 15
+            VStack(spacing: 4) {
+                headerRow
+                chart
+            }
+            .overlay(alignment: .top) {
+                tooltipOverlay(chartWidth: chartWidth, totalWidth: geometry.size.width)
+            }
         }
+        .frame(height: 76) // 16 (header) + 60 (chart)
     }
 }
 
@@ -25,7 +33,7 @@ struct HourlyCostChartSimple: View {
 
 private extension HourlyCostChartSimple {
     var maxValue: Double {
-        hourlyData.max() ?? 1.0
+        maxScale ?? hourlyData.max() ?? 1.0
     }
 
     var currentHour: Int {
@@ -33,30 +41,20 @@ private extension HourlyCostChartSimple {
     }
 
     var yAxisScale: YAxisScale {
-        YAxisScale(maxValue: hourlyData.max() ?? 1.0)
+        YAxisScale(maxValue: maxValue)
     }
 
     var headerRow: some View {
-        HStack {
-            Text("Hourly")
-                .font(.system(size: 10, weight: .medium))
-                .foregroundColor(.secondary)
-            Spacer()
-            Text(maxValue > 0 ? String(format: "$%.1f", maxValue) : "$0")
-                .font(.system(size: 9, weight: .regular, design: .monospaced))
-                .foregroundColor(.secondary)
-        }
+        Text("Hourly")
+            .font(.system(size: 10, weight: .medium))
+            .foregroundColor(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    var chartWithTooltip: some View {
-        GeometryReader { geometry in
-            costChart
-                .overlay(alignment: .top) {
-                    tooltipOverlay(chartWidth: geometry.size.width - 15) // subtract trailing padding for y-axis
-                }
-        }
-        .frame(height: 60)
-        .padding(.trailing, 15)
+    var chart: some View {
+        costChart
+            .frame(height: 60)
+            .padding(.trailing, 15)
     }
 
     var costChart: some View {
@@ -111,7 +109,7 @@ private extension HourlyCostChartSimple {
     }
 
     @ViewBuilder
-    func tooltipOverlay(chartWidth: CGFloat) -> some View {
+    func tooltipOverlay(chartWidth: CGFloat, totalWidth: CGFloat) -> some View {
         if let selectedHour,
            selectedHour >= 0 && selectedHour < hourlyData.count {
             HourlyTooltipView(
@@ -119,17 +117,17 @@ private extension HourlyCostChartSimple {
                 cost: hourlyData[selectedHour],
                 isCompact: true
             )
-            .offset(x: tooltipXPosition(for: selectedHour, chartWidth: chartWidth), y: -5)
+            .offset(x: tooltipXPosition(for: selectedHour, chartWidth: chartWidth, totalWidth: totalWidth))
             .allowsHitTesting(false)
         }
     }
 
-    func tooltipXPosition(for hour: Int, chartWidth: CGFloat) -> CGFloat {
-        // With .top (center) alignment, offset is relative to chart center
+    func tooltipXPosition(for hour: Int, chartWidth: CGFloat, totalWidth: CGFloat) -> CGFloat {
+        // With .top alignment, offset is relative to VStack center
         let barWidth = chartWidth / 24
         let barCenter = (CGFloat(hour) + 0.5) * barWidth
-        let chartCenter = chartWidth / 2
-        return barCenter - chartCenter
+        let vstackCenter = totalWidth / 2
+        return barCenter - vstackCenter
     }
 }
 
