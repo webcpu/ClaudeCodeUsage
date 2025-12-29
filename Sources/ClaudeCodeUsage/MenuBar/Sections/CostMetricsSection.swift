@@ -115,7 +115,7 @@ private extension CostMetricsSection {
 
     var dailyAverageStat: some View {
         VStack(alignment: .trailing, spacing: 2) {
-            Text("Daily Avg")
+            Text("7d Avg")
                 .font(MenuBarTheme.Typography.summaryLabel)
                 .foregroundColor(MenuBarTheme.Colors.UI.secondaryText)
             Text(FormatterService.formatDailyAverage(store.averageDailyCost))

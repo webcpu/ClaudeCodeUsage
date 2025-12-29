@@ -30,7 +30,6 @@ struct MenuBarContentView: View {
             liveSessionSection
             usageSection
             costSection
-            systemSection
             actionsSection
         }
         .frame(width: MenuBarTheme.Layout.menuBarWidth)
@@ -90,22 +89,6 @@ struct MenuBarContentView: View {
         }
     }
 
-    private var systemSection: some View {
-        Group {
-            SectionHeader(
-                title: "System",
-                icon: "memorychip",
-                color: MenuBarTheme.Colors.Sections.system,
-                badge: nil
-            )
-            MemoryMonitorView()
-                .padding(.horizontal, 12)
-                .padding(.vertical, 4)
-            largeDivider
-                .padding(.horizontal, 12)
-        }
-    }
-
     private var actionsSection: some View {
         ActionButtons(settingsService: settingsService, onRefresh: handleRefresh, viewMode: viewMode)
             .padding(.horizontal, 12)
@@ -158,12 +141,7 @@ struct MenuBarContentView: View {
         Divider()
             .padding(.vertical, MenuBarTheme.Layout.dividerVerticalPadding)
     }
-    
-    private var largeDivider: some View {
-        Divider()
-            .padding(.vertical, MenuBarTheme.Layout.verticalPadding)
-    }
-    
+
     // MARK: - Actions
     private func handleRefresh() {
         Task {
