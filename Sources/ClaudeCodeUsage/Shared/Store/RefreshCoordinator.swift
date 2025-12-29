@@ -1,6 +1,6 @@
 //
 //  RefreshCoordinator.swift
-//  Manages refresh timing, lifecycle events, and day change detection
+//  Manages refresh via file monitoring, lifecycle events, and day change detection
 //
 
 import Foundation
@@ -10,12 +10,16 @@ import AppKit
 
 @MainActor
 final class RefreshCoordinator {
-    private var timerTask: Task<Void, Never>?
+    private var fallbackTimerTask: Task<Void, Never>?
     private var dayChangeObserver: NSObjectProtocol?
     private var lastKnownDay: String
     private var lastRefreshTime: Date
     private let clock: any ClockProtocol
-    private let refreshInterval: TimeInterval
+    private let monitoredPath: String
+    private let directoryMonitor: DirectoryMonitor
+
+    /// Fallback interval when file monitoring might miss changes (5 minutes)
+    private let fallbackInterval: TimeInterval = 300.0
 
     /// Callback for refresh - set after init to avoid capturing self before initialization
     var onRefresh: (() async -> Void)?
@@ -28,42 +32,63 @@ final class RefreshCoordinator {
 
     init(
         clock: any ClockProtocol = SystemClock(),
-        refreshInterval: TimeInterval
+        refreshInterval: TimeInterval,
+        basePath: String = NSHomeDirectory() + "/.claude"
     ) {
         self.clock = clock
-        self.refreshInterval = refreshInterval
         self.lastRefreshTime = clock.now
         self.lastKnownDay = Self.dayFormatter.string(from: clock.now)
+        self.monitoredPath = basePath + "/projects"
+        self.directoryMonitor = DirectoryMonitor(path: monitoredPath, debounceInterval: 1.0)
+
+        setupDirectoryMonitor()
     }
 
-    // MARK: - Timer Management
+    private func setupDirectoryMonitor() {
+        directoryMonitor.onChange = { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.handleFileChange()
+            }
+        }
+    }
+
+    // MARK: - Monitoring Management
 
     func start() {
         stop()
+        directoryMonitor.start()
+        startFallbackTimer()
+        startDayChangeMonitoring()
+    }
 
-        timerTask = Task { @MainActor in
-            var nextFireTime = ContinuousClock.now + .seconds(refreshInterval)
+    func stop() {
+        directoryMonitor.stop()
+        fallbackTimerTask?.cancel()
+        fallbackTimerTask = nil
+        stopDayChangeMonitoring()
+    }
 
+    private func startFallbackTimer() {
+        fallbackTimerTask = Task { @MainActor in
             while !Task.isCancelled {
                 do {
-                    try await Task.sleep(until: nextFireTime, clock: .continuous)
+                    try await Task.sleep(for: .seconds(fallbackInterval))
                     guard !Task.isCancelled else { break }
                     lastRefreshTime = clock.now
                     await onRefresh?()
-                    nextFireTime = nextFireTime + .seconds(refreshInterval)
                 } catch {
                     break
                 }
             }
         }
-
-        startDayChangeMonitoring()
     }
 
-    func stop() {
-        timerTask?.cancel()
-        timerTask = nil
-        stopDayChangeMonitoring()
+    // MARK: - File Change Handling
+
+    private func handleFileChange() {
+        guard shouldRefresh() else { return }
+        lastRefreshTime = clock.now
+        Task { await onRefresh?() }
     }
 
     // MARK: - Lifecycle Events

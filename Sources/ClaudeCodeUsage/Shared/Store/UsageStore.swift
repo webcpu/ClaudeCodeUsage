@@ -93,7 +93,8 @@ final class UsageStore {
         self.defaultThreshold = config.configuration.dailyCostThreshold
         self.refreshCoordinator = RefreshCoordinator(
             clock: clock,
-            refreshInterval: config.configuration.refreshInterval
+            refreshInterval: config.configuration.refreshInterval,
+            basePath: config.configuration.basePath
         )
 
         setupMemoryCleanupObserver()
