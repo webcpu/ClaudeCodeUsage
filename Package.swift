@@ -22,7 +22,7 @@ let package = Package(
             targets: ["ClaudeUsage"]),
         // CLI monitor
         .executable(
-            name: "claude-usage",
+            name: "ClaudeMonitorCLI",
             targets: ["ClaudeMonitorCLI"])
     ],
     dependencies: [],
