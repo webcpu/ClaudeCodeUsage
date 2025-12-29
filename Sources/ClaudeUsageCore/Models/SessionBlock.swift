@@ -49,6 +49,27 @@ public struct SessionBlock: Sendable, Hashable, Identifiable {
     }
 }
 
+// MARK: - Transformations
+
+public extension SessionBlock {
+    /// Returns a copy with updated tokenLimit
+    func with(tokenLimit: Int?) -> SessionBlock {
+        SessionBlock(
+            id: id,
+            startTime: startTime,
+            endTime: endTime,
+            actualEndTime: actualEndTime,
+            isActive: isActive,
+            entries: entries,
+            tokens: tokens,
+            costUSD: costUSD,
+            models: models,
+            burnRate: burnRate,
+            tokenLimit: tokenLimit
+        )
+    }
+}
+
 // MARK: - Derived Properties
 
 public extension SessionBlock {

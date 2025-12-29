@@ -30,7 +30,10 @@ public actor SessionMonitor: SessionDataSource {
         loadModifiedFiles()
         let blocks = identifySessionBlocks()
         cachedTokenLimit = maxTokensFromCompletedBlocks(blocks)
-        return mostRecentActiveBlock(from: blocks)
+
+        // Inject tokenLimit into active block (calculated after block creation)
+        guard let activeBlock = mostRecentActiveBlock(from: blocks) else { return nil }
+        return activeBlock.with(tokenLimit: cachedTokenLimit > 0 ? cachedTokenLimit : nil)
     }
 
     public func getBurnRate() async -> BurnRate? {
@@ -142,8 +145,7 @@ public actor SessionMonitor: SessionDataSource {
             tokens: tokens,
             costUSD: cost,
             models: models,
-            burnRate: burnRate,
-            tokenLimit: cachedTokenLimit > 0 ? cachedTokenLimit : nil
+            burnRate: burnRate
         )
     }
 
