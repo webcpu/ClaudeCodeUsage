@@ -16,7 +16,6 @@ public actor SessionMonitor: SessionDataSource {
     private let parser = JSONLParser()
 
     private var lastFileTimestamps: [String: Date] = [:]
-    private var processedHashes = Set<String>()
     private var allEntries: [UsageEntry] = []
     private var cachedTokenLimit: Int = 0
 
@@ -51,15 +50,17 @@ public actor SessionMonitor: SessionDataSource {
         for file in files {
             guard shouldReloadFile(file) else { continue }
 
-            var localHashes = processedHashes
-            let entries = parser.parseFile(
+            // Parse entire file fresh (per-file deduplication only)
+            var fileHashes = Set<String>()
+            let newEntries = parser.parseFile(
                 at: file.path,
                 project: file.projectName,
-                processedHashes: &localHashes
+                processedHashes: &fileHashes
             )
-            processedHashes = localHashes
 
-            allEntries.append(contentsOf: entries)
+            // Remove old entries from this file, add new ones
+            allEntries.removeAll { $0.sourceFile == file.path }
+            allEntries.append(contentsOf: newEntries)
             lastFileTimestamps[file.path] = file.modificationDate
         }
 
@@ -185,7 +186,6 @@ public actor SessionMonitor: SessionDataSource {
 
     public func clearCache() {
         lastFileTimestamps.removeAll()
-        processedHashes.removeAll()
         allEntries.removeAll()
         cachedTokenLimit = 0
     }

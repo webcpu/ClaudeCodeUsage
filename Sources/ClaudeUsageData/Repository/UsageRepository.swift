@@ -18,7 +18,6 @@ public actor UsageRepository: UsageDataSource {
 
     private let parser = JSONLParser()
     private var fileCache: [String: CachedFile] = [:]
-    private var processedHashes = Set<String>()
 
     public init(basePath: String = NSHomeDirectory() + "/.claude") {
         self.basePath = basePath
@@ -50,7 +49,6 @@ public actor UsageRepository: UsageDataSource {
 
     public func clearCache() {
         fileCache.removeAll()
-        processedHashes.removeAll()
     }
 
     // MARK: - Private Loading
@@ -74,14 +72,13 @@ public actor UsageRepository: UsageDataSource {
             return cached.entries
         }
 
-        // Parse file
-        var localHashes = processedHashes
+        // Parse file with fresh deduplication set (per-file scope)
+        var fileHashes = Set<String>()
         let entries = parser.parseFile(
             at: file.path,
             project: file.projectName,
-            processedHashes: &localHashes
+            processedHashes: &fileHashes
         )
-        processedHashes = localHashes
 
         // Cache results
         fileCache[file.path] = CachedFile(
