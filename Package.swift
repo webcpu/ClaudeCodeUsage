@@ -3,52 +3,80 @@
 import PackageDescription
 
 let package = Package(
-    name: "ClaudeCodeUsage",
+    name: "ClaudeUsage",
     platforms: [
         .macOS(.v15),
     ],
     products: [
+        // Domain layer - pure types, protocols, analytics
         .library(
-            name: "ClaudeCodeUsageKit",
-            targets: ["ClaudeCodeUsageKit"]),
+            name: "ClaudeUsageCore",
+            targets: ["ClaudeUsageCore"]),
+        // Data layer - repository, parsing, monitoring
+        .library(
+            name: "ClaudeUsageData",
+            targets: ["ClaudeUsageData"]),
+        // macOS menu bar app
         .executable(
-            name: "ClaudeCodeUsage",
-            targets: ["ClaudeCodeUsage"])
+            name: "ClaudeUsage",
+            targets: ["ClaudeUsage"]),
+        // CLI monitor
+        .executable(
+            name: "claude-usage",
+            targets: ["ClaudeMonitorCLI"])
     ],
-    dependencies: [
-        .package(path: "Packages/ClaudeLiveMonitor"),
-        .package(path: "Packages/TimingMacro")
-    ],
+    dependencies: [],
     targets: [
+        // MARK: - Domain Layer (no dependencies)
+
         .target(
-            name: "ClaudeCodeUsageKit",
-            dependencies: [
-                .product(name: "TimingMacro", package: "TimingMacro")
-            ],
-            path: "Sources/ClaudeCodeUsageKit"),
+            name: "ClaudeUsageCore",
+            dependencies: [],
+            path: "Sources/ClaudeUsageCore"),
+
+        // MARK: - Data Layer (depends on Core)
+
+        .target(
+            name: "ClaudeUsageData",
+            dependencies: ["ClaudeUsageCore"],
+            path: "Sources/ClaudeUsageData"),
+
+        // MARK: - Presentation Layer
+
         .executableTarget(
-            name: "ClaudeCodeUsage",
+            name: "ClaudeUsage",
             dependencies: [
-                "ClaudeCodeUsageKit",
-                .product(name: "ClaudeLiveMonitorLib", package: "ClaudeLiveMonitor")
+                "ClaudeUsageCore",
+                "ClaudeUsageData"
             ],
-            path: "Sources/ClaudeCodeUsage"),
+            path: "Sources/ClaudeUsage"),
+
+        // MARK: - CLI
+
+        .executableTarget(
+            name: "ClaudeMonitorCLI",
+            dependencies: ["ClaudeUsageData"],
+            path: "Sources/ClaudeMonitorCLI"),
+
+        // MARK: - Tests
+
         .testTarget(
-            name: "ClaudeCodeUsageKitTests",
-            dependencies: ["ClaudeCodeUsageKit"],
-            path: "Tests/ClaudeCodeUsageKitTests",
-            swiftSettings: [
-                .unsafeFlags(["-enable-testing"]),
-                .define("ENABLE_CODE_COVERAGE", .when(configuration: .debug))
-            ]),
+            name: "ClaudeUsageCoreTests",
+            dependencies: ["ClaudeUsageCore"],
+            path: "Tests/ClaudeUsageCoreTests"),
+
         .testTarget(
-            name: "ClaudeCodeUsageTests",
+            name: "ClaudeUsageDataTests",
+            dependencies: ["ClaudeUsageData"],
+            path: "Tests/ClaudeUsageDataTests"),
+
+        .testTarget(
+            name: "ClaudeUsageTests",
             dependencies: [
-                "ClaudeCodeUsage",
-                "ClaudeCodeUsageKit",
-                .product(name: "ClaudeLiveMonitorLib", package: "ClaudeLiveMonitor")
+                "ClaudeUsage",
+                "ClaudeUsageData"
             ],
-            path: "Tests/ClaudeCodeUsageTests",
+            path: "Tests/ClaudeUsageTests",
             swiftSettings: [
                 .unsafeFlags(["-enable-testing"]),
                 .define("ENABLE_CODE_COVERAGE", .when(configuration: .debug))
