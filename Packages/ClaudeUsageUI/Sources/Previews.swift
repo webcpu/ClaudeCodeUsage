@@ -52,4 +52,12 @@ struct MainWindowPreviewWrapper: View {
 #Preview("Main Window") {
     MainWindowPreviewWrapper()
 }
+
+#Preview("All") {
+    HStack {
+        MenuBarPreviewWrapper()
+        Divider()
+        MainWindowPreviewWrapper()
+    }
+}
 #endif
