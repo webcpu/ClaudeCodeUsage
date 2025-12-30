@@ -25,11 +25,10 @@ struct UsageRepositoryTests {
         let repo = UsageRepository(basePath: basePath)
         let entries = try await repo.getTodayEntries()
 
-        guard entries.count >= 2 else { return }
+        let isSortedAscending = zip(entries, entries.dropFirst())
+            .allSatisfy { $0.timestamp <= $1.timestamp }
 
-        for i in 1..<entries.count {
-            #expect(entries[i].timestamp >= entries[i-1].timestamp, "Entries should be sorted ascending")
-        }
+        #expect(isSortedAscending, "Entries should be sorted ascending")
     }
 
     @Test("clearCache invalidates cached data")
