@@ -175,6 +175,61 @@ extension UsageStore {
     }
 }
 
+// MARK: - Preview
+
+#if DEBUG
+struct MenuBarPreview: View {
+    @State private var store = UsageStore()
+
+    var body: some View {
+        content
+            .frame(height: 500)
+            .task { await store.loadData() }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if store.state.hasLoaded {
+            MenuBarContentView(settingsService: AppSettingsService())
+                .environment(store)
+        } else {
+            ProgressView("Loading...")
+                .frame(width: MenuBarTheme.Layout.menuBarWidth, height: 200)
+        }
+    }
+}
+
+struct MenuBarLabelPreview: View {
+    @State private var store = UsageStore()
+
+    var body: some View {
+        content
+            .frame(width: 200, height: 100)
+            .task { await store.loadData() }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if store.state.hasLoaded {
+            MenuBarLabel(store: store)
+                .padding()
+                .background(Color(nsColor: .windowBackgroundColor))
+                .cornerRadius(8)
+        } else {
+            ProgressView()
+        }
+    }
+}
+
+#Preview("Menu Bar Content", traits: .sizeThatFitsLayout) {
+    MenuBarPreview()
+}
+
+#Preview("Menu Bar Label", traits: .sizeThatFitsLayout) {
+    MenuBarLabelPreview()
+}
+#endif
+
 // MARK: - Window Actions
 
 public enum WindowActions {

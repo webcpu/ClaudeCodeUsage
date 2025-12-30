@@ -42,7 +42,8 @@ struct MenuBarContentView: View {
 
     @ViewBuilder
     private var liveSessionSection: some View {
-        if let session = store.activeSession, session.isActive {
+        if let session = store.activeSession {
+            let _ = session  // Suppress unused warning
             SectionHeader(
                 title: "Live Session",
                 icon: "dot.radiowaves.left.and.right",
