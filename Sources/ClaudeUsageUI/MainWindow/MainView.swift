@@ -132,9 +132,18 @@ enum Destination: Hashable {
 // MARK: - Preview
 
 #if DEBUG
+struct MainViewPreview: View {
+    @State private var store = UsageStore()
+
+    var body: some View {
+        MainView(settingsService: AppSettingsService())
+            .environment(store)
+            .frame(width: 1000, height: 700)
+            .task { await store.loadData() }
+    }
+}
+
 #Preview {
-    MainView(settingsService: AppSettingsService())
-        .environment(UsageStore.preview())
-        .frame(width: 1000, height: 700)
+    MainViewPreview()
 }
 #endif
