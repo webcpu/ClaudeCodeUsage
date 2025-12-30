@@ -11,9 +11,6 @@ let package = Package(
         .library(
             name: "ClaudeUsageUI",
             targets: ["ClaudeUsageUI"]),
-        .executable(
-            name: "ClaudeCodeUsage",
-            targets: ["ClaudeCodeUsage"]),
     ],
     dependencies: [
         .package(path: "../ClaudeUsageCore"),
@@ -26,10 +23,6 @@ let package = Package(
                 "ClaudeUsageCore",
                 "ClaudeUsageData",
             ]),
-
-        .executableTarget(
-            name: "ClaudeCodeUsage",
-            dependencies: ["ClaudeUsageUI"]),
 
         .testTarget(
             name: "ClaudeUsageUITests",
