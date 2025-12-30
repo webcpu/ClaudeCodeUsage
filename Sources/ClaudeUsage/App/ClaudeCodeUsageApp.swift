@@ -5,6 +5,7 @@
 
 import SwiftUI
 import ClaudeUsageCore
+import ClaudeUsageUI
 
 // MARK: - App Entry Point
 
@@ -84,8 +85,3 @@ struct AppCommands: Commands {
     }
 }
 
-// MARK: - Notification Names
-
-extension Notification.Name {
-    static let refreshData = Notification.Name("refreshData")
-}

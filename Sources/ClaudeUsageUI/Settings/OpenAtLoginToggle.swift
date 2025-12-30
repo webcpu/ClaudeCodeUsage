@@ -5,11 +5,15 @@
 
 import SwiftUI
 
-struct OpenAtLoginToggle: View {
+public struct OpenAtLoginToggle: View {
     let settingsService: AppSettingsService
     @State private var isHovered = false
 
-    var body: some View {
+    public init(settingsService: AppSettingsService) {
+        self.settingsService = settingsService
+    }
+
+    public var body: some View {
         HStack(spacing: Layout.spacing) {
             checkboxIcon
             labelText

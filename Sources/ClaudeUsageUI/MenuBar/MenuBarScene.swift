@@ -8,13 +8,19 @@ import ClaudeUsageCore
 
 // MARK: - Menu Bar Scene
 
-struct MenuBarScene: Scene {
+public struct MenuBarScene: Scene {
     let store: UsageStore
     let settingsService: AppSettingsService
     let lifecycleManager: AppLifecycleManager
     @State private var hasInitialized = false
 
-    var body: some Scene {
+    public init(store: UsageStore, settingsService: AppSettingsService, lifecycleManager: AppLifecycleManager) {
+        self.store = store
+        self.settingsService = settingsService
+        self.lifecycleManager = lifecycleManager
+    }
+
+    public var body: some Scene {
         MenuBarExtra {
             menuContent
         } label: {
@@ -171,9 +177,9 @@ extension UsageStore {
 
 // MARK: - Window Actions
 
-enum WindowActions {
+public enum WindowActions {
     @MainActor
-    static func showMainWindow() {
+    public static func showMainWindow() {
         let targetScreen = captureScreenAtMouseLocation()
         activateApp()
         findAndShowWindow(on: targetScreen)

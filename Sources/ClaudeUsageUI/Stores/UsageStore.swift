@@ -12,7 +12,7 @@ import ClaudeUsageData
 
 @Observable
 @MainActor
-final class UsageStore {
+public final class UsageStore {
     // MARK: - Source State
 
     private(set) var state: ViewState = .loading
@@ -71,6 +71,10 @@ final class UsageStore {
     private var lastHistoryLoadDate: Date?
 
     // MARK: - Initialization
+
+    public convenience init() {
+        self.init(repository: nil, sessionMonitorService: nil, configurationService: nil, clock: SystemClock())
+    }
 
     init(
         repository: (any UsageDataSource)? = nil,
@@ -198,6 +202,34 @@ final class UsageStore {
         return clock.now.timeIntervalSince(lastTime) < 2.0
     }
 }
+
+// MARK: - Preview Support
+
+#if DEBUG
+extension UsageStore {
+    /// Creates a store with real data loaded synchronously for SwiftUI previews
+    @MainActor
+    public static func preview() -> UsageStore {
+        let store = UsageStore()
+        // Load real data synchronously (bypasses actor, no caching)
+        let entries = loadEntriesSync(from: NSHomeDirectory() + "/.claude")
+        if !entries.isEmpty {
+            store.state = .loaded(UsageAggregator.aggregate(entries))
+        }
+        return store
+    }
+
+    /// Sync entry loading for previews - bypasses actor/async
+    private static func loadEntriesSync(from basePath: String) -> [UsageEntry] {
+        guard let files = try? FileDiscovery.discoverFiles(in: basePath) else { return [] }
+        let parser = JSONLParser()
+        var allHashes = Set<String>()
+        return files.flatMap { file in
+            parser.parseFile(at: file.path, project: file.projectName, processedHashes: &allHashes)
+        }.sorted()
+    }
+}
+#endif
 
 // MARK: - Supporting Types
 

@@ -16,6 +16,10 @@ let package = Package(
         .library(
             name: "ClaudeUsageData",
             targets: ["ClaudeUsageData"]),
+        // UI layer - SwiftUI views and stores
+        .library(
+            name: "ClaudeUsageUI",
+            targets: ["ClaudeUsageUI"]),
         // macOS menu bar app
         .executable(
             name: "ClaudeCodeUsage",
@@ -37,13 +41,22 @@ let package = Package(
             dependencies: ["ClaudeUsageCore"],
             path: "Sources/ClaudeUsageData"),
 
-        // MARK: - Presentation Layer
+        // MARK: - UI Layer (SwiftUI views, stores)
+
+        .target(
+            name: "ClaudeUsageUI",
+            dependencies: [
+                "ClaudeUsageCore",
+                "ClaudeUsageData"
+            ],
+            path: "Sources/ClaudeUsageUI"),
+
+        // MARK: - App Entry Point
 
         .executableTarget(
             name: "ClaudeUsage",
             dependencies: [
-                "ClaudeUsageCore",
-                "ClaudeUsageData"
+                "ClaudeUsageUI"
             ],
             path: "Sources/ClaudeUsage"),
 
@@ -62,7 +75,7 @@ let package = Package(
         .testTarget(
             name: "ClaudeUsageTests",
             dependencies: [
-                "ClaudeUsage",
+                "ClaudeUsageUI",
                 "ClaudeUsageData"
             ],
             path: "Tests/ClaudeUsageTests",

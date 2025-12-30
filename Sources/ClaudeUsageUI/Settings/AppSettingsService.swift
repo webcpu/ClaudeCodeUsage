@@ -24,18 +24,18 @@ protocol AppSettingsServiceProtocol: AnyObject {
 
 @Observable
 @MainActor
-final class AppSettingsService: AppSettingsServiceProtocol {
-    private(set) var isOpenAtLoginEnabled: Bool = false
+public final class AppSettingsService: AppSettingsServiceProtocol {
+    public private(set) var isOpenAtLoginEnabled: Bool = false
 
-    var appName: String { AppMetadata.name }
+    public var appName: String { AppMetadata.name }
 
-    init() {
+    public init() {
         refreshLoginStatus()
     }
 
     // MARK: - Public API (High-Level Intent)
 
-    func setOpenAtLogin(_ enabled: Bool) async -> Result<Void, AppSettingsError> {
+    public func setOpenAtLogin(_ enabled: Bool) async -> Result<Void, AppSettingsError> {
         guard #available(macOS 13.0, *) else {
             return .failure(.unsupportedOS)
         }
@@ -54,7 +54,7 @@ final class AppSettingsService: AppSettingsServiceProtocol {
         }
     }
 
-    func showAboutPanel() {
+    public func showAboutPanel() {
         NSApp.orderFrontStandardAboutPanel(options: aboutPanelOptions)
     }
 
@@ -116,12 +116,12 @@ final class MockAppSettingsService: AppSettingsServiceProtocol {
 
 // MARK: - Supporting Types
 
-enum AppSettingsError: LocalizedError {
+public enum AppSettingsError: LocalizedError {
     case serviceManagementFailed(Error)
     case permissionDenied
     case unsupportedOS
 
-    var errorDescription: String? {
+    public var errorDescription: String? {
         switch self {
         case .serviceManagementFailed(let error):
             return "Failed to update launch settings: \(error.localizedDescription)"
@@ -132,7 +132,7 @@ enum AppSettingsError: LocalizedError {
         }
     }
 
-    var recoverySuggestion: String? {
+    public var recoverySuggestion: String? {
         switch self {
         case .serviceManagementFailed:
             return "Try again or check System Settings > Login Items"
@@ -144,8 +144,8 @@ enum AppSettingsError: LocalizedError {
     }
 }
 
-enum AppMetadata {
-    static let name = "Claude Usage"
-    static let version = "1.0.0"
-    static let credits = "Claude Code Usage Tracking"
+public enum AppMetadata {
+    public static let name = "Claude Usage"
+    public static let version = "1.0.0"
+    public static let credits = "Claude Code Usage Tracking"
 }

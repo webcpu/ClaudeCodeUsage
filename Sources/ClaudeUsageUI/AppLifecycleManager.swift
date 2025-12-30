@@ -9,15 +9,15 @@ import Combine
 
 @Observable
 @MainActor
-final class AppLifecycleManager {
+public final class AppLifecycleManager {
     private var cancellables = Set<AnyCancellable>()
     private weak var store: UsageStore?
 
-    init() {
+    public init() {
         setupNotificationHandlers()
     }
 
-    func configure(with store: UsageStore) {
+    public func configure(with store: UsageStore) {
         self.store = store
     }
     

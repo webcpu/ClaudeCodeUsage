@@ -6,13 +6,23 @@
 import SwiftUI
 import ClaudeUsageCore
 
+// MARK: - Notification Names
+
+public extension Notification.Name {
+    static let refreshData = Notification.Name("refreshData")
+}
+
 // MARK: - Main View
-struct MainView: View {
+public struct MainView: View {
     @Environment(UsageStore.self) private var store
     @State private var selectedDestination: Destination? = .overview
     let settingsService: AppSettingsService
 
-    var body: some View {
+    public init(settingsService: AppSettingsService) {
+        self.settingsService = settingsService
+    }
+
+    public var body: some View {
         NavigationContent(
             selectedDestination: $selectedDestination,
             store: store,
@@ -118,3 +128,13 @@ enum Destination: Hashable {
     case analytics
     case liveMetrics
 }
+
+// MARK: - Preview
+
+#if DEBUG
+#Preview {
+    MainView(settingsService: AppSettingsService())
+        .environment(UsageStore.preview())
+        .frame(width: 1000, height: 700)
+}
+#endif

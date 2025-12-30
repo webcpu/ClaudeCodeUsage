@@ -5,7 +5,7 @@
 
 import Testing
 import Foundation
-@testable import ClaudeUsage
+@testable import ClaudeUsageUI
 @testable import ClaudeUsageData
 @testable import ClaudeUsageCore
 
