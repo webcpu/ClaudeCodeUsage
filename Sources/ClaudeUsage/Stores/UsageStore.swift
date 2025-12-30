@@ -65,7 +65,6 @@ final class UsageStore {
 
     // MARK: - Internal State
 
-    private var memoryCleanupObserver: NSObjectProtocol?
     private var isCurrentlyLoading = false
     private var lastLoadStartTime: Date?
     private var hasInitialized = false
@@ -91,8 +90,6 @@ final class UsageStore {
             refreshInterval: config.configuration.refreshInterval,
             basePath: config.configuration.basePath
         )
-
-        setupMemoryCleanupObserver()
 
         refreshCoordinator.onRefresh = { [weak self] in
             await self?.loadData()
@@ -194,37 +191,11 @@ final class UsageStore {
         refreshCoordinator.stop()
     }
 
-    // MARK: - Memory Management
-
-    private func setupMemoryCleanupObserver() {
-        memoryCleanupObserver = NotificationCenter.default.addObserver(
-            forName: .performMemoryCleanup,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in
-                self?.performMemoryCleanup()
-            }
-        }
-    }
-
-    private func performMemoryCleanup() {
-        todayEntries = filterToday(todayEntries, referenceDate: clock.now)
-
-        if activeSession != nil {
-            Task { await loadData() }
-        }
-    }
-
     // MARK: - Helpers
 
     private var isLoadedRecently: Bool {
         guard let lastTime = lastLoadStartTime else { return false }
         return clock.now.timeIntervalSince(lastTime) < 2.0
-    }
-
-    deinit {
-        NotificationCenter.default.removeObserver(self)
     }
 }
 
@@ -278,10 +249,4 @@ private func sessionProgress(_ session: SessionBlock, now: Date) -> Double {
     let total = session.endTime.timeIntervalSince(session.startTime)
     guard total > 0 else { return 0 }
     return min(elapsed / total, 1.0)
-}
-
-private func filterToday(_ entries: [UsageEntry], referenceDate: Date) -> [UsageEntry] {
-    let calendar = Calendar.current
-    let today = calendar.startOfDay(for: referenceDate)
-    return entries.filter { calendar.startOfDay(for: $0.timestamp) == today }
 }
