@@ -84,7 +84,7 @@ public struct JSONLParser: Sendable {
             costUSD: cost,
             project: project,
             sourceFile: path,
-            sessionId: nil,
+            sessionId: rawData.sessionId,
             messageId: validated.message.id,
             requestId: rawData.requestId
         )
@@ -196,6 +196,7 @@ struct RawJSONLData: Codable {
     let costUSD: Double?
     let type: String?
     let requestId: String?
+    let sessionId: String?
 
     struct Message: Codable {
         let usage: Usage?
