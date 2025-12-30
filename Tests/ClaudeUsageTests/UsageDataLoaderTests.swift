@@ -123,12 +123,12 @@ extension UsageDataLoaderTests {
         )
     }
 
-    private func assertHistoryResultIsValid(_ result: HistoryLoadResult) throws {
+    private func assertHistoryResultIsValid(_ result: FullLoadResult) throws {
         #expect(result.fullStats.totalCost >= 0)
         #expect(result.fullStats.byDate.count >= 0)
     }
 
-    private func assertTodayNeverExceedsTotal(_ result: AllLoadResult) throws {
+    private func assertTodayNeverExceedsTotal(_ result: UsageLoadResult) throws {
         #expect(
             result.todayStats.totalCost <= result.fullStats.totalCost + 0.01,
             "Today's cost should never exceed total historical cost"

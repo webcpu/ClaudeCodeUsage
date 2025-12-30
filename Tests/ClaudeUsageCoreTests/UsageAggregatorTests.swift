@@ -255,7 +255,7 @@ private enum TestEntryFactory {
 
     /// Creates entries by mapping (project, cost) pairs (pure function)
     static func entriesWithProjects(_ projectCosts: [(project: String, cost: Double)]) -> [UsageEntry] {
-        projectCosts.map { entry(project: $0.project, cost: $0.cost) }
+        projectCosts.map { Self.entry(cost: $0.cost, project: $0.project) }
     }
 
     // MARK: - Date Helpers (Pure Functions)

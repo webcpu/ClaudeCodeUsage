@@ -48,19 +48,19 @@ struct JSONLParserTests {
 
     // MARK: - Pure Helpers
 
-    private func discoverFirstFile() throws -> FileInfo? {
+    private func discoverFirstFile() throws -> FileMetadata? {
         try FileDiscovery.discoverFiles(in: basePath).first
     }
 
-    private func findFileWithEntries() throws -> FileInfo? {
+    private func findFileWithEntries() throws -> FileMetadata? {
         try FileDiscovery.discoverFiles(in: basePath).first { fileHasEntries($0) }
     }
 
-    private func fileHasEntries(_ file: FileInfo) -> Bool {
+    private func fileHasEntries(_ file: FileMetadata) -> Bool {
         !parseEntries(from: file).isEmpty
     }
 
-    private func parseEntries(from file: FileInfo) -> [UsageEntry] {
+    private func parseEntries(from file: FileMetadata) -> [UsageEntry] {
         var hashes = Set<String>()
         return parser.parseFile(at: file.path, project: file.projectName, processedHashes: &hashes)
     }

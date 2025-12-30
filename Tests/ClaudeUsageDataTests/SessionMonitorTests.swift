@@ -8,30 +8,6 @@ import Foundation
 @testable import ClaudeUsageData
 @testable import ClaudeUsageCore
 
-// MARK: - Pure Validation Functions
-
-private func hasValidIdentifier(_ session: SessionInfo) -> Bool {
-    !session.id.isEmpty
-}
-
-private func hasEntries(_ session: SessionInfo) -> Bool {
-    session.entries.count > 0
-}
-
-private func hasValidTimeRange(_ session: SessionInfo) -> Bool {
-    session.startTime < Date() && session.endTime > session.startTime
-}
-
-private func hasTokenUsage(_ session: SessionInfo) -> Bool {
-    session.tokens.total > 0
-}
-
-private func hasModels(_ session: SessionInfo) -> Bool {
-    !session.models.isEmpty
-}
-
-// MARK: - Tests
-
 @Suite("SessionMonitor")
 struct SessionMonitorTests {
     private let basePath = NSHomeDirectory() + "/.claude"
@@ -74,5 +50,27 @@ struct SessionMonitorTests {
         if session != nil {
             #expect(limit != nil, "Should have token limit when session exists")
         }
+    }
+
+    // MARK: - Pure Validation Functions
+
+    private func hasValidIdentifier(_ session: SessionBlock) -> Bool {
+        !session.id.isEmpty
+    }
+
+    private func hasEntries(_ session: SessionBlock) -> Bool {
+        session.entries.count > 0
+    }
+
+    private func hasValidTimeRange(_ session: SessionBlock) -> Bool {
+        session.startTime < Date() && session.endTime > session.startTime
+    }
+
+    private func hasTokenUsage(_ session: SessionBlock) -> Bool {
+        session.tokens.total > 0
+    }
+
+    private func hasModels(_ session: SessionBlock) -> Bool {
+        !session.models.isEmpty
     }
 }
