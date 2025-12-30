@@ -162,90 +162,111 @@ struct HeatmapPerformanceTests {
 // MARK: - Test Data Factory
 
 private enum TestDataFactory {
+
+    // MARK: - High-Level Factory Methods (SLAP Layer 1)
+
+    static func mockStats(days: Int) -> UsageStats {
+        let dailyUsage = generateDailyUsage(days: days, relativeTo: Date())
+        return buildStats(from: dailyUsage, sessionCount: days)
+    }
+
+    static func emptyStats() -> UsageStats {
+        buildStats(from: [], sessionCount: 0)
+    }
+
+    static func statsWithInvalidDate() -> UsageStats {
+        let invalidUsage = DailyUsage(
+            date: "invalid-date",
+            totalCost: 100,
+            totalTokens: 1000,
+            modelsUsed: ["claude-3"]
+        )
+        return UsageStats(
+            totalCost: 100,
+            tokens: TokenCounts(input: 500, output: 400, cacheCreation: 50, cacheRead: 50),
+            sessionCount: 5,
+            byModel: [],
+            byDate: [invalidUsage],
+            byProject: []
+        )
+    }
+
+    static func statsWithCosts(
+        _ entries: [(daysAgo: Int, cost: Double)],
+        relativeTo today: Date
+    ) -> UsageStats {
+        let dailyUsage = entries.map { makeDailyUsage(daysAgo: $0.daysAgo, cost: $0.cost, relativeTo: today) }
+        return buildStats(from: dailyUsage, sessionCount: entries.count)
+    }
+
+    // MARK: - Mid-Level Builders (SLAP Layer 2)
+
+    private static func generateDailyUsage(days: Int, relativeTo today: Date) -> [DailyUsage] {
+        (0..<days).map { dayIndex in
+            makeDailyUsage(
+                daysAgo: dayIndex,
+                cost: Double(dayIndex * 10),
+                tokens: dayIndex * 100,
+                relativeTo: today
+            )
+        }
+    }
+
+    private static func buildStats(from dailyUsage: [DailyUsage], sessionCount: Int) -> UsageStats {
+        let totalCost = sumCosts(dailyUsage)
+        let totalTokens = sumTokens(dailyUsage)
+
+        return UsageStats(
+            totalCost: totalCost,
+            tokens: distributeTokens(totalTokens),
+            sessionCount: sessionCount,
+            byModel: [],
+            byDate: dailyUsage,
+            byProject: []
+        )
+    }
+
+    // MARK: - Pure Functions (SLAP Layer 3)
+
     private static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
         return formatter
     }()
 
-    static func mockStats(days: Int) -> UsageStats {
-        let today = Date()
-        let dailyUsage = (0..<days).map { i -> DailyUsage in
-            let date = Calendar.current.date(byAdding: .day, value: -i, to: today)!
-            return DailyUsage(
-                date: dateFormatter.string(from: date),
-                totalCost: Double(i * 10),
-                totalTokens: i * 100,
-                modelsUsed: ["claude-3"]
-            )
-        }
+    private static func makeDailyUsage(
+        daysAgo: Int,
+        cost: Double,
+        tokens: Int? = nil,
+        relativeTo today: Date
+    ) -> DailyUsage {
+        let date = Calendar.current.date(byAdding: .day, value: -daysAgo, to: today)!
+        let tokenCount = tokens ?? Int(cost * 10)
+        let modelsUsed = cost > 0 ? ["claude-3"] : []
 
-        let totalCost = dailyUsage.reduce(0) { $0 + $1.totalCost }
-        let totalTokens = dailyUsage.reduce(0) { $0 + $1.totalTokens }
-
-        return UsageStats(
-            totalCost: totalCost,
-            tokens: TokenCounts(
-                input: Int(Double(totalTokens) * 0.6),
-                output: Int(Double(totalTokens) * 0.3),
-                cacheCreation: Int(Double(totalTokens) * 0.05),
-                cacheRead: Int(Double(totalTokens) * 0.05)
-            ),
-            sessionCount: days,
-            byModel: [],
-            byDate: dailyUsage,
-            byProject: []
+        return DailyUsage(
+            date: dateFormatter.string(from: date),
+            totalCost: cost,
+            totalTokens: tokenCount,
+            modelsUsed: modelsUsed
         )
     }
 
-    static func emptyStats() -> UsageStats {
-        UsageStats(
-            totalCost: 0,
-            tokens: TokenCounts(input: 0, output: 0, cacheCreation: 0, cacheRead: 0),
-            sessionCount: 0,
-            byModel: [],
-            byDate: [],
-            byProject: []
-        )
+    private static func sumCosts(_ dailyUsage: [DailyUsage]) -> Double {
+        dailyUsage.map(\.totalCost).reduce(0, +)
     }
 
-    static func statsWithInvalidDate() -> UsageStats {
-        UsageStats(
-            totalCost: 100,
-            tokens: TokenCounts(input: 500, output: 400, cacheCreation: 50, cacheRead: 50),
-            sessionCount: 5,
-            byModel: [],
-            byDate: [DailyUsage(date: "invalid-date", totalCost: 100, totalTokens: 1000, modelsUsed: ["claude-3"])],
-            byProject: []
-        )
+    private static func sumTokens(_ dailyUsage: [DailyUsage]) -> Int {
+        dailyUsage.map(\.totalTokens).reduce(0, +)
     }
 
-    static func statsWithCosts(_ entries: [(daysAgo: Int, cost: Double)], relativeTo today: Date) -> UsageStats {
-        let dailyUsage = entries.map { entry -> DailyUsage in
-            let date = Calendar.current.date(byAdding: .day, value: -entry.daysAgo, to: today)!
-            return DailyUsage(
-                date: dateFormatter.string(from: date),
-                totalCost: entry.cost,
-                totalTokens: Int(entry.cost * 10),
-                modelsUsed: entry.cost > 0 ? ["claude-3"] : []
-            )
-        }
-
-        let totalCost = dailyUsage.reduce(0) { $0 + $1.totalCost }
-        let totalTokens = dailyUsage.reduce(0) { $0 + $1.totalTokens }
-
-        return UsageStats(
-            totalCost: totalCost,
-            tokens: TokenCounts(
-                input: Int(Double(totalTokens) * 0.5),
-                output: Int(Double(totalTokens) * 0.4),
-                cacheCreation: Int(Double(totalTokens) * 0.05),
-                cacheRead: Int(Double(totalTokens) * 0.05)
-            ),
-            sessionCount: entries.count,
-            byModel: [],
-            byDate: dailyUsage,
-            byProject: []
+    private static func distributeTokens(_ total: Int) -> TokenCounts {
+        let totalDouble = Double(total)
+        return TokenCounts(
+            input: Int(totalDouble * 0.6),
+            output: Int(totalDouble * 0.3),
+            cacheCreation: Int(totalDouble * 0.05),
+            cacheRead: Int(totalDouble * 0.05)
         )
     }
 }
