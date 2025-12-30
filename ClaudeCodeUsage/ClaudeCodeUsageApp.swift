@@ -1,17 +1,11 @@
 //
 //  ClaudeCodeUsageApp.swift
-//  ClaudeCodeUsage
-//
-//  Created by Liang on 30-12-2025.
-//
-
-//
-//  ClaudeCodeUsageApp.swift
 //  App entry point
 //
 
 import SwiftUI
 import ClaudeUsageCore
+import ClaudeUsageUI
 
 // MARK: - App Entry Point
 

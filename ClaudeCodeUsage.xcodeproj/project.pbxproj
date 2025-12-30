@@ -13,6 +13,7 @@
 		ECF4105F2F03EA5900DFC0C8 /* ClaudeUsageData in Frameworks */ = {isa = PBXBuildFile; productRef = ECF4105E2F03EA5900DFC0C8 /* ClaudeUsageData */; };
 		ECF4108D2F03EC6700DFC0C8 /* ClaudeUsageCore in Frameworks */ = {isa = PBXBuildFile; productRef = ECF4108C2F03EC6700DFC0C8 /* ClaudeUsageCore */; };
 		ECF410902F03EC7800DFC0C8 /* ClaudeUsageData in Frameworks */ = {isa = PBXBuildFile; productRef = ECF4108F2F03EC7800DFC0C8 /* ClaudeUsageData */; };
+		ECF412B72F03F5BB00DFC0C8 /* ClaudeUsageUI in Frameworks */ = {isa = PBXBuildFile; productRef = ECF412B62F03F5BB00DFC0C8 /* ClaudeUsageUI */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -63,6 +64,7 @@
 			files = (
 				ECF4105F2F03EA5900DFC0C8 /* ClaudeUsageData in Frameworks */,
 				ECF410592F03E6FD00DFC0C8 /* ClaudeUsageData in Frameworks */,
+				ECF412B72F03F5BB00DFC0C8 /* ClaudeUsageUI in Frameworks */,
 				ECF410572F03E6FD00DFC0C8 /* ClaudeUsageCore in Frameworks */,
 				ECF410902F03EC7800DFC0C8 /* ClaudeUsageData in Frameworks */,
 				ECF4105C2F03EA3E00DFC0C8 /* ClaudeUsageCore in Frameworks */,
@@ -133,6 +135,7 @@
 				ECF4105E2F03EA5900DFC0C8 /* ClaudeUsageData */,
 				ECF4108C2F03EC6700DFC0C8 /* ClaudeUsageCore */,
 				ECF4108F2F03EC7800DFC0C8 /* ClaudeUsageData */,
+				ECF412B62F03F5BB00DFC0C8 /* ClaudeUsageUI */,
 			);
 			productName = ClaudeCodeUsage;
 			productReference = ECF4102B2F03E6AD00DFC0C8 /* ClaudeCodeUsage.app */;
@@ -219,6 +222,7 @@
 			packageReferences = (
 				ECF4108B2F03EC6700DFC0C8 /* XCLocalSwiftPackageReference "Packages/ClaudeUsageCore" */,
 				ECF4108E2F03EC7800DFC0C8 /* XCLocalSwiftPackageReference "Packages/ClaudeUsageData" */,
+				ECF412B52F03F5BB00DFC0C8 /* XCLocalSwiftPackageReference "Packages/ClaudeUsageUI" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = ECF4102C2F03E6AD00DFC0C8 /* Products */;
@@ -610,6 +614,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/ClaudeUsageData;
 		};
+		ECF412B52F03F5BB00DFC0C8 /* XCLocalSwiftPackageReference "Packages/ClaudeUsageUI" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/ClaudeUsageUI;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -636,6 +644,10 @@
 		ECF4108F2F03EC7800DFC0C8 /* ClaudeUsageData */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = ClaudeUsageData;
+		};
+		ECF412B62F03F5BB00DFC0C8 /* ClaudeUsageUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ClaudeUsageUI;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

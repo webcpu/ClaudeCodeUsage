@@ -6,6 +6,10 @@
 import SwiftUI
 import ClaudeUsageCore
 
+// MARK: - Preview Detection
+
+private let isRunningForPreviews = ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PLAYGROUNDS"] == "1"
+
 // MARK: - Menu Bar Scene
 
 public struct MenuBarScene: Scene {
@@ -29,16 +33,29 @@ public struct MenuBarScene: Scene {
         .menuBarExtraStyle(.window)
     }
 
+    @ViewBuilder
     private var menuContent: some View {
-        MenuBarContentView(settingsService: settingsService)
-            .environment(store)
+        if isRunningForPreviews {
+            // Minimal content for preview mode to avoid blocking app launch
+            Text("Preview Mode")
+                .frame(width: 200, height: 100)
+        } else {
+            MenuBarContentView(settingsService: settingsService)
+                .environment(store)
+        }
     }
 
+    @ViewBuilder
     private var menuLabel: some View {
-        MenuBarLabel(store: store)
-            .environment(store)
-            .task { await initializeOnce() }
-            .contextMenu { contextMenu }
+        if isRunningForPreviews {
+            // Minimal label for preview mode
+            Image(systemName: "dollarsign.circle")
+        } else {
+            MenuBarLabel(store: store)
+                .environment(store)
+                .task { await initializeOnce() }
+                .contextMenu { contextMenu }
+        }
     }
 
     private var contextMenu: some View {
