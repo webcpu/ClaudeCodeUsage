@@ -22,7 +22,8 @@ let package = Package(
             dependencies: [
                 "ClaudeUsageCore",
                 "ClaudeUsageData",
-            ]),
+            ],
+            path: "Sources"),
 
         .testTarget(
             name: "ClaudeUsageUITests",
