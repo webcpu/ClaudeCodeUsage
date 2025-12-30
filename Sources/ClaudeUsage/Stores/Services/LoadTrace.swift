@@ -132,19 +132,11 @@ actor LoadTrace {
     // MARK: - Formatting
 
     private func formatDuration(_ seconds: TimeInterval) -> String {
-        if seconds < 0.01 {
-            return "<10ms"
-        } else if seconds < 1.0 {
-            return String(format: "%.0fms", seconds * 1000)
-        } else {
-            return String(format: "%.2fs", seconds)
-        }
+        DurationFormatter.format(seconds)
     }
 
     private func formatNumber(_ n: Int) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
-        return formatter.string(from: NSNumber(value: n)) ?? "\(n)"
+        NumberFormat.decimal(n)
     }
 }
 
@@ -157,4 +149,28 @@ enum LoadPhase: String {
 
 private enum Threshold {
     static let slowLoad: TimeInterval = 2.0
+}
+
+// MARK: - Pure Formatters
+
+private enum DurationFormatter {
+    static func format(_ seconds: TimeInterval) -> String {
+        switch seconds {
+        case ..<0.01: "<10ms"
+        case ..<1.0: String(format: "%.0fms", seconds * 1000)
+        default: String(format: "%.2fs", seconds)
+        }
+    }
+}
+
+private enum NumberFormat {
+    private static let decimalFormatter: NumberFormatter = {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        return formatter
+    }()
+
+    static func decimal(_ n: Int) -> String {
+        decimalFormatter.string(from: NSNumber(value: n)) ?? "\(n)"
+    }
 }
