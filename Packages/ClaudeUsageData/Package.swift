@@ -18,10 +18,12 @@ let package = Package(
     targets: [
         .target(
             name: "ClaudeUsageData",
-            dependencies: ["ClaudeUsageCore"]),
+            dependencies: ["ClaudeUsageCore"],
+            path: "Sources"),
 
         .testTarget(
             name: "ClaudeUsageDataTests",
-            dependencies: ["ClaudeUsageData"]),
+            dependencies: ["ClaudeUsageData"],
+            path: "Tests"),
     ]
 )

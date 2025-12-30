@@ -31,6 +31,7 @@ let package = Package(
                 "ClaudeUsageUI",
                 "ClaudeUsageData",
             ],
+            path: "Tests",
             swiftSettings: [
                 .unsafeFlags(["-enable-testing"]),
                 .define("ENABLE_CODE_COVERAGE", .when(configuration: .debug)),
