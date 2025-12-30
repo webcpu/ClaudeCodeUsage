@@ -17,25 +17,27 @@ Reads usage data from `~/.claude/projects/` (Claude Code's local storage).
 
 ## Build & Run
 
-### Terminal
+1. Open `ClaudeCodeUsage.xcodeproj`
+2. Press **⌘R** to build and run
+
+## Testing
 
 ```bash
-swift build
-swift run ClaudeCodeUsage
+make test          # Run all tests
+make test-core     # Run ClaudeUsageCore tests
+make test-data     # Run ClaudeUsageData tests
+make test-ui       # Run ClaudeUsageUI tests
 ```
-
-### Xcode
-
-1. Open `Package.swift` in Xcode
-2. Select **ClaudeCodeUsage** scheme (top toolbar)
-3. Press **⌘R** to build and run
 
 ## Architecture
 
 ```
-ClaudeUsageCore   → Pure types, protocols, analytics
-ClaudeUsageData   → Repository, parsing, session monitoring
-ClaudeCodeUsage   → SwiftUI menu bar app (executable)
+Packages/
+├── ClaudeUsageCore/   → Pure types, protocols, analytics
+├── ClaudeUsageData/   → Repository, parsing, session monitoring
+└── ClaudeUsageUI/     → SwiftUI views and ViewModels
+
+ClaudeCodeUsage/       → Xcode project (app entry point)
 ```
 
 ## Requirements
