@@ -1,0 +1,40 @@
+{
+  "configurations" : [
+    {
+      "id" : "863E2FD1-1C91-46C5-B5FA-75CAF5654882",
+      "name" : "Test Scheme Action",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "performanceAntipatternCheckerEnabled" : true,
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:ClaudeCodeUsage.xcodeproj",
+      "identifier" : "ECF4102A2F03E6AD00DFC0C8",
+      "name" : "ClaudeCodeUsage"
+    }
+  },
+  "testTargets" : [
+    {
+      "enabled" : false,
+      "parallelizable" : true,
+      "target" : {
+        "containerPath" : "container:ClaudeCodeUsage.xcodeproj",
+        "identifier" : "ECF410372F03E6AE00DFC0C8",
+        "name" : "ClaudeCodeUsageTests"
+      }
+    },
+    {
+      "enabled" : false,
+      "parallelizable" : true,
+      "target" : {
+        "containerPath" : "container:ClaudeCodeUsage.xcodeproj",
+        "identifier" : "ECF410412F03E6AE00DFC0C8",
+        "name" : "ClaudeCodeUsageUITests"
+      }
+    }
+  ],
+  "version" : 1
+}

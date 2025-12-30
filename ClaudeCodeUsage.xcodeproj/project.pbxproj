@@ -37,6 +37,7 @@
 		ECF4102B2F03E6AD00DFC0C8 /* ClaudeCodeUsage.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ClaudeCodeUsage.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		ECF410382F03E6AE00DFC0C8 /* ClaudeCodeUsageTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ClaudeCodeUsageTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		ECF410422F03E6AE00DFC0C8 /* ClaudeCodeUsageUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ClaudeCodeUsageUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		ECF412B82F03F9B900DFC0C8 /* ClaudeCodeUsage.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = file; path = ClaudeCodeUsage.xctestplan; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -92,6 +93,7 @@
 		ECF410222F03E6AD00DFC0C8 = {
 			isa = PBXGroup;
 			children = (
+				ECF412B82F03F9B900DFC0C8 /* ClaudeCodeUsage.xctestplan */,
 				ECF4102D2F03E6AD00DFC0C8 /* ClaudeCodeUsage */,
 				ECF4103B2F03E6AE00DFC0C8 /* ClaudeCodeUsageTests */,
 				ECF410452F03E6AE00DFC0C8 /* ClaudeCodeUsageUITests */,
