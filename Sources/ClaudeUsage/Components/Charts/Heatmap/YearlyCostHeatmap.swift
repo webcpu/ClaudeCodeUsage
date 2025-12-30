@@ -40,7 +40,7 @@ public struct YearlyCostHeatmap: View {
     let configuration: HeatmapConfiguration
 
     /// View model managing data and state
-    @State private var viewModel: HeatmapViewModel
+    @State private var viewModel: HeatmapStore
 
     /// Screen bounds for tooltip positioning
     @State private var screenBounds: CGRect = NSScreen.main?.frame ?? .zero
@@ -62,7 +62,7 @@ public struct YearlyCostHeatmap: View {
         self.configuration = configuration
 
         // Initialize view model with configuration
-        self._viewModel = State(wrappedValue: HeatmapViewModel(configuration: configuration))
+        self._viewModel = State(wrappedValue: HeatmapStore(configuration: configuration))
     }
 
     // MARK: - Body

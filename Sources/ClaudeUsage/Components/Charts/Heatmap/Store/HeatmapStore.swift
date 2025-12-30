@@ -1,9 +1,6 @@
 //
-//  HeatmapViewModel.swift
+//  HeatmapStore.swift
 //  Business logic and state management for heatmap visualization
-//
-//  Provides MVVM architecture with proper separation of concerns,
-//  optimized data processing, and reactive state management.
 //
 //  Split into extensions for focused responsibilities:
 //    - +DataGeneration: Dataset generation and processing
@@ -16,7 +13,7 @@ import Observation
 import ClaudeUsageCore
 import OSLog
 
-private let logger = Logger(subsystem: "com.claudecodeusage", category: "HeatmapViewModel")
+private let logger = Logger(subsystem: "com.claudecodeusage", category: "HeatmapStore")
 
 // MARK: - Constants
 
@@ -35,7 +32,7 @@ private enum AccessibilityStrings {
 /// View model managing heatmap data, state, and business logic
 @Observable
 @MainActor
-public final class HeatmapViewModel {
+public final class HeatmapStore {
 
     // MARK: - Observable Properties
 
@@ -182,7 +179,7 @@ public final class HeatmapViewModel {
 
 // MARK: - Public State Properties
 
-public extension HeatmapViewModel {
+public extension HeatmapStore {
 
     /// Whether the heatmap has data to display
     var hasData: Bool {
@@ -202,7 +199,7 @@ public extension HeatmapViewModel {
 
 // MARK: - Hover State Helpers
 
-private extension HeatmapViewModel {
+private extension HeatmapStore {
 
     func clearHoveredDay() {
         hoveredDay = nil
@@ -233,7 +230,7 @@ private extension HeatmapViewModel {
 
 // MARK: - Grid Index Calculations
 
-private extension HeatmapViewModel {
+private extension HeatmapStore {
 
     typealias GridIndices = (week: Int, day: Int)
 
@@ -259,7 +256,7 @@ private extension HeatmapViewModel {
 
 // MARK: - Pure Transformation Functions
 
-private extension HeatmapViewModel {
+private extension HeatmapStore {
 
     func buildSummaryStats(from dataset: HeatmapDataset) -> SummaryStats {
         SummaryStats(

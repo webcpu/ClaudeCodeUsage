@@ -1,7 +1,7 @@
 //
-//  HeatmapViewModel+SupportingTypes.swift
+//  HeatmapStore+SupportingTypes.swift
 //
-//  Supporting types for HeatmapViewModel: errors, stats, and factory.
+//  Supporting types for HeatmapStore: errors, stats, and factory.
 //
 
 import Foundation
@@ -74,25 +74,25 @@ struct PerformanceMetrics {
 // MARK: - View Model Factory
 
 /// Factory for creating pre-configured view models
-public struct HeatmapViewModelFactory {
+public struct HeatmapStoreFactory {
 
     /// Create view model optimized for performance
     @MainActor
-    public static func performanceOptimized() -> HeatmapViewModel {
-        return HeatmapViewModel(configuration: .performanceOptimized)
+    public static func performanceOptimized() -> HeatmapStore {
+        return HeatmapStore(configuration: .performanceOptimized)
     }
 
     /// Create view model for compact displays
     @MainActor
-    public static func compact() -> HeatmapViewModel {
-        return HeatmapViewModel(configuration: .compact)
+    public static func compact() -> HeatmapStore {
+        return HeatmapStore(configuration: .compact)
     }
 
     /// Create view model with custom configuration
     /// - Parameter configuration: Custom configuration
     /// - Returns: Configured view model
     @MainActor
-    public static func custom(_ configuration: HeatmapConfiguration) -> HeatmapViewModel {
-        return HeatmapViewModel(configuration: configuration)
+    public static func custom(_ configuration: HeatmapConfiguration) -> HeatmapStore {
+        return HeatmapStore(configuration: configuration)
     }
 }

@@ -1,5 +1,5 @@
 //
-//  HeatmapViewModel+DataGeneration.swift
+//  HeatmapStore+DataGeneration.swift
 //
 
 import Foundation
@@ -17,7 +17,7 @@ private enum DataGenerationConstants {
 
 // MARK: - High-Level Orchestration
 
-extension HeatmapViewModel {
+extension HeatmapStore {
 
     func generateDataset(from stats: UsageStats) async {
         do {
@@ -34,7 +34,7 @@ extension HeatmapViewModel {
 
 // MARK: - Dataset Assembly
 
-extension HeatmapViewModel {
+extension HeatmapStore {
 
     func buildDataset(
         from dailyUsage: [DailyUsage],
@@ -80,7 +80,7 @@ extension HeatmapViewModel {
 
 // MARK: - Week Building
 
-extension HeatmapViewModel {
+extension HeatmapStore {
 
     func buildWeeks(
         from weeksLayout: [[Date?]],
@@ -144,7 +144,7 @@ extension HeatmapViewModel {
 
 // MARK: - Validation
 
-extension HeatmapViewModel {
+extension HeatmapStore {
 
     func validateDailyUsage(_ dailyUsage: [DailyUsage]) throws -> [DailyUsage] {
         let invalidDates = findInvalidDates(in: dailyUsage)
@@ -175,7 +175,7 @@ extension HeatmapViewModel {
 
 // MARK: - Pure Functions
 
-extension HeatmapViewModel {
+extension HeatmapStore {
 
     func buildCostLookup(from dailyUsage: [DailyUsage]) -> [String: Double] {
         Dictionary(
@@ -193,7 +193,7 @@ extension HeatmapViewModel {
 
 // MARK: - Private Helpers
 
-private extension HeatmapViewModel {
+private extension HeatmapStore {
 
     func delayForTestability() async throws {
         try await Task.sleep(nanoseconds: DataGenerationConstants.testabilityDelayNanoseconds)
@@ -224,7 +224,7 @@ private extension HeatmapViewModel {
 
 // MARK: - Model Factories
 
-private extension HeatmapViewModel {
+private extension HeatmapStore {
 
     func makeHeatmapMonth(from info: HeatmapDateCalculator.MonthInfo) -> HeatmapMonth {
         HeatmapMonth(
