@@ -13,63 +13,34 @@ struct PricingCalculatorTests {
 
     @Test("detects opus model from various formats")
     func detectsOpusModel() {
-        let opusVariants = [
-            "claude-opus-4-5-20251101",
-            "claude-4-opus",
-            "opus",
-            "CLAUDE-OPUS",
-            "claude-opus"
-        ]
-
-        for model in opusVariants {
-            let pricing = PricingCalculator.modelPricing(for: model)
-            #expect(pricing == .opus, "Should detect opus for: \(model)")
-        }
+        assertAllDetectModel(
+            ["claude-opus-4-5-20251101", "claude-4-opus", "opus", "CLAUDE-OPUS", "claude-opus"],
+            expected: .opus
+        )
     }
 
     @Test("detects sonnet model from various formats")
     func detectsSonnetModel() {
-        let sonnetVariants = [
-            "claude-sonnet-4-20250514",
-            "claude-3-5-sonnet",
-            "sonnet",
-            "CLAUDE-SONNET"
-        ]
-
-        for model in sonnetVariants {
-            let pricing = PricingCalculator.modelPricing(for: model)
-            #expect(pricing == .sonnet, "Should detect sonnet for: \(model)")
-        }
+        assertAllDetectModel(
+            ["claude-sonnet-4-20250514", "claude-3-5-sonnet", "sonnet", "CLAUDE-SONNET"],
+            expected: .sonnet
+        )
     }
 
     @Test("detects haiku model from various formats")
     func detectsHaikuModel() {
-        let haikuVariants = [
-            "claude-haiku-3-5-20241022",
-            "claude-3-haiku",
-            "haiku",
-            "HAIKU"
-        ]
-
-        for model in haikuVariants {
-            let pricing = PricingCalculator.modelPricing(for: model)
-            #expect(pricing == .haiku, "Should detect haiku for: \(model)")
-        }
+        assertAllDetectModel(
+            ["claude-haiku-3-5-20241022", "claude-3-haiku", "haiku", "HAIKU"],
+            expected: .haiku
+        )
     }
 
     @Test("defaults to sonnet for unknown models")
     func defaultsToSonnet() {
-        let unknownModels = [
-            "gpt-4",
-            "unknown-model",
-            "claude-new",
-            ""
-        ]
-
-        for model in unknownModels {
-            let pricing = PricingCalculator.modelPricing(for: model)
-            #expect(pricing == .sonnet, "Should default to sonnet for: \(model)")
-        }
+        assertAllDetectModel(
+            ["gpt-4", "unknown-model", "claude-new", ""],
+            expected: .sonnet
+        )
     }
 
     // MARK: - Cost Calculation
@@ -82,46 +53,32 @@ struct PricingCalculatorTests {
 
     @Test("calculates input token cost correctly")
     func calculatesInputCost() {
-        let tokens = TokenCounts(input: 1_000_000, output: 0)
+        let tokens = inputOnlyTokens(1_000_000)
 
-        let opusCost = PricingCalculator.calculateCost(tokens: tokens, model: "opus")
-        #expect(opusCost == 5.0) // $5 per million input
-
-        let sonnetCost = PricingCalculator.calculateCost(tokens: tokens, model: "sonnet")
-        #expect(sonnetCost == 3.0) // $3 per million input
-
-        let haikuCost = PricingCalculator.calculateCost(tokens: tokens, model: "haiku")
-        #expect(haikuCost == 1.0) // $1 per million input
+        assertCost(tokens, model: "opus", expectedCost: 5.0)
+        assertCost(tokens, model: "sonnet", expectedCost: 3.0)
+        assertCost(tokens, model: "haiku", expectedCost: 1.0)
     }
 
     @Test("calculates output token cost correctly")
     func calculatesOutputCost() {
-        let tokens = TokenCounts(input: 0, output: 1_000_000)
+        let tokens = outputOnlyTokens(1_000_000)
 
-        let opusCost = PricingCalculator.calculateCost(tokens: tokens, model: "opus")
-        #expect(opusCost == 25.0) // $25 per million output
-
-        let sonnetCost = PricingCalculator.calculateCost(tokens: tokens, model: "sonnet")
-        #expect(sonnetCost == 15.0) // $15 per million output
-
-        let haikuCost = PricingCalculator.calculateCost(tokens: tokens, model: "haiku")
-        #expect(haikuCost == 5.0) // $5 per million output
+        assertCost(tokens, model: "opus", expectedCost: 25.0)
+        assertCost(tokens, model: "sonnet", expectedCost: 15.0)
+        assertCost(tokens, model: "haiku", expectedCost: 5.0)
     }
 
     @Test("calculates cache write cost correctly")
     func calculatesCacheWriteCost() {
-        let tokens = TokenCounts(input: 0, output: 0, cacheCreation: 1_000_000, cacheRead: 0)
-
-        let sonnetCost = PricingCalculator.calculateCost(tokens: tokens, model: "sonnet")
-        #expect(sonnetCost == 3.75) // $3.75 per million (1.25x input)
+        let tokens = cacheWriteOnlyTokens(1_000_000)
+        assertCost(tokens, model: "sonnet", expectedCost: 3.75)
     }
 
     @Test("calculates cache read cost correctly")
     func calculatesCacheReadCost() {
-        let tokens = TokenCounts(input: 0, output: 0, cacheCreation: 0, cacheRead: 1_000_000)
-
-        let sonnetCost = PricingCalculator.calculateCost(tokens: tokens, model: "sonnet")
-        #expect(sonnetCost == 0.30) // $0.30 per million (0.1x input)
+        let tokens = cacheReadOnlyTokens(1_000_000)
+        assertCost(tokens, model: "sonnet", expectedCost: 0.30)
     }
 
     @Test("calculates combined token costs")
@@ -133,67 +90,107 @@ struct PricingCalculatorTests {
             cacheRead: 1_000_000
         )
 
-        let sonnetCost = PricingCalculator.calculateCost(tokens: tokens, model: "sonnet")
-
-        // Expected: (0.5M * $3) + (0.1M * $15) + (0.2M * $3.75) + (1M * $0.30)
-        // = $1.50 + $1.50 + $0.75 + $0.30 = $4.05
-        #expect(abs(sonnetCost - 4.05) < 0.001)
+        let cost = PricingCalculator.calculateCost(tokens: tokens, model: "sonnet")
+        let expectedCost = 1.50 + 1.50 + 0.75 + 0.30
+        #expect(abs(cost - expectedCost) < 0.001)
     }
 
     // MARK: - ModelPricing Values
 
     @Test("opus pricing values are correct")
     func opusPricingValues() {
-        let pricing = ModelPricing.opus
-
-        #expect(pricing.inputPerToken == 5.0 / 1_000_000)
-        #expect(pricing.outputPerToken == 25.0 / 1_000_000)
-        #expect(pricing.cacheWritePerToken == 6.25 / 1_000_000)
-        #expect(pricing.cacheReadPerToken == 0.50 / 1_000_000)
+        assertPricingValues(
+            .opus,
+            input: 5.0 / 1_000_000,
+            output: 25.0 / 1_000_000,
+            cacheWrite: 6.25 / 1_000_000,
+            cacheRead: 0.50 / 1_000_000
+        )
     }
 
     @Test("sonnet pricing values are correct")
     func sonnetPricingValues() {
-        let pricing = ModelPricing.sonnet
-
-        #expect(pricing.inputPerToken == 3.0 / 1_000_000)
-        #expect(pricing.outputPerToken == 15.0 / 1_000_000)
-        #expect(pricing.cacheWritePerToken == 3.75 / 1_000_000)
-        #expect(pricing.cacheReadPerToken == 0.30 / 1_000_000)
+        assertPricingValues(
+            .sonnet,
+            input: 3.0 / 1_000_000,
+            output: 15.0 / 1_000_000,
+            cacheWrite: 3.75 / 1_000_000,
+            cacheRead: 0.30 / 1_000_000
+        )
     }
 
     @Test("haiku pricing values are correct")
     func haikuPricingValues() {
-        let pricing = ModelPricing.haiku
-
-        #expect(pricing.inputPerToken == 1.0 / 1_000_000)
-        #expect(pricing.outputPerToken == 5.0 / 1_000_000)
-        #expect(pricing.cacheWritePerToken == 1.25 / 1_000_000)
-        #expect(pricing.cacheReadPerToken == 0.10 / 1_000_000)
+        assertPricingValues(
+            .haiku,
+            input: 1.0 / 1_000_000,
+            output: 5.0 / 1_000_000,
+            cacheWrite: 1.25 / 1_000_000,
+            cacheRead: 0.10 / 1_000_000
+        )
     }
 
     // MARK: - Edge Cases
 
     @Test("handles very large token counts")
     func handlesLargeTokenCounts() {
-        let tokens = TokenCounts(input: 100_000_000, output: 50_000_000) // 150M tokens
-
-        let cost = PricingCalculator.calculateCost(tokens: tokens, model: "sonnet")
-
-        // (100M * $3) + (50M * $15) = $300 + $750 = $1050
-        #expect(cost == 1050.0)
+        let tokens = TokenCounts(input: 100_000_000, output: 50_000_000)
+        assertCost(tokens, model: "sonnet", expectedCost: 1050.0)
     }
 
     @Test("cost is additive across token types")
     func costIsAdditive() {
-        let inputOnly = TokenCounts(input: 1000, output: 0)
-        let outputOnly = TokenCounts(input: 0, output: 1000)
-        let combined = TokenCounts(input: 1000, output: 1000)
-
-        let inputCost = PricingCalculator.calculateCost(tokens: inputOnly, model: "sonnet")
-        let outputCost = PricingCalculator.calculateCost(tokens: outputOnly, model: "sonnet")
-        let combinedCost = PricingCalculator.calculateCost(tokens: combined, model: "sonnet")
+        let inputCost = calculateSonnetCost(inputOnlyTokens(1000))
+        let outputCost = calculateSonnetCost(outputOnlyTokens(1000))
+        let combinedCost = calculateSonnetCost(TokenCounts(input: 1000, output: 1000))
 
         #expect(abs(combinedCost - (inputCost + outputCost)) < 0.0001)
+    }
+
+    // MARK: - Test Helpers
+
+    private func assertAllDetectModel(_ modelNames: [String], expected: ModelPricing) {
+        modelNames.forEach { model in
+            let pricing = PricingCalculator.modelPricing(for: model)
+            #expect(pricing == expected, "Should detect \(expected) for: \(model)")
+        }
+    }
+
+    private func assertCost(_ tokens: TokenCounts, model: String, expectedCost: Double) {
+        let cost = PricingCalculator.calculateCost(tokens: tokens, model: model)
+        #expect(cost == expectedCost)
+    }
+
+    private func assertPricingValues(
+        _ pricing: ModelPricing,
+        input: Double,
+        output: Double,
+        cacheWrite: Double,
+        cacheRead: Double
+    ) {
+        #expect(pricing.inputPerToken == input)
+        #expect(pricing.outputPerToken == output)
+        #expect(pricing.cacheWritePerToken == cacheWrite)
+        #expect(pricing.cacheReadPerToken == cacheRead)
+    }
+
+    private func calculateSonnetCost(_ tokens: TokenCounts) -> Double {
+        PricingCalculator.calculateCost(tokens: tokens, model: "sonnet")
+    }
+
+    private func inputOnlyTokens(_ count: Int) -> TokenCounts {
+        TokenCounts(input: count, output: 0)
+    }
+
+    private func outputOnlyTokens(_ count: Int) -> TokenCounts {
+        TokenCounts(input: 0, output: count)
+    }
+
+    private func cacheWriteOnlyTokens(_ count: Int) -> TokenCounts {
+        TokenCounts(input: 0, output: 0, cacheCreation: count, cacheRead: 0)
+    }
+
+    private func cacheReadOnlyTokens(_ count: Int) -> TokenCounts {
+        TokenCounts(input: 0, output: 0, cacheCreation: 0, cacheRead: count)
     }
 }
