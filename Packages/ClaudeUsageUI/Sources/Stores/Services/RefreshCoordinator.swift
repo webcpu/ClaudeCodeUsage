@@ -7,6 +7,13 @@ import Foundation
 import AppKit
 import ClaudeUsageData
 
+// MARK: - Home Directory Helper
+
+private func realHomeDirectory() -> String {
+    guard let pw = getpwuid(getuid()) else { return NSHomeDirectory() }
+    return String(cString: pw.pointee.pw_dir)
+}
+
 // MARK: - Timing Constants
 
 private enum Timing {
@@ -40,7 +47,7 @@ final class RefreshCoordinator {
     init(
         clock: any ClockProtocol = SystemClock(),
         refreshInterval: TimeInterval,
-        basePath: String = NSHomeDirectory() + "/.claude"
+        basePath: String = realHomeDirectory() + "/.claude"
     ) {
         self.clock = clock
         self.lastRefreshTime = clock.now

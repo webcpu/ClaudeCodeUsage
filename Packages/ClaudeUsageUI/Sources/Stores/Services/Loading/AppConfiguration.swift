@@ -5,6 +5,16 @@
 
 import Foundation
 
+// MARK: - Home Directory Helper
+
+/// Returns the real user home directory, even in sandboxed apps.
+/// In sandboxed apps, NSHomeDirectory() returns the container path,
+/// but we need the actual user home to access ~/.claude
+private func realHomeDirectory() -> String {
+    guard let pw = getpwuid(getuid()) else { return NSHomeDirectory() }
+    return String(cString: pw.pointee.pw_dir)
+}
+
 // MARK: - Configuration
 
 public struct AppConfiguration: Sendable {
@@ -14,7 +24,7 @@ public struct AppConfiguration: Sendable {
     let dailyCostThreshold: Double
 
     static let `default` = AppConfiguration(
-        basePath: NSHomeDirectory() + "/.claude",
+        basePath: realHomeDirectory() + "/.claude",
         refreshInterval: 30.0,
         sessionDurationHours: 5.0,
         dailyCostThreshold: 10.0

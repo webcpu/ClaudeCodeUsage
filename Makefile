@@ -1,7 +1,7 @@
 # Makefile for ClaudeCodeUsage
 # Provides convenient commands for development
 
-.PHONY: help build test coverage clean format lint docs
+.PHONY: help build test test-core test-data test-ui coverage clean format lint docs
 
 # Default target
 help:
@@ -23,8 +23,16 @@ build:
 	swift build
 
 # Run all tests
-test:
-	swift test --parallel
+test: test-core test-data test-ui
+
+test-core:
+	swift test --package-path Packages/ClaudeUsageCore
+
+test-data:
+	swift test --package-path Packages/ClaudeUsageData
+
+test-ui:
+	swift test --package-path Packages/ClaudeUsageUI
 
 # Generate code coverage report
 coverage:
