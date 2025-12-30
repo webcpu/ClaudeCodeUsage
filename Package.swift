@@ -8,80 +8,46 @@ let package = Package(
         .macOS(.v15),
     ],
     products: [
-        // Domain layer - pure types, protocols, analytics
+        // Re-export products from standalone packages
         .library(
             name: "ClaudeUsageCore",
-            targets: ["ClaudeUsageCore"]),
-        // Data layer - repository, parsing, monitoring
+            targets: ["ClaudeUsageCoreWrapper"]),
         .library(
             name: "ClaudeUsageData",
-            targets: ["ClaudeUsageData"]),
-        // UI layer - SwiftUI views and stores
+            targets: ["ClaudeUsageDataWrapper"]),
         .library(
             name: "ClaudeUsageUI",
-            targets: ["ClaudeUsageUI"]),
-        // macOS menu bar app
-        .executable(
-            name: "ClaudeCodeUsage",
-            targets: ["ClaudeUsage"])
+            targets: ["ClaudeUsageUIWrapper"]),
     ],
-    dependencies: [],
+    dependencies: [
+        .package(path: "Packages/ClaudeUsageCore"),
+        .package(path: "Packages/ClaudeUsageData"),
+        .package(path: "Packages/ClaudeUsageUI"),
+    ],
     targets: [
-        // MARK: - Domain Layer (no dependencies)
+        // Thin wrappers that re-export standalone packages
+        .target(
+            name: "ClaudeUsageCoreWrapper",
+            dependencies: [
+                .product(name: "ClaudeUsageCore", package: "ClaudeUsageCore"),
+            ],
+            path: "Sources/Wrappers/Core"),
 
         .target(
-            name: "ClaudeUsageCore",
-            dependencies: [],
-            path: "Sources/ClaudeUsageCore"),
-
-        // MARK: - Data Layer (depends on Core)
+            name: "ClaudeUsageDataWrapper",
+            dependencies: [
+                .product(name: "ClaudeUsageData", package: "ClaudeUsageData"),
+            ],
+            path: "Sources/Wrappers/Data"),
 
         .target(
-            name: "ClaudeUsageData",
-            dependencies: ["ClaudeUsageCore"],
-            path: "Sources/ClaudeUsageData"),
-
-        // MARK: - UI Layer (SwiftUI views, stores)
-
-        .target(
-            name: "ClaudeUsageUI",
+            name: "ClaudeUsageUIWrapper",
             dependencies: [
-                "ClaudeUsageCore",
-                "ClaudeUsageData"
+                .product(name: "ClaudeUsageUI", package: "ClaudeUsageUI"),
             ],
-            path: "Sources/ClaudeUsageUI"),
-
-        // MARK: - App Entry Point
-
-        .executableTarget(
-            name: "ClaudeUsage",
-            dependencies: [
-                "ClaudeUsageUI"
-            ],
-            path: "Sources/ClaudeUsage"),
-
-        // MARK: - Tests
-
-        .testTarget(
-            name: "ClaudeUsageCoreTests",
-            dependencies: ["ClaudeUsageCore"],
-            path: "Tests/ClaudeUsageCoreTests"),
-
-        .testTarget(
-            name: "ClaudeUsageDataTests",
-            dependencies: ["ClaudeUsageData"],
-            path: "Tests/ClaudeUsageDataTests"),
-
-        .testTarget(
-            name: "ClaudeUsageTests",
-            dependencies: [
-                "ClaudeUsageUI",
-                "ClaudeUsageData"
-            ],
-            path: "Tests/ClaudeUsageTests",
-            swiftSettings: [
-                .unsafeFlags(["-enable-testing"]),
-                .define("ENABLE_CODE_COVERAGE", .when(configuration: .debug))
-            ]),
+            path: "Sources/Wrappers/UI"),
     ]
 )
+
+// Note: To run the app, use:
+// swift run --package-path Packages/ClaudeUsageUI ClaudeCodeUsage
