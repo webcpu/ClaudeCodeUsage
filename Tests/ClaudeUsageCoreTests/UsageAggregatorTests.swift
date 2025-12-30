@@ -53,12 +53,12 @@ struct UsageAggregatorTests {
 
     @Test("groups entries by model")
     func groupsByModel() {
-        let entries = [
-            TestEntryFactory.entry(model: "claude-opus", cost: 5.00),
-            TestEntryFactory.entry(model: "claude-sonnet", cost: 3.00),
-            TestEntryFactory.entry(model: "claude-opus", cost: 2.00),
-            TestEntryFactory.entry(model: "claude-haiku", cost: 0.50)
-        ]
+        let entries = TestEntryFactory.entriesWithModels([
+            (model: "claude-opus", cost: 5.00),
+            (model: "claude-sonnet", cost: 3.00),
+            (model: "claude-opus", cost: 2.00),
+            (model: "claude-haiku", cost: 0.50)
+        ])
         let result = UsageAggregator.aggregateByModel(entries)
 
         #expect(result.count == 3)
@@ -72,11 +72,11 @@ struct UsageAggregatorTests {
 
     @Test("sorts models by cost descending")
     func sortsModelsByCostDescending() {
-        let entries = [
-            TestEntryFactory.entry(model: "haiku", cost: 1.00),
-            TestEntryFactory.entry(model: "opus", cost: 10.00),
-            TestEntryFactory.entry(model: "sonnet", cost: 5.00)
-        ]
+        let entries = TestEntryFactory.entriesWithModels([
+            (model: "haiku", cost: 1.00),
+            (model: "opus", cost: 10.00),
+            (model: "sonnet", cost: 5.00)
+        ])
         let result = UsageAggregator.aggregateByModel(entries)
 
         #expect(result[0].model == "opus")
@@ -89,13 +89,13 @@ struct UsageAggregatorTests {
     @Test("groups entries by date string")
     func groupsByDate() {
         let today = Date()
-        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: today)!
+        let yesterday = TestEntryFactory.dateOffset(days: -1, from: today)
 
-        let entries = [
-            TestEntryFactory.entry(timestamp: today, cost: 2.00),
-            TestEntryFactory.entry(timestamp: today, cost: 1.00),
-            TestEntryFactory.entry(timestamp: yesterday, cost: 5.00)
-        ]
+        let entries = TestEntryFactory.entriesWithTimestamps([
+            (timestamp: today, cost: 2.00),
+            (timestamp: today, cost: 1.00),
+            (timestamp: yesterday, cost: 5.00)
+        ])
         let result = UsageAggregator.aggregateByDate(entries)
 
         #expect(result.count == 2)
@@ -107,7 +107,7 @@ struct UsageAggregatorTests {
 
     @Test("sorts dates ascending")
     func sortsDatesAscending() {
-        let dates = (0..<5).map { Calendar.current.date(byAdding: .day, value: -$0, to: Date())! }
+        let dates = TestEntryFactory.datesRelativeToToday([0, -1, -2, -3, -4])
         let entries = dates.map { TestEntryFactory.entry(timestamp: $0, cost: 1.00) }
 
         let result = UsageAggregator.aggregateByDate(entries)
@@ -120,11 +120,11 @@ struct UsageAggregatorTests {
 
     @Test("groups entries by project path")
     func groupsByProject() {
-        let entries = [
-            TestEntryFactory.entry(cost: 10.00, project: "/Users/dev/project-a"),
-            TestEntryFactory.entry(cost: 5.00, project: "/Users/dev/project-b"),
-            TestEntryFactory.entry(cost: 3.00, project: "/Users/dev/project-a")
-        ]
+        let entries = TestEntryFactory.entriesWithProjects([
+            (project: "/Users/dev/project-a", cost: 10.00),
+            (project: "/Users/dev/project-b", cost: 5.00),
+            (project: "/Users/dev/project-a", cost: 3.00)
+        ])
         let result = UsageAggregator.aggregateByProject(entries)
 
         #expect(result.count == 2)
@@ -136,11 +136,11 @@ struct UsageAggregatorTests {
 
     @Test("sorts projects by cost descending")
     func sortsProjectsByCostDescending() {
-        let entries = [
-            TestEntryFactory.entry(cost: 1.00, project: "cheap"),
-            TestEntryFactory.entry(cost: 100.00, project: "expensive"),
-            TestEntryFactory.entry(cost: 10.00, project: "medium")
-        ]
+        let entries = TestEntryFactory.entriesWithProjects([
+            (project: "cheap", cost: 1.00),
+            (project: "expensive", cost: 100.00),
+            (project: "medium", cost: 10.00)
+        ])
         let result = UsageAggregator.aggregateByProject(entries)
 
         #expect(result[0].projectPath == "expensive")
@@ -153,31 +153,30 @@ struct UsageAggregatorTests {
     @Test("filters to today's entries only")
     func filtersTodayEntries() {
         let now = Date()
-        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: now)!
-        let lastWeek = Calendar.current.date(byAdding: .day, value: -7, to: now)!
+        let yesterday = TestEntryFactory.dateOffset(days: -1, from: now)
+        let lastWeek = TestEntryFactory.dateOffset(days: -7, from: now)
 
-        let entries = [
-            TestEntryFactory.entry(timestamp: now, cost: 1.00),
-            TestEntryFactory.entry(timestamp: yesterday, cost: 2.00),
-            TestEntryFactory.entry(timestamp: lastWeek, cost: 3.00),
-            TestEntryFactory.entry(timestamp: now, cost: 0.50)
-        ]
+        let entries = TestEntryFactory.entriesWithTimestamps([
+            (timestamp: now, cost: 1.00),
+            (timestamp: yesterday, cost: 2.00),
+            (timestamp: lastWeek, cost: 3.00),
+            (timestamp: now, cost: 0.50)
+        ])
         let result = UsageAggregator.filterToday(entries)
 
         #expect(result.count == 2)
-        #expect(result.reduce(0) { $0 + $1.costUSD } == 1.50)
+        #expect(sumCosts(result) == 1.50)
     }
 
     @Test("filterToday with custom reference date")
     func filtersTodayWithReferenceDate() {
-        let referenceDate = Calendar.current.date(byAdding: .day, value: -5, to: Date())!
-        let onReferenceDay = referenceDate
-        let beforeReferenceDay = Calendar.current.date(byAdding: .day, value: -1, to: referenceDate)!
+        let referenceDate = TestEntryFactory.dateOffset(days: -5)
+        let beforeReferenceDay = TestEntryFactory.dateOffset(days: -1, from: referenceDate)
 
-        let entries = [
-            TestEntryFactory.entry(timestamp: onReferenceDay, cost: 1.00),
-            TestEntryFactory.entry(timestamp: beforeReferenceDay, cost: 2.00)
-        ]
+        let entries = TestEntryFactory.entriesWithTimestamps([
+            (timestamp: referenceDate, cost: 1.00),
+            (timestamp: beforeReferenceDay, cost: 2.00)
+        ])
         let result = UsageAggregator.filterToday(entries, referenceDate: referenceDate)
 
         #expect(result.count == 1)
@@ -188,33 +187,103 @@ struct UsageAggregatorTests {
 
     @Test("calculates hourly costs correctly")
     func calculatesHourlyCosts() {
-        let today = Calendar.current.startOfDay(for: Date())
-        let hour9 = Calendar.current.date(byAdding: .hour, value: 9, to: today)!
-        let hour14 = Calendar.current.date(byAdding: .hour, value: 14, to: today)!
+        let today = Date()
+        let hour9 = TestEntryFactory.hourOffset(9, on: today)
+        let hour14 = TestEntryFactory.hourOffset(14, on: today)
 
-        let entries = [
-            TestEntryFactory.entry(timestamp: hour9, cost: 1.00),
-            TestEntryFactory.entry(timestamp: hour9, cost: 0.50),
-            TestEntryFactory.entry(timestamp: hour14, cost: 2.00)
-        ]
-        let result = UsageAggregator.todayHourlyCosts(from: entries, referenceDate: today)
+        let entries = TestEntryFactory.entriesWithTimestamps([
+            (timestamp: hour9, cost: 1.00),
+            (timestamp: hour9, cost: 0.50),
+            (timestamp: hour14, cost: 2.00)
+        ])
+        let referenceDate = Calendar.current.startOfDay(for: today)
+        let result = UsageAggregator.todayHourlyCosts(from: entries, referenceDate: referenceDate)
 
         #expect(result.count == 24)
         #expect(result[9] == 1.50)
         #expect(result[14] == 2.00)
         #expect(result[0] == 0.00)
     }
+
+    // MARK: - Helper Functions (Pure)
+
+    /// Sums costs from entries (pure function)
+    private func sumCosts(_ entries: [UsageEntry]) -> Double {
+        entries.reduce(0) { $0 + $1.costUSD }
+    }
 }
 
-// MARK: - Test Factory
+// MARK: - Test Entry Factory (FP Style)
 
 private enum TestEntryFactory {
+
+    // MARK: - Pure Factory Functions
+
+    /// Creates a test entry with specified attributes (pure function)
     static func entry(
         model: String = "claude-sonnet",
         timestamp: Date = Date(),
         cost: Double = 0.0,
         tokens: TokenCounts = .zero,
         project: String = "test-project"
+    ) -> UsageEntry {
+        makeEntry(
+            model: model,
+            timestamp: timestamp,
+            cost: cost,
+            tokens: tokens,
+            project: project
+        )
+    }
+
+    // MARK: - Batch Creation (Functional Combinators)
+
+    /// Creates entries by mapping costs to entries (pure function)
+    static func entriesWithCosts(_ costs: [Double]) -> [UsageEntry] {
+        costs.map { entry(cost: $0) }
+    }
+
+    /// Creates entries by mapping (model, cost) pairs (pure function)
+    static func entriesWithModels(_ modelCosts: [(model: String, cost: Double)]) -> [UsageEntry] {
+        modelCosts.map { entry(model: $0.model, cost: $0.cost) }
+    }
+
+    /// Creates entries by mapping (timestamp, cost) pairs (pure function)
+    static func entriesWithTimestamps(_ timestampCosts: [(timestamp: Date, cost: Double)]) -> [UsageEntry] {
+        timestampCosts.map { entry(timestamp: $0.timestamp, cost: $0.cost) }
+    }
+
+    /// Creates entries by mapping (project, cost) pairs (pure function)
+    static func entriesWithProjects(_ projectCosts: [(project: String, cost: Double)]) -> [UsageEntry] {
+        projectCosts.map { entry(project: $0.project, cost: $0.cost) }
+    }
+
+    // MARK: - Date Helpers (Pure Functions)
+
+    /// Generates dates relative to today (pure function)
+    static func datesRelativeToToday(_ dayOffsets: [Int]) -> [Date] {
+        dayOffsets.map { dateOffset(days: $0, from: Date()) }
+    }
+
+    /// Single date offset (pure function)
+    static func dateOffset(days: Int, from reference: Date = Date()) -> Date {
+        Calendar.current.date(byAdding: .day, value: days, to: reference)!
+    }
+
+    /// Hour offset within a day (pure function)
+    static func hourOffset(_ hour: Int, on date: Date) -> Date {
+        let startOfDay = Calendar.current.startOfDay(for: date)
+        return Calendar.current.date(byAdding: .hour, value: hour, to: startOfDay)!
+    }
+
+    // MARK: - Private Implementation
+
+    private static func makeEntry(
+        model: String,
+        timestamp: Date,
+        cost: Double,
+        tokens: TokenCounts,
+        project: String
     ) -> UsageEntry {
         UsageEntry(
             id: UUID().uuidString,
