@@ -35,12 +35,13 @@ struct YearlyCostHeatmap_Previews: PreviewProvider {
         let dailyUsage = generateSampleDailyUsage()
         return UsageStats(
             totalCost: dailyUsage.reduce(0) { $0 + $1.totalCost },
-            totalTokens: dailyUsage.reduce(0) { $0 + $1.totalTokens },
-            totalInputTokens: 250000,
-            totalOutputTokens: 150000,
-            totalCacheCreationTokens: 0,
-            totalCacheReadTokens: 0,
-            totalSessions: 150,
+            tokens: TokenCounts(
+                input: 250000,
+                output: 150000,
+                cacheCreation: 0,
+                cacheRead: 0
+            ),
+            sessionCount: 150,
             byModel: [],
             byDate: dailyUsage,
             byProject: []

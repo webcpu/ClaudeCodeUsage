@@ -180,7 +180,7 @@ private struct ModelStats: View {
         HStack {
             StatLabel(icon: "doc.text", value: "\(model.sessionCount) sessions")
             Spacer()
-            StatLabel(icon: "number", value: "\(model.totalTokens.abbreviated) tokens")
+            StatLabel(icon: "number", value: "\(model.tokens.total.abbreviated) tokens")
             Spacer()
             StatLabel(icon: "percent", value: percentage.asPercentage)
         }

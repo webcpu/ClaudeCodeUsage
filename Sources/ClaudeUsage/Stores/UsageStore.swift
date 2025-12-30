@@ -30,7 +30,7 @@ final class UsageStore {
     var stats: UsageStats? { state.stats }
 
     var todaysCost: Double {
-        todayEntries.reduce(0.0) { $0 + $1.cost }
+        todayEntries.reduce(0.0) { $0 + $1.costUSD }
     }
 
     var dailyCostThreshold: Double {
@@ -283,8 +283,5 @@ private func sessionProgress(_ session: SessionBlock, now: Date) -> Double {
 private func filterToday(_ entries: [UsageEntry], referenceDate: Date) -> [UsageEntry] {
     let calendar = Calendar.current
     let today = calendar.startOfDay(for: referenceDate)
-    return entries.filter { entry in
-        guard let date = entry.date else { return false }
-        return calendar.startOfDay(for: date) == today
-    }
+    return entries.filter { calendar.startOfDay(for: $0.timestamp) == today }
 }

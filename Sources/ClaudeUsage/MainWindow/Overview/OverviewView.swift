@@ -125,7 +125,7 @@ private struct MetricsGrid: View {
     }
 
     private var totalSessionsCard: some View {
-        MetricCard(title: "Total Sessions", value: "\(stats.totalSessions)", icon: "doc.text", color: .blue)
+        MetricCard(title: "Total Sessions", value: "\(stats.sessionCount)", icon: "doc.text", color: .blue)
     }
 
     private var totalTokensCard: some View {

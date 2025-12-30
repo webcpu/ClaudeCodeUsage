@@ -147,7 +147,7 @@ struct DailyCard: View {
     private var summaryRow: some View {
         HStack(spacing: 16) {
             DateBadge(info: dateInfo)
-            DateDetails(info: dateInfo, modelCount: daily.modelCount)
+            DateDetails(info: dateInfo, modelCount: daily.modelsUsed.count)
             Spacer()
             CostMetrics(cost: daily.totalCost, tokens: daily.totalTokens)
         }
