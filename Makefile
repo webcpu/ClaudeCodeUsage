@@ -1,19 +1,17 @@
 # Makefile for ClaudeCodeUsage
 # Provides convenient commands for development
 
-.PHONY: help test test-core test-data test-ui clean format lint
+.PHONY: help test test-core test-data test-ui clean format lint screenshot
 
 # Default target
 help:
 	@echo "ClaudeCodeUsage Development Commands"
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@echo "  make test      - Run all tests"
-	@echo "  make test-core - Run ClaudeUsageCore tests"
-	@echo "  make test-data - Run ClaudeUsageData tests"
-	@echo "  make test-ui   - Run ClaudeUsageUI tests"
-	@echo "  make clean     - Clean build artifacts"
-	@echo "  make format    - Format code with swift-format"
-	@echo "  make lint      - Lint code with SwiftLint"
+	@echo "  make test       - Run all tests"
+	@echo "  make screenshot - Capture UI previews to /tmp/ClaudeUsageUI/"
+	@echo "  make clean      - Clean build artifacts"
+	@echo "  make format     - Format code with swift-format"
+	@echo "  make lint       - Lint code with SwiftLint"
 
 # Run all tests
 test: test-core test-data test-ui
@@ -48,3 +46,8 @@ lint:
 	else \
 		echo "SwiftLint not installed. Install with: brew install swiftlint"; \
 	fi
+
+# Capture UI preview screenshots
+screenshot:
+	swift run --package-path Packages/ClaudeUsageUI PreviewCapture
+	@echo "Screenshots saved to /tmp/ClaudeUsageUI/"
