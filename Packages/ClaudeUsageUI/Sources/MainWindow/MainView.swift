@@ -15,43 +15,87 @@ public extension Notification.Name {
 // MARK: - Main View
 public struct MainView: View {
     @Environment(UsageStore.self) private var store
-    @State private var selectedDestination: Destination? = .overview
-    let settingsService: AppSettingsService
+    @State private var selectedDestination: Destination?
 
-    public init(settingsService: AppSettingsService) {
-        self.settingsService = settingsService
+    public init(initialDestination: Destination = .overview) {
+        self._selectedDestination = State(initialValue: initialDestination)
     }
 
     public var body: some View {
         NavigationContent(
             selectedDestination: $selectedDestination,
-            store: store,
-            settingsService: settingsService
+            store: store
         )
+        .task { await store.initializeIfNeeded() }
     }
 }
 
 // MARK: - Navigation Content
 private struct NavigationContent: View {
     @Binding var selectedDestination: Destination?
+    @Environment(\.isCaptureMode) private var isCaptureMode
     let store: UsageStore
-    let settingsService: AppSettingsService
 
     var body: some View {
+        if isCaptureMode {
+            captureLayout
+        } else {
+            navigationLayout
+        }
+    }
+
+    private var navigationLayout: some View {
         NavigationSplitView {
             Sidebar(selectedDestination: $selectedDestination)
         } detail: {
-            DetailView(
-                destination: selectedDestination ?? .overview,
-                store: store,
-                settingsService: settingsService
-            )
+            DetailView(destination: selectedDestination ?? .overview, store: store)
         }
         .onReceive(NotificationCenter.default.publisher(for: .refreshData)) { _ in
             Task {
                 await store.loadData()
             }
         }
+    }
+
+    private var captureLayout: some View {
+        HStack(spacing: 0) {
+            StaticSidebar(selectedDestination: selectedDestination ?? .overview)
+            Divider()
+            DetailView(destination: selectedDestination ?? .overview, store: store)
+        }
+    }
+}
+
+// MARK: - Static Sidebar (for capture mode)
+private struct StaticSidebar: View {
+    let selectedDestination: Destination
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(AppMetadata.name)
+                .font(.headline)
+                .padding()
+            VStack(alignment: .leading, spacing: 2) {
+                ForEach(Destination.allCases, id: \.self) { dest in
+                    row(for: dest)
+                }
+            }
+            .padding(.horizontal, 8)
+            Spacer()
+        }
+        .frame(width: 200)
+        .background(Color(NSColor.controlBackgroundColor))
+    }
+
+    private func row(for dest: Destination) -> some View {
+        HStack {
+            Label(dest.title, systemImage: dest.icon)
+            Spacer()
+        }
+        .padding(.vertical, 6)
+        .padding(.horizontal, 8)
+        .background(dest == selectedDestination ? Color.accentColor.opacity(0.2) : Color.clear)
+        .cornerRadius(6)
     }
 }
 
@@ -61,24 +105,10 @@ private struct Sidebar: View {
 
     var body: some View {
         List(selection: $selectedDestination) {
-            NavigationLink(value: Destination.overview) {
-                Label("Overview", systemImage: "chart.line.uptrend.xyaxis")
-            }
-
-            NavigationLink(value: Destination.models) {
-                Label("Models", systemImage: "cpu")
-            }
-
-            NavigationLink(value: Destination.dailyUsage) {
-                Label("Daily Usage", systemImage: "calendar")
-            }
-
-            NavigationLink(value: Destination.analytics) {
-                Label("Analytics", systemImage: "chart.bar.xaxis")
-            }
-
-            NavigationLink(value: Destination.liveMetrics) {
-                Label("Live Metrics", systemImage: "arrow.triangle.2.circlepath")
+            ForEach(Destination.allCases, id: \.self) { dest in
+                NavigationLink(value: dest) {
+                    Label(dest.title, systemImage: dest.icon)
+                }
             }
         }
         .navigationTitle(AppMetadata.name)
@@ -91,10 +121,10 @@ private struct Sidebar: View {
 private struct DetailView: View {
     let destination: Destination
     let store: UsageStore
-    let settingsService: AppSettingsService
 
     var body: some View {
         content
+            .environment(store)
             .frame(minWidth: 700)
     }
 
@@ -103,47 +133,44 @@ private struct DetailView: View {
         switch destination {
         case .overview:
             OverviewView()
-                .environment(store)
         case .models:
             ModelsView()
-                .environment(store)
         case .dailyUsage:
             DailyUsageView()
-                .environment(store)
         case .analytics:
             AnalyticsView()
-                .environment(store)
         case .liveMetrics:
-            MenuBarContentView(settingsService: settingsService, viewMode: .liveMetrics)
-                .environment(store)
+            MenuBarContentView(viewMode: .liveMetrics)
         }
     }
 }
 
 // MARK: - Navigation Destination
-enum Destination: Hashable {
+public enum Destination: Hashable, CaseIterable {
     case overview
     case models
     case dailyUsage
     case analytics
     case liveMetrics
-}
 
-// MARK: - Preview
+    var title: String {
+        switch self {
+        case .overview: "Overview"
+        case .models: "Models"
+        case .dailyUsage: "Daily Usage"
+        case .analytics: "Analytics"
+        case .liveMetrics: "Live Metrics"
+        }
+    }
 
-#if DEBUG
-struct MainViewPreview: View {
-    @State private var store = UsageStore()
-
-    var body: some View {
-        MainView(settingsService: AppSettingsService())
-            .environment(store)
-            .frame(width: 1000, height: 700)
-            .task { await store.loadData() }
+    var icon: String {
+        switch self {
+        case .overview: "chart.line.uptrend.xyaxis"
+        case .models: "cpu"
+        case .dailyUsage: "calendar"
+        case .analytics: "chart.bar.xaxis"
+        case .liveMetrics: "arrow.triangle.2.circlepath"
+        }
     }
 }
 
-#Preview {
-    MainViewPreview()
-}
-#endif

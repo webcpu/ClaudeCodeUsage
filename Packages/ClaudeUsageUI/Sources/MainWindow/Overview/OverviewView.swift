@@ -10,10 +10,10 @@ struct OverviewView: View {
     @Environment(UsageStore.self) private var store
 
     var body: some View {
-        ScrollView {
+        CaptureCompatibleScrollView {
             OverviewContent(state: ContentState.from(store: store))
         }
-        .frame(minWidth: 600, idealWidth: 840, maxWidth: .infinity, maxHeight: .infinity)
+        .frame(minWidth: 600, idealWidth: 840)
     }
 }
 

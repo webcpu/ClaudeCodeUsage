@@ -10,14 +10,14 @@ struct DailyUsageView: View {
     @Environment(UsageStore.self) private var store
 
     var body: some View {
-        ScrollView {
+        CaptureCompatibleScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 DailyUsageHeader()
                 DailyUsageContent(state: ContentState.from(store: store))
             }
             .padding()
         }
-        .frame(minWidth: 600, idealWidth: 840, maxWidth: .infinity, maxHeight: .infinity)
+        .frame(minWidth: 600, idealWidth: 840)
     }
 }
 
