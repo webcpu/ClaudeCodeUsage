@@ -45,6 +45,9 @@ public struct YearlyCostHeatmap: View {
     /// Screen bounds for tooltip positioning
     @State private var screenBounds: CGRect = NSScreen.main?.frame ?? .zero
 
+    /// Capture mode environment value
+    @Environment(\.isCaptureMode) private var isCaptureMode
+
     // MARK: - Initialization
 
     /// Initialize with usage statistics and optional configuration
@@ -78,8 +81,24 @@ public struct YearlyCostHeatmap: View {
         .background(Color(NSColor.controlBackgroundColor))
         .cornerRadius(12)
         .overlay(tooltipOverlay, alignment: .topLeading)
-        .task { await viewModel.updateStats(stats) }
-        .onAppear { screenBounds = NSScreen.main?.frame ?? .zero }
+        .task { await loadDataIfNeeded() }
+        .onAppear { handleOnAppear() }
+    }
+
+    // MARK: - Data Loading
+
+    /// Load data asynchronously (for normal mode)
+    private func loadDataIfNeeded() async {
+        guard !isCaptureMode else { return }
+        await viewModel.updateStats(stats)
+    }
+
+    /// Handle onAppear - sync load for capture mode
+    private func handleOnAppear() {
+        screenBounds = NSScreen.main?.frame ?? .zero
+        if isCaptureMode {
+            viewModel.updateStatsSync(stats)
+        }
     }
 
     private var shouldShowLegend: Bool {

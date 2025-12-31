@@ -30,6 +30,9 @@ public struct HeatmapGrid: View {
     /// Accessibility configuration
     private let accessibility: HeatmapAccessibility
 
+    /// Capture mode environment value
+    @Environment(\.isCaptureMode) private var isCaptureMode
+
     // MARK: - Initialization
 
     /// Initialize heatmap grid
@@ -86,6 +89,27 @@ public struct HeatmapGrid: View {
 
     @ViewBuilder
     private var scrollableGridWithMonthLabels: some View {
+        if isCaptureMode {
+            staticGridWithMonthLabels
+        } else {
+            interactiveScrollableGrid
+        }
+    }
+
+    /// Static grid for capture mode (no ScrollView)
+    @ViewBuilder
+    private var staticGridWithMonthLabels: some View {
+        VStack(spacing: 8) {
+            monthLabelsRowIfNeeded
+            gridWithHoverOverlay
+        }
+        .accessibilityElement(children: accessibility.groupAccessibilityElements ? .contain : .ignore)
+        .accessibilityLabel("Heatmap grid showing daily usage over time")
+    }
+
+    /// Interactive scrollable grid for normal mode
+    @ViewBuilder
+    private var interactiveScrollableGrid: some View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
                 VStack(spacing: 8) {

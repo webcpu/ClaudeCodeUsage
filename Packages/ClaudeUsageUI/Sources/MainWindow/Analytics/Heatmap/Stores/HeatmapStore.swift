@@ -102,6 +102,44 @@ public final class HeatmapStore {
         isLoading = false
     }
 
+    /// Synchronous update for capture mode (ImageRenderer doesn't wait for .task)
+    public func updateStatsSync(_ stats: UsageStats) {
+        error = nil
+        currentStats = stats
+
+        do {
+            let validDailyUsage = try validateDailyUsage(stats.byDate)
+            let dateRange = try calculateValidDateRange()
+            dataset = buildDatasetSync(from: validDailyUsage, dateRange: dateRange)
+        } catch {
+            handleDatasetError(error)
+        }
+    }
+
+    /// Synchronous dataset building for capture mode
+    private func buildDatasetSync(
+        from dailyUsage: [DailyUsage],
+        dateRange: (start: Date, end: Date)
+    ) -> HeatmapDataset {
+        let costLookup = buildCostLookup(from: dailyUsage)
+        let maxCost = calculateMaxCost(from: dailyUsage)
+        let weeksLayout = dateCalculator.generateWeeksLayout(from: dateRange.start, to: dateRange.end)
+
+        let weeks = buildWeeks(
+            from: weeksLayout,
+            costLookup: costLookup,
+            maxCost: maxCost,
+            dateRange: dateRange.start...dateRange.end
+        )
+
+        return HeatmapDataset(
+            weeks: weeks,
+            monthLabels: generateMonthLabels(from: dateRange.start, to: dateRange.end),
+            maxCost: calculateMaxCost(from: dailyUsage),
+            dateRange: dateRange.start...dateRange.end
+        )
+    }
+
     /// Handle hover at specific location
     /// - Parameters:
     ///   - location: Cursor location in heatmap coordinate space
