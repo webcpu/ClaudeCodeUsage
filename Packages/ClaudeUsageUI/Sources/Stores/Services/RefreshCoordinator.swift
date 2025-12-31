@@ -22,6 +22,26 @@ private enum Timing {
     static let refreshThreshold: TimeInterval = 2.0
 }
 
+// MARK: - Refresh Reason
+
+enum RefreshReason: Sendable {
+    case manual
+    case fileChange
+    case dayChange
+    case timer
+    case appBecameActive
+    case windowFocus
+
+    var shouldInvalidateCache: Bool {
+        switch self {
+        case .timer:
+            false
+        case .manual, .fileChange, .dayChange, .appBecameActive, .windowFocus:
+            true
+        }
+    }
+}
+
 // MARK: - Refresh Coordinator
 
 @MainActor
@@ -34,7 +54,7 @@ final class RefreshCoordinator {
     private let monitoredPath: String
     private let directoryMonitor: DirectoryMonitor
 
-    var onRefresh: (() async -> Void)?
+    var onRefresh: ((RefreshReason) async -> Void)?
 
     private static let dayFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -78,7 +98,7 @@ final class RefreshCoordinator {
     }
 
     func handleAppBecameActive() {
-        triggerRefreshIfNeeded()
+        triggerRefreshIfNeeded(reason: .appBecameActive)
         start()
     }
 
@@ -87,19 +107,19 @@ final class RefreshCoordinator {
     }
 
     func handleWindowFocus() {
-        triggerRefreshIfNeeded()
+        triggerRefreshIfNeeded(reason: .windowFocus)
     }
 
     // MARK: - Refresh Logic
 
-    private func triggerRefreshIfNeeded() {
+    private func triggerRefreshIfNeeded(reason: RefreshReason) {
         guard shouldRefresh() else { return }
-        triggerRefresh()
+        triggerRefresh(reason: reason)
     }
 
-    private func triggerRefresh() {
+    private func triggerRefresh(reason: RefreshReason) {
         lastRefreshTime = clock.now
-        Task { await onRefresh?() }
+        Task { await onRefresh?(reason) }
     }
 
     private func shouldRefresh() -> Bool {
@@ -111,7 +131,7 @@ final class RefreshCoordinator {
     private func setupDirectoryMonitor() {
         directoryMonitor.onChange = { [weak self] in
             Task { @MainActor [weak self] in
-                self?.triggerRefreshIfNeeded()
+                self?.triggerRefreshIfNeeded(reason: .fileChange)
             }
         }
     }
@@ -124,7 +144,7 @@ final class RefreshCoordinator {
                 do {
                     try await Task.sleep(for: .seconds(Timing.fallbackInterval))
                     guard !Task.isCancelled else { break }
-                    triggerRefresh()
+                    triggerRefresh(reason: .timer)
                 } catch {
                     break
                 }
@@ -173,7 +193,7 @@ final class RefreshCoordinator {
 
     private func handleDayChange() {
         lastKnownDay = Self.formatDay(clock.now)
-        triggerRefresh()
+        triggerRefresh(reason: .dayChange)
     }
 
     @objc private func handleSignificantTimeChange() {
@@ -181,7 +201,7 @@ final class RefreshCoordinator {
             let currentDay = Self.formatDay(clock.now)
             guard currentDay != lastKnownDay else { return }
             lastKnownDay = currentDay
-            triggerRefresh()
+            triggerRefresh(reason: .dayChange)
         }
     }
 

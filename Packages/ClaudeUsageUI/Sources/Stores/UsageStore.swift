@@ -95,8 +95,8 @@ public final class UsageStore {
             basePath: config.configuration.basePath
         )
 
-        refreshCoordinator.onRefresh = { [weak self] in
-            await self?.loadData()
+        refreshCoordinator.onRefresh = { [weak self] reason in
+            await self?.loadData(invalidateCache: reason.shouldInvalidateCache)
         }
     }
 
@@ -107,14 +107,14 @@ public final class UsageStore {
         hasInitialized = true
 
         if !state.hasLoaded {
-            await loadData()
+            await loadData(invalidateCache: true)
         }
         refreshCoordinator.start()
     }
 
-    func loadData() async {
+    func loadData(invalidateCache: Bool = true) async {
         guard canStartLoad else { return }
-        await trackLoadExecution { try await executeLoad() }
+        await trackLoadExecution { try await executeLoad(invalidateCache: invalidateCache) }
     }
 
     // MARK: - Load Execution
@@ -137,8 +137,8 @@ public final class UsageStore {
         }
     }
 
-    private func executeLoad() async throws {
-        let todayResult = try await dataLoader.loadToday()
+    private func executeLoad(invalidateCache: Bool) async throws {
+        let todayResult = try await dataLoader.loadToday(invalidateCache: invalidateCache)
         apply(todayResult)
         try await loadHistoryIfNeeded()
     }

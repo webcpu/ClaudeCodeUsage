@@ -17,8 +17,11 @@ actor UsageDataLoader {
         self.sessionMonitorService = sessionMonitorService
     }
 
-    func loadToday() async throws -> TodayLoadResult {
-        try await tracePhase(.today) {
+    func loadToday(invalidateCache: Bool = false) async throws -> TodayLoadResult {
+        if invalidateCache {
+            await repository.clearCache()
+        }
+        return try await tracePhase(.today) {
             try await fetchTodayData()
         }
     }
@@ -29,8 +32,8 @@ actor UsageDataLoader {
         }
     }
 
-    func loadAll() async throws -> UsageLoadResult {
-        let today = try await loadToday()
+    func loadAll(invalidateCache: Bool = false) async throws -> UsageLoadResult {
+        let today = try await loadToday(invalidateCache: invalidateCache)
         let history = try await loadHistory()
         return combineResults(today: today, history: history)
     }

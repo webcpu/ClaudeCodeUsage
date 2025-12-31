@@ -19,6 +19,9 @@ public protocol UsageDataSource: Sendable {
 
     /// Get all raw usage entries (for detailed analysis)
     func getAllEntries() async throws -> [UsageEntry]
+
+    /// Invalidate any cached data to force fresh reads
+    func clearCache() async
 }
 
 // MARK: - SessionDataSource
