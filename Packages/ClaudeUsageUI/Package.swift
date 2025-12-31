@@ -11,6 +11,9 @@ let package = Package(
         .library(
             name: "ClaudeUsageUI",
             targets: ["ClaudeUsageUI"]),
+        .executable(
+            name: "PreviewCapture",
+            targets: ["PreviewCapture"]),
     ],
     dependencies: [
         .package(path: "../ClaudeUsageCore"),
@@ -24,6 +27,14 @@ let package = Package(
                 "ClaudeUsageData",
             ],
             path: "Sources"),
+
+        .executableTarget(
+            name: "PreviewCapture",
+            dependencies: ["ClaudeUsageUI"],
+            path: "PreviewCapture",
+            swiftSettings: [
+                .unsafeFlags(["-enable-testing"]),
+            ]),
 
         .testTarget(
             name: "ClaudeUsageUITests",
