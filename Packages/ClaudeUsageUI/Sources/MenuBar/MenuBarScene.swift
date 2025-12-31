@@ -13,14 +13,12 @@ private let isRunningForPreviews = ProcessInfo.processInfo.environment["XCODE_RU
 // MARK: - Menu Bar Scene
 
 public struct MenuBarScene: Scene {
-    let store: UsageStore
-    let settingsService: AppSettingsService
+    let env: AppEnvironment
     let lifecycleManager: AppLifecycleManager
     @State private var hasInitialized = false
 
-    public init(store: UsageStore, settingsService: AppSettingsService, lifecycleManager: AppLifecycleManager) {
-        self.store = store
-        self.settingsService = settingsService
+    public init(env: AppEnvironment, lifecycleManager: AppLifecycleManager) {
+        self.env = env
         self.lifecycleManager = lifecycleManager
     }
 
@@ -36,38 +34,36 @@ public struct MenuBarScene: Scene {
     @ViewBuilder
     private var menuContent: some View {
         if isRunningForPreviews {
-            // Minimal content for preview mode to avoid blocking app launch
             Text("Preview Mode")
                 .frame(width: 200, height: 100)
         } else {
-            MenuBarContentView(settingsService: settingsService)
-                .environment(store)
+            MenuBarContentView()
+                .withAppEnvironment(env)
         }
     }
 
     @ViewBuilder
     private var menuLabel: some View {
         if isRunningForPreviews {
-            // Minimal label for preview mode
             Image(systemName: "dollarsign.circle")
         } else {
-            MenuBarLabel(store: store)
-                .environment(store)
+            MenuBarLabel(store: env.store)
+                .withAppEnvironment(env)
                 .task { await initializeOnce() }
                 .contextMenu { contextMenu }
         }
     }
 
     private var contextMenu: some View {
-        MenuBarContextMenu(settingsService: settingsService)
-            .environment(store)
+        MenuBarContextMenu()
+            .withAppEnvironment(env)
     }
 
     private func initializeOnce() async {
         guard !hasInitialized else { return }
         hasInitialized = true
-        lifecycleManager.configure(with: store)
-        await store.initializeIfNeeded()
+        lifecycleManager.configure(with: env.store)
+        await env.store.initializeIfNeeded()
     }
 }
 
@@ -102,7 +98,6 @@ struct MenuBarLabel: View {
 
 struct MenuBarContextMenu: View {
     @Environment(UsageStore.self) private var store
-    let settingsService: AppSettingsService
 
     var body: some View {
         Group {
@@ -140,7 +135,7 @@ struct MenuBarContextMenu: View {
     private var actionsSection: some View {
         Group {
             Button("Main") { WindowActions.showMainWindow() }
-            OpenAtLoginToggle(settingsService: settingsService)
+            OpenAtLoginToggle()
         }
     }
 
@@ -195,55 +190,12 @@ extension UsageStore {
 // MARK: - Preview
 
 #if DEBUG
-struct MenuBarPreview: View {
-    @State private var store = UsageStore()
-
-    var body: some View {
-        content
-            .frame(height: 500)
-            .task { await store.loadData() }
-    }
-
-    @ViewBuilder
-    private var content: some View {
-        if store.state.hasLoaded {
-            MenuBarContentView(settingsService: AppSettingsService())
-                .environment(store)
-        } else {
-            ProgressView("Loading...")
-                .frame(width: MenuBarTheme.Layout.menuBarWidth, height: 200)
-        }
-    }
-}
-
-struct MenuBarLabelPreview: View {
-    @State private var store = UsageStore()
-
-    var body: some View {
-        content
-            .frame(width: 200, height: 100)
-            .task { await store.loadData() }
-    }
-
-    @ViewBuilder
-    private var content: some View {
-        if store.state.hasLoaded {
-            MenuBarLabel(store: store)
-                .padding()
-                .background(Color(nsColor: .windowBackgroundColor))
-                .cornerRadius(8)
-        } else {
-            ProgressView()
-        }
-    }
-}
-
-#Preview("Menu Bar Content", traits: .sizeThatFitsLayout) {
-    MenuBarPreview()
-}
-
 #Preview("Menu Bar Label", traits: .sizeThatFitsLayout) {
-    MenuBarLabelPreview()
+    MenuBarLabel(store: UsageStore())
+        .padding()
+        .background(Color(nsColor: .windowBackgroundColor))
+        .cornerRadius(8)
+        .frame(width: 200, height: 100)
 }
 #endif
 

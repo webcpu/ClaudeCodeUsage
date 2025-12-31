@@ -1,35 +1,27 @@
 //
 //  SettingsMenu.swift
-//  Reusable settings menu component with proper separation of concerns
+//  Reusable settings menu component
 //
 
 import SwiftUI
 
 struct SettingsMenu<Label: View>: View {
-    let settingsService: AppSettingsService
+    @Environment(AppSettingsService.self) private var settings
     @State private var showingError = false
     @State private var lastError: AppSettingsError?
-    
+
     let label: () -> Label
-    
-    init(
-        settingsService: AppSettingsService,
-        @ViewBuilder label: @escaping () -> Label
-    ) {
-        self.settingsService = settingsService
+
+    init(@ViewBuilder label: @escaping () -> Label) {
         self.label = label
     }
-    
+
     var body: some View {
         Menu {
-            // Open at Login Toggle
             Toggle("Open at Login", isOn: openAtLoginBinding)
-            
             Divider()
-            
-            // About
-            Button("About \(settingsService.appName)") {
-                settingsService.showAboutPanel()
+            Button("About \(settings.appName)") {
+                settings.showAboutPanel()
             }
         } label: {
             label()
@@ -47,13 +39,13 @@ struct SettingsMenu<Label: View>: View {
             }
         }
     }
-    
+
     private var openAtLoginBinding: Binding<Bool> {
         Binding(
-            get: { settingsService.isOpenAtLoginEnabled },
+            get: { settings.isOpenAtLoginEnabled },
             set: { newValue in
                 Task {
-                    let result = await settingsService.setOpenAtLogin(newValue)
+                    let result = await settings.setOpenAtLogin(newValue)
                     if case .failure(let error) = result {
                         lastError = error
                         showingError = true
@@ -66,20 +58,14 @@ struct SettingsMenu<Label: View>: View {
 
 // MARK: - Convenience Initializers
 
-extension SettingsMenu {
-    /// Creates a settings menu with a gear icon
-    init(settingsService: AppSettingsService) where Label == Image {
-        self.init(settingsService: settingsService) {
-            Image(systemName: "gearshape.fill")
-        }
+extension SettingsMenu where Label == Image {
+    init() {
+        self.init { Image(systemName: "gearshape.fill") }
     }
 }
 
 extension SettingsMenu where Label == Text {
-    /// Creates a settings menu with text label
-    init(_ title: String, settingsService: AppSettingsService) {
-        self.init(settingsService: settingsService) {
-            Text(title)
-        }
+    init(_ title: String) {
+        self.init { Text(title) }
     }
 }

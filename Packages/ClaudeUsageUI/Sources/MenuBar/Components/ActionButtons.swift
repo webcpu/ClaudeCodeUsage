@@ -10,7 +10,6 @@ import ClaudeUsageCore
 
 struct ActionButtons: View {
     @Environment(\.openWindow) private var openWindow
-    let settingsService: AppSettingsService
     let onRefresh: () -> Void
     let viewMode: MenuBarViewMode
 
@@ -56,7 +55,7 @@ struct ActionButtons: View {
     }
 
     private var settingsMenuButton: some View {
-        SettingsMenu(settingsService: settingsService)
+        SettingsMenu()
             .menuStyle(BorderlessButtonMenuStyle())
             .fixedSize()
             .buttonStyle(MenuButtonStyle(style: .secondary))

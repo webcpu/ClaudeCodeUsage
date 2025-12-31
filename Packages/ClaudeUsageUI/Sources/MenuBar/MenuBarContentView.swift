@@ -9,19 +9,17 @@ import ClaudeUsageCore
 // MARK: - Main Menu Bar Content View
 struct MenuBarContentView: View {
     @Environment(UsageStore.self) private var store
-    let settingsService: AppSettingsService
+    @Environment(AppSettingsService.self) private var settings
     @FocusState private var focusedField: FocusField?
     let viewMode: MenuBarViewMode
-    
+
     enum FocusField: Hashable {
         case refresh
         case settings
         case quit
     }
-    
-    // MARK: - Initializers
-    init(settingsService: AppSettingsService, viewMode: MenuBarViewMode = .menuBar) {
-        self.settingsService = settingsService
+
+    init(viewMode: MenuBarViewMode = .menuBar) {
         self.viewMode = viewMode
     }
     
@@ -36,6 +34,7 @@ struct MenuBarContentView: View {
         .background(MenuBarTheme.Colors.UI.background)
         .focusable()
         .onKeyPress { handleKeyPress($0) }
+        .task { await store.initializeIfNeeded() }
     }
 
     // MARK: - Sections
@@ -91,7 +90,7 @@ struct MenuBarContentView: View {
     }
 
     private var actionsSection: some View {
-        ActionButtons(settingsService: settingsService, onRefresh: handleRefresh, viewMode: viewMode)
+        ActionButtons(onRefresh: handleRefresh, viewMode: viewMode)
             .padding(.horizontal, 12)
             .padding(.bottom, 8)
     }

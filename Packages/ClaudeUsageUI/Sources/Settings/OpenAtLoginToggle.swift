@@ -6,12 +6,10 @@
 import SwiftUI
 
 public struct OpenAtLoginToggle: View {
-    let settingsService: AppSettingsService
+    @Environment(AppSettingsService.self) private var settings
     @State private var isHovered = false
 
-    public init(settingsService: AppSettingsService) {
-        self.settingsService = settingsService
-    }
+    public init() {}
 
     public var body: some View {
         HStack(spacing: Layout.spacing) {
@@ -55,7 +53,7 @@ private extension OpenAtLoginToggle {
 
 private extension OpenAtLoginToggle {
     var isEnabled: Bool {
-        settingsService.isOpenAtLoginEnabled
+        settings.isOpenAtLoginEnabled
     }
 
     var checkboxIconName: String {
@@ -76,7 +74,7 @@ private extension OpenAtLoginToggle {
 private extension OpenAtLoginToggle {
     func toggleSetting() {
         Task {
-            _ = await settingsService.setOpenAtLogin(!isEnabled)
+            _ = await settings.setOpenAtLogin(!isEnabled)
         }
     }
 }
