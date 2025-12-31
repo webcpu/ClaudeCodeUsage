@@ -11,9 +11,8 @@ import ClaudeUsageUI
 
 @main
 struct ClaudeCodeUsageApp: App {
-    @State private var store = UsageStore()
+    @State private var env = AppEnvironment.live()
     @State private var lifecycleManager = AppLifecycleManager()
-    @State private var settingsService = AppSettingsService()
 
     var body: some Scene {
         mainWindow
@@ -22,25 +21,25 @@ struct ClaudeCodeUsageApp: App {
 
     private var mainWindow: some Scene {
         Window(AppMetadata.name, id: "main") {
-            MainView(settingsService: settingsService)
-                .environment(store)
+            MainView()
+                .withAppEnvironment(env)
         }
         .defaultLaunchBehavior(.suppressed)
         .windowStyle(.automatic)
         .windowToolbarStyle(.unified)
         .defaultSize(width: 840, height: 600)
-        .commands { AppCommands(settingsService: settingsService) }
+        .commands { AppCommands(settings: env.settings) }
     }
 
     private var menuBarScene: some Scene {
-        MenuBarScene(store: store, settingsService: settingsService, lifecycleManager: lifecycleManager)
+        MenuBarScene(env: env, lifecycleManager: lifecycleManager)
     }
 }
 
 // MARK: - App Commands
 
 struct AppCommands: Commands {
-    let settingsService: AppSettingsService
+    let settings: AppSettingsService
 
     var body: some Commands {
         aboutCommand
@@ -51,14 +50,15 @@ struct AppCommands: Commands {
     private var aboutCommand: some Commands {
         CommandGroup(replacing: .appInfo) {
             Button("About \(AppMetadata.name)") {
-                settingsService.showAboutPanel()
+                settings.showAboutPanel()
             }
         }
     }
 
     private var settingsCommand: some Commands {
         CommandGroup(after: .appSettings) {
-            OpenAtLoginToggle(settingsService: settingsService)
+            OpenAtLoginToggle()
+                .environment(settings)
         }
     }
 
