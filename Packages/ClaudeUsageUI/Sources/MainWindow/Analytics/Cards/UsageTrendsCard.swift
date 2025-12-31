@@ -1,6 +1,6 @@
 //
 //  UsageTrendsCard.swift
-//  Usage trends and efficiency analytics
+//  Usage trends analytics
 //
 
 import SwiftUI
@@ -35,22 +35,6 @@ struct TrendsCard: View {
                 value: DateFormatting.formatMedium(peak.date),
                 detail: peak.totalCost.asCurrency
             )
-        }
-    }
-}
-
-// MARK: - Efficiency Card
-
-struct EfficiencyCard: View {
-    let stats: UsageStats
-
-    var body: some View {
-        AnalyticsCard(title: "Efficiency", icon: "memorychip", color: .purple) {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(UsageAnalytics.cacheSavings(from: stats).description)
-                    .font(.body)
-                    .foregroundColor(.primary)
-            }
         }
     }
 }

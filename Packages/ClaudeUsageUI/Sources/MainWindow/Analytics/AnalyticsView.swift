@@ -65,7 +65,6 @@ private struct AnalyticsCards: View {
             YearlyCostHeatmapCard(stats: stats)
             TokenDistributionCard(stats: stats)
             PredictionsCard(stats: stats)
-            EfficiencyCard(stats: stats)
             TrendsCard(stats: stats)
         }
     }
