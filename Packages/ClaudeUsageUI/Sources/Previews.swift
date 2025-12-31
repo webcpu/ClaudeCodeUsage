@@ -1,63 +1,45 @@
 //
 //  Previews.swift
-//  All app previews in one place
+//  Xcode previews
 //
 
 #if DEBUG
+
 import SwiftUI
-import ClaudeUsageCore
 
-// MARK: - Menu Bar Preview
-
-struct MenuBarPreviewWrapper: View {
-    @State private var store = UsageStore()
-
-    var body: some View {
-        content
-            .frame(height: 500)
-            .task { await store.loadData() }
-    }
-
-    @ViewBuilder
-    private var content: some View {
-        if store.state.hasLoaded {
-            MenuBarContentView(settingsService: AppSettingsService())
-                .environment(store)
-        } else {
-            ProgressView("Loading...")
-                .frame(width: MenuBarTheme.Layout.menuBarWidth, height: 200)
-        }
-    }
+#Preview("MenuBar", traits: .appEnvironment) {
+    MenuBarContentView()
+        .frame(width: 360, height: 500)
 }
 
-// MARK: - Main Window Preview
-
-struct MainWindowPreviewWrapper: View {
-    @State private var store = UsageStore()
-
-    var body: some View {
-        MainView(settingsService: AppSettingsService())
-            .environment(store)
-            .frame(width: 1000, height: 700)
-            .task { await store.loadData() }
-    }
+#Preview("MainWindow", traits: .appEnvironment) {
+    MainView()
+        .frame(width: 1100, height: 700)
 }
 
-// MARK: - Previews
-
-#Preview("Menu Bar") {
-    MenuBarPreviewWrapper()
+#Preview("MainWindow-Overview", traits: .appEnvironment) {
+    MainView(initialDestination: .overview)
+        .frame(width: 1100, height: 700)
 }
 
-#Preview("Main Window") {
-    MainWindowPreviewWrapper()
+#Preview("MainWindow-Models", traits: .appEnvironment) {
+    MainView(initialDestination: .models)
+        .frame(width: 1100, height: 700)
 }
 
-#Preview("All") {
-    HStack {
-        MenuBarPreviewWrapper()
-        Divider()
-        MainWindowPreviewWrapper()
-    }
+#Preview("MainWindow-DailyUsage", traits: .appEnvironment) {
+    MainView(initialDestination: .dailyUsage)
+        .frame(width: 1100, height: 700)
 }
+
+#Preview("MainWindow-Analytics", traits: .appEnvironment) {
+    MainView(initialDestination: .analytics)
+        .frame(width: 1100, height: 700)
+}
+
+#Preview("MainWindow-LiveMetrics", traits: .appEnvironment) {
+    MainView(initialDestination: .liveMetrics)
+        .frame(width: 1100, height: 700)
+}
+
 #endif
