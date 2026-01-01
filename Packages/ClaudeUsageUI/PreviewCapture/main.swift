@@ -16,6 +16,7 @@ import SwiftUI
 
 private enum Config {
     static let renderScale: CGFloat = 2.0
+    static let manifestFilename = "manifest.json"
 }
 
 // MARK: - Capture Result
@@ -51,8 +52,7 @@ struct CaptureResult: Codable {
     }
 
     var logMessage: String {
-        let prefix = status == "success" ? "Saved" : "FAILED"
-        return "\(prefix): \(path)"
+        "\(status == "success" ? "Saved" : "FAILED"): \(path)"
     }
 }
 
@@ -89,23 +89,100 @@ enum CaptureError: Error, CustomStringConvertible {
     }
 }
 
-// MARK: - NSImage Extension
+// MARK: - Capture Pipeline (High Level)
 
-private extension NSImage {
-    var pngData: Data? {
-        tiffRepresentation
-            .flatMap { NSBitmapImageRep(data: $0) }
-            .flatMap { $0.representation(using: .png, properties: [:]) }
+@MainActor
+func runCapture<M: CaptureManifest>(_ manifest: M.Type, targetFilter: String?) async throws {
+    let env = try await M.makeEnvironment()
+    let targets = try filterTargets(M.targets, by: targetFilter)
+    try createOutputDirectory(M.outputDirectory)
+    let results = await captureAllTargets(targets, env: env, outputDir: M.outputDirectory)
+    results.forEach { print($0.logMessage) }
+    try writeManifest(results, to: M.outputDirectory)
+}
+
+// MARK: - Capture Pipeline (Mid Level)
+
+@MainActor
+private func captureAllTargets<E: Sendable>(
+    _ targets: [CaptureTarget<E>],
+    env: E,
+    outputDir: URL
+) async -> [CaptureResult] {
+    await withTaskGroup(of: CaptureResult.self, returning: [CaptureResult].self) { group in
+        targets.forEach { target in
+            group.addTask { @MainActor in
+                captureTarget(target, env: env, outputDir: outputDir)
+            }
+        }
+        var results: [CaptureResult] = []
+        for await result in group {
+            results.append(result)
+        }
+        return results
     }
 }
 
-// MARK: - Rendering
+@MainActor
+private func captureTarget<E>(_ target: CaptureTarget<E>, env: E, outputDir: URL) -> CaptureResult {
+    let path = outputPath(for: target, in: outputDir)
+    do {
+        try renderAndSave(target: target, env: env, to: path)
+        return .success(name: target.name, path: path.path, size: target.size)
+    } catch {
+        return .failure(name: target.name, path: path.path, size: target.size, error: error)
+    }
+}
+
+// MARK: - Capture Pipeline (Low Level)
 
 @MainActor
-private func renderImage<V: View>(from view: V, size: CGSize) -> NSImage? {
+private func renderAndSave<E>(target: CaptureTarget<E>, env: E, to path: URL) throws {
+    let view = target.view(env)
+    let image = try renderImage(from: view, size: target.size, name: target.name)
+    let data = try convertToPNG(image, name: target.name)
+    try data.write(to: path)
+}
+
+@MainActor
+private func renderImage<V: View>(from view: V, size: CGSize, name: String) throws -> NSImage {
     let renderer = ImageRenderer(content: view.frame(width: size.width, height: size.height))
     renderer.scale = Config.renderScale
-    return renderer.nsImage
+    guard let image = renderer.nsImage else {
+        throw CaptureError.renderFailed(name)
+    }
+    return image
+}
+
+private func convertToPNG(_ image: NSImage, name: String) throws -> Data {
+    guard let data = image.pngData else {
+        throw CaptureError.pngConversionFailed(name)
+    }
+    return data
+}
+
+// MARK: - File Operations
+
+private func createOutputDirectory(_ url: URL) throws {
+    try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+}
+
+private func outputPath<E>(for target: CaptureTarget<E>, in directory: URL) -> URL {
+    directory.appendingPathComponent("\(target.name).png")
+}
+
+private func writeManifest(_ results: [CaptureResult], to directory: URL) throws {
+    let manifest = CaptureManifestOutput.from(results: results, directory: directory)
+    let data = try encodeManifest(manifest)
+    let path = directory.appendingPathComponent(Config.manifestFilename)
+    try data.write(to: path)
+    print("Manifest: \(path.path)")
+}
+
+private func encodeManifest(_ manifest: CaptureManifestOutput) throws -> Data {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+    return try encoder.encode(manifest)
 }
 
 // MARK: - Target Filtering
@@ -115,82 +192,10 @@ private func filterTargets<E>(
     by filter: String?
 ) throws -> [CaptureTarget<E>] {
     guard let filter else { return allTargets }
-
     guard let target = allTargets.first(where: { $0.name == filter }) else {
         throw CaptureError.targetNotFound(filter, available: allTargets.map(\.name))
     }
     return [target]
-}
-
-// MARK: - Manifest Writing
-
-private func writeManifest(_ results: [CaptureResult], to directory: URL) throws {
-    let manifest = CaptureManifestOutput.from(results: results, directory: directory)
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-    let path = directory.appendingPathComponent("manifest.json")
-    try encoder.encode(manifest).write(to: path)
-    print("Manifest: \(path.path)")
-}
-
-// MARK: - Capture Pipeline
-
-@MainActor
-func runCapture<M: CaptureManifest>(_ manifest: M.Type, targetFilter: String?) async throws {
-    let env = try await M.makeEnvironment()
-    let targets = try filterTargets(M.targets, by: targetFilter)
-
-    try FileManager.default.createDirectory(at: M.outputDirectory, withIntermediateDirectories: true)
-
-    let results = await captureAllTargets(targets, env: env, outputDir: M.outputDirectory)
-    try writeManifest(results, to: M.outputDirectory)
-}
-
-@MainActor
-private func captureAllTargets<E: Sendable>(
-    _ targets: [CaptureTarget<E>],
-    env: E,
-    outputDir: URL
-) async -> [CaptureResult] {
-    await withTaskGroup(of: CaptureResult.self, returning: [CaptureResult].self) { group in
-        for target in targets {
-            group.addTask { @MainActor in
-                captureTarget(target, env: env, outputDir: outputDir)
-            }
-        }
-
-        var results: [CaptureResult] = []
-        for await result in group {
-            print(result.logMessage)
-            results.append(result)
-        }
-        return results
-    }
-}
-
-@MainActor
-private func captureTarget<E>(_ target: CaptureTarget<E>, env: E, outputDir: URL) -> CaptureResult {
-    let path = outputDir.appendingPathComponent("\(target.name).png")
-
-    do {
-        try renderAndSave(target: target, env: env, to: path)
-        return .success(name: target.name, path: path.path, size: target.size)
-    } catch {
-        return .failure(name: target.name, path: path.path, size: target.size, error: error)
-    }
-}
-
-@MainActor
-private func renderAndSave<E>(target: CaptureTarget<E>, env: E, to path: URL) throws {
-    let view = target.view(env)
-
-    guard let image = renderImage(from: view, size: target.size) else {
-        throw CaptureError.renderFailed(target.name)
-    }
-    guard let data = image.pngData else {
-        throw CaptureError.pngConversionFailed(target.name)
-    }
-    try data.write(to: path)
 }
 
 // MARK: - List Targets
@@ -198,12 +203,12 @@ private func renderAndSave<E>(target: CaptureTarget<E>, env: E, to path: URL) th
 @MainActor
 func listTargets<M: CaptureManifest>(_ manifest: M.Type) {
     print("Available capture targets:")
-    M.targets.forEach { target in
-        print("  - \(target.name) (\(Int(target.size.width))x\(Int(target.size.height)))")
-    }
+    M.targets
+        .map { "  - \($0.name) (\(Int($0.size.width))x\(Int($0.size.height)))" }
+        .forEach { print($0) }
 }
 
-// MARK: - CLI Command
+// MARK: - CLI
 
 private enum Command {
     case list
@@ -217,13 +222,13 @@ private enum Command {
     }
 }
 
-// MARK: - Main
-
 @main
 struct PreviewCaptureApp {
     static func main() async {
-        let command = Command.parse(Array(CommandLine.arguments.dropFirst()))
+        await execute(Command.parse(Array(CommandLine.arguments.dropFirst())))
+    }
 
+    private static func execute(_ command: Command) async {
         switch command {
         case .list:
             await listTargets(AppEnvironment.self)
@@ -265,11 +270,12 @@ struct PreviewCaptureApp {
     }
 }
 
-// MARK: - Functional Helpers
+// MARK: - Extensions
 
-private extension CaptureResult {
-    func also(_ effect: (CaptureResult) -> Void) -> CaptureResult {
-        effect(self)
-        return self
+private extension NSImage {
+    var pngData: Data? {
+        tiffRepresentation
+            .flatMap { NSBitmapImageRep(data: $0) }
+            .flatMap { $0.representation(using: .png, properties: [:]) }
     }
 }
