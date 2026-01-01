@@ -11,21 +11,37 @@ import ClaudeUsageCore
 
 struct HourlyCostChartSimple: View {
     let hourlyData: [Double]
-    var maxScale: Double? = nil // Optional shared scale for comparing multiple charts
+    var maxScale: Double? = nil
     @State private var selectedHour: Int? = nil
 
     var body: some View {
         GeometryReader { geometry in
-            let chartWidth = geometry.size.width - 25
-            VStack(spacing: 4) {
-                headerRow
-                chart
-            }
-            .overlay(alignment: .top) {
-                tooltipOverlay(chartWidth: chartWidth, totalWidth: geometry.size.width)
-            }
+            chartLayout(geometry: geometry)
         }
-        .frame(height: 76) // 16 (header) + 60 (chart)
+        .frame(height: Layout.totalHeight)
+    }
+}
+
+// MARK: - Layout Constants
+
+private extension HourlyCostChartSimple {
+    enum Layout {
+        static let yAxisWidth: CGFloat = 25
+        static let chartHeight: CGFloat = 60
+        static let headerHeight: CGFloat = 16
+        static let totalHeight: CGFloat = headerHeight + chartHeight
+        static let chartPadding: CGFloat = 8
+        static let verticalSpacing: CGFloat = 4
+    }
+
+    enum Opacity {
+        static let pastHour: Double = 1.0
+        static let futureHour: Double = 0.3
+    }
+
+    enum AxisConfig {
+        static let hourMarks = [0, 6, 12, 18, 23]
+        static let gridLineWidth: CGFloat = 0.25
     }
 }
 
@@ -44,47 +60,102 @@ private extension HourlyCostChartSimple {
         YAxisScale(maxValue: maxValue)
     }
 
-    var headerRow: some View {
+    var chartWidth: CGFloat {
+        Layout.yAxisWidth
+    }
+}
+
+// MARK: - View Composition
+
+private extension HourlyCostChartSimple {
+    func chartLayout(geometry: GeometryProxy) -> some View {
+        let chartWidth = geometry.size.width - Layout.yAxisWidth
+        return VStack(spacing: Layout.verticalSpacing) {
+            headerView
+            chartView
+        }
+        .overlay(alignment: .top) {
+            tooltipView(chartWidth: chartWidth, totalWidth: geometry.size.width)
+        }
+    }
+
+    var headerView: some View {
         Text("Hourly")
             .font(.system(size: 10, weight: .medium))
             .foregroundColor(.secondary)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    var chart: some View {
+    var chartView: some View {
         costChart
-            .frame(height: 60)
-            .padding(.trailing, 25)
+            .frame(height: Layout.chartHeight)
+            .padding(.trailing, Layout.yAxisWidth)
     }
+}
 
+// MARK: - Chart Content
+
+private extension HourlyCostChartSimple {
     var costChart: some View {
-        Chart(Array(hourlyData.enumerated()), id: \.offset) { hour, cost in
-            BarMark(
-                x: .value("Hour", hour),
-                y: .value("Cost", cost)
-            )
-            .foregroundStyle(CostIntensity(cost: cost, maxValue: maxValue).color)
-            .opacity(hour <= currentHour ? 1.0 : 0.3)
-
-            if let selectedHour, selectedHour == hour {
-                selectionIndicator(for: hour)
-            }
+        Chart(enumeratedHourlyData, id: \.offset) { hour, cost in
+            hourlyBar(hour: hour, cost: cost)
+            selectionMark(for: hour)
         }
         .chartXSelection(value: $selectedHour)
         .chartXAxis { xAxisMarks }
         .chartYAxis { yAxisMarks }
         .chartYScale(domain: 0...yAxisScale.roundedMax)
-        .chartXScale(range: .plotDimension(padding: 8))
+        .chartXScale(range: .plotDimension(padding: Layout.chartPadding))
     }
 
+    var enumeratedHourlyData: [(offset: Int, element: Double)] {
+        Array(hourlyData.enumerated())
+    }
+
+    func hourlyBar(hour: Int, cost: Double) -> some ChartContent {
+        BarMark(
+            x: .value("Hour", hour),
+            y: .value("Cost", cost)
+        )
+        .foregroundStyle(barColor(for: cost))
+        .opacity(barOpacity(for: hour))
+    }
+
+    func barColor(for cost: Double) -> Color {
+        CostIntensity(cost: cost, maxValue: maxValue).color
+    }
+
+    func barOpacity(for hour: Int) -> Double {
+        hour <= currentHour ? Opacity.pastHour : Opacity.futureHour
+    }
+
+    @ChartContentBuilder
+    func selectionMark(for hour: Int) -> some ChartContent {
+        if let selectedHour, selectedHour == hour {
+            RuleMark(x: .value("Hour", hour))
+                .foregroundStyle(.primary.opacity(0.3))
+                .lineStyle(StrokeStyle(lineWidth: 1, dash: [2, 2]))
+        }
+    }
+}
+
+// MARK: - Axis Configuration
+
+private extension HourlyCostChartSimple {
     var xAxisMarks: some AxisContent {
-        AxisMarks(values: [0, 6, 12, 18, 23]) { value in
+        AxisMarks(values: AxisConfig.hourMarks) { value in
             AxisValueLabel {
-                if let hour = value.as(Int.self) {
-                    Text("\(hour)")
-                        .font(.system(size: 8))
-                        .foregroundColor(.secondary)
-                }
+                hourLabel(for: value)
+            }
+        }
+    }
+
+    func hourLabel(for value: AxisValue) -> some View {
+        Group {
+            if let hour = value.as(Int.self) {
+                Text("\(hour)")
+                    .font(.system(size: 8))
+                    .foregroundColor(.secondary)
             }
         }
     }
@@ -92,43 +163,57 @@ private extension HourlyCostChartSimple {
     var yAxisMarks: some AxisContent {
         AxisMarks(position: .trailing, values: yAxisScale.tickValues) { value in
             AxisValueLabel {
-                if let cost = value.as(Double.self) {
-                    Text(CostAxisFormat(cost).formatted)
-                        .font(.system(size: 8, design: .monospaced))
-                        .foregroundColor(.secondary)
-                }
+                costLabel(for: value)
             }
-            AxisGridLine(stroke: StrokeStyle(lineWidth: 0.25))
-                .foregroundStyle(.tertiary)
+            gridLine
         }
     }
 
-    func selectionIndicator(for hour: Int) -> some ChartContent {
-        RuleMark(x: .value("Hour", hour))
-            .foregroundStyle(.primary.opacity(0.3))
-            .lineStyle(StrokeStyle(lineWidth: 1, dash: [2, 2]))
+    func costLabel(for value: AxisValue) -> some View {
+        Group {
+            if let cost = value.as(Double.self) {
+                Text(CostAxisFormat(cost).formatted)
+                    .font(.system(size: 8, design: .monospaced))
+                    .foregroundColor(.secondary)
+            }
+        }
     }
 
+    var gridLine: some AxisMark {
+        AxisGridLine(stroke: StrokeStyle(lineWidth: AxisConfig.gridLineWidth))
+            .foregroundStyle(.tertiary)
+    }
+}
+
+// MARK: - Tooltip
+
+private extension HourlyCostChartSimple {
     @ViewBuilder
-    func tooltipOverlay(chartWidth: CGFloat, totalWidth: CGFloat) -> some View {
-        if let selectedHour,
-           selectedHour >= 0 && selectedHour < hourlyData.count {
+    func tooltipView(chartWidth: CGFloat, totalWidth: CGFloat) -> some View {
+        if let selectedHour, isValidHour(selectedHour) {
             HourlyTooltipView(
                 hour: selectedHour,
                 cost: hourlyData[selectedHour],
                 isCompact: true
             )
-            .offset(x: tooltipXPosition(for: selectedHour, chartWidth: chartWidth, totalWidth: totalWidth))
+            .offset(x: tooltipXOffset(for: selectedHour, chartWidth: chartWidth, totalWidth: totalWidth))
             .allowsHitTesting(false)
         }
     }
 
-    func tooltipXPosition(for hour: Int, chartWidth: CGFloat, totalWidth: CGFloat) -> CGFloat {
-        // With .top alignment, offset is relative to VStack center
+    func isValidHour(_ hour: Int) -> Bool {
+        hourlyData.indices.contains(hour)
+    }
+
+    func tooltipXOffset(for hour: Int, chartWidth: CGFloat, totalWidth: CGFloat) -> CGFloat {
+        let barCenter = calculateBarCenter(for: hour, chartWidth: chartWidth)
+        let viewCenter = totalWidth / 2
+        return barCenter - viewCenter
+    }
+
+    func calculateBarCenter(for hour: Int, chartWidth: CGFloat) -> CGFloat {
         let barWidth = chartWidth / 24
-        let barCenter = (CGFloat(hour) + 0.5) * barWidth
-        let vstackCenter = totalWidth / 2
-        return barCenter - vstackCenter
+        return (CGFloat(hour) + 0.5) * barWidth
     }
 }
 
@@ -170,13 +255,7 @@ enum CostIntensity {
             self = .zero
             return
         }
-        let intensity = min(cost / max(maxValue, 1.0), 1.0)
-        switch intensity {
-        case 0.8...: self = .peak
-        case 0.5...: self = .high
-        case 0.2...: self = .medium
-        default: self = .low
-        }
+        self = Self.classify(intensity: cost / max(maxValue, 1.0))
     }
 
     var color: Color {
@@ -186,6 +265,18 @@ enum CostIntensity {
         case .medium: .teal
         case .high: .cyan
         case .peak: .blue
+        }
+    }
+}
+
+private extension CostIntensity {
+    static func classify(intensity: Double) -> CostIntensity {
+        let clamped = min(intensity, 1.0)
+        switch clamped {
+        case 0.8...: return .peak
+        case 0.5...: return .high
+        case 0.2...: return .medium
+        default: return .low
         }
     }
 }
@@ -217,10 +308,9 @@ enum YAxisScale {
     }
 
     var tickValues: [Double] {
-        let max = roundedMax
         switch self {
-        case .small: return [0, max / 2, max]
-        default: return [0, max / 3, max * 2 / 3, max]
+        case .small: [0, roundedMax / 2, roundedMax]
+        default: [0, roundedMax / 3, roundedMax * 2 / 3, roundedMax]
         }
     }
 }
