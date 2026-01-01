@@ -273,13 +273,17 @@ struct HeatmapGrid_Previews: PreviewProvider {
     }
 
     private static func generateSampleDataset() -> HeatmapDataset {
+        let startDate = Date()
+        let calendar = Calendar.current
+
         let weeks = (0..<52).map { weekIndex in
-            let days = (0..<7).map { dayIndex -> HeatmapDay? in
-                let cost = Double.random(in: 0...5)
-                let date = Calendar.current.date(byAdding: .day, value: weekIndex * 7 + dayIndex, to: Date())!
+            let days: [HeatmapDay?] = (0..<7).compactMap { dayIndex -> HeatmapDay? in
+                guard let date = calendar.date(byAdding: .day, value: weekIndex * 7 + dayIndex, to: startDate) else {
+                    return nil
+                }
                 return HeatmapDay(
                     date: date,
-                    cost: cost,
+                    cost: Double.random(in: 0...5),
                     dayOfYear: weekIndex * 7 + dayIndex,
                     weekOfYear: weekIndex,
                     dayOfWeek: dayIndex,
@@ -295,11 +299,13 @@ struct HeatmapGrid_Previews: PreviewProvider {
             HeatmapMonth(name: "Mar", weekSpan: 8..<13),
         ]
 
+        let endDate = calendar.date(byAdding: .year, value: 1, to: startDate) ?? startDate
+
         return HeatmapDataset(
             weeks: weeks,
             monthLabels: months,
             maxCost: 5.0,
-            dateRange: Date()...Calendar.current.date(byAdding: .year, value: 1, to: Date())!
+            dateRange: startDate...endDate
         )
     }
 }
