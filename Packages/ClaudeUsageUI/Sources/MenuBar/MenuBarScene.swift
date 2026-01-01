@@ -33,7 +33,7 @@ public struct MenuBarScene: Scene {
     }
 
     private var menuLabel: some View {
-        MenuBarLabel()
+        MenuBarLabel(store: env.store)
             .withAppEnvironment(env)
             .task { await initializeOnce() }
             .contextMenu { contextMenu }
@@ -55,7 +55,7 @@ public struct MenuBarScene: Scene {
 // MARK: - Menu Bar Label
 
 struct MenuBarLabel: View {
-    @Environment(UsageStore.self) private var store
+    @Bindable var store: UsageStore
 
     var body: some View {
         HStack(spacing: 4) {
@@ -175,12 +175,20 @@ extension UsageStore {
 // MARK: - Preview
 
 #if DEBUG
+private struct MenuBarLabelPreview: View {
+    @Environment(UsageStore.self) private var store
+
+    var body: some View {
+        MenuBarLabel(store: store)
+            .padding()
+            .background(Color(nsColor: .windowBackgroundColor))
+            .cornerRadius(8)
+            .frame(width: 200, height: 100)
+    }
+}
+
 #Preview("Menu Bar Label", traits: .appEnvironment) {
-    MenuBarLabel()
-        .padding()
-        .background(Color(nsColor: .windowBackgroundColor))
-        .cornerRadius(8)
-        .frame(width: 200, height: 100)
+    MenuBarLabelPreview()
 }
 #endif
 
