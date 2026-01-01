@@ -15,16 +15,16 @@ struct YearlyCostHeatmap_Previews: PreviewProvider {
         ScrollView {
             VStack(spacing: 30) {
                 // Default configuration
-                YearlyCostHeatmap(stats: sampleStats, year: 2024)
+                YearlyCostHeatmap(stats: sampleStats)
 
                 // Performance optimized
-                YearlyCostHeatmap.performanceOptimized(stats: sampleStats, year: 2024)
+                YearlyCostHeatmap.performanceOptimized(stats: sampleStats)
 
                 // Compact version
-                YearlyCostHeatmap.compact(stats: sampleStats, year: 2024)
+                YearlyCostHeatmap.compact(stats: sampleStats)
 
                 // Accessibility optimized
-                YearlyCostHeatmap.accessible(stats: sampleStats, year: 2024)
+                YearlyCostHeatmap.accessible(stats: sampleStats)
             }
             .padding()
         }

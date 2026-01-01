@@ -33,9 +33,6 @@ public struct YearlyCostHeatmap: View {
     /// Usage statistics to visualize
     let stats: UsageStats
 
-    /// Year parameter (kept for backward compatibility, now ignored in favor of rolling year)
-    let year: Int
-
     /// Configuration for heatmap appearance and behavior
     let configuration: HeatmapConfiguration
 
@@ -53,18 +50,13 @@ public struct YearlyCostHeatmap: View {
     /// Initialize with usage statistics and optional configuration
     /// - Parameters:
     ///   - stats: Usage statistics to display
-    ///   - year: Year (kept for backward compatibility, ignored)
     ///   - configuration: Heatmap configuration (defaults to standard)
     public init(
         stats: UsageStats,
-        year: Int,
         configuration: HeatmapConfiguration = .default
     ) {
         self.stats = stats
-        self.year = year
         self.configuration = configuration
-
-        // Initialize view model with configuration
         self._viewModel = State(wrappedValue: HeatmapStore(configuration: configuration))
     }
 
