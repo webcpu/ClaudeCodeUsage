@@ -11,7 +11,9 @@ import SwiftUI
 
 // MARK: - Capture Manifest
 
-extension AppEnvironment: CaptureManifest {
+public struct ClaudeUsageUICaptures: CaptureManifest {
+    public typealias Environment = AppEnvironment
+
     public static var outputDirectory: URL {
         URL(fileURLWithPath: "/tmp/ClaudeUsageUI")
     }
