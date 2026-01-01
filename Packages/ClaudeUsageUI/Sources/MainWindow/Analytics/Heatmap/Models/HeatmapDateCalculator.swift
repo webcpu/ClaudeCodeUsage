@@ -115,21 +115,22 @@ public final class HeatmapDateCalculator: @unchecked Sendable {
 
     /// Generate month labels for date range
     public func generateMonthLabels(from startDate: Date, to endDate: Date) -> [MonthInfo] {
-        var months: [MonthInfo] = []
-        var state = createInitialMonthTrackingState(for: startDate)
+        let weeks = indexedWeeks(from: startDate, to: endDate)
+        let initial = MonthAccumulator.initial(for: startDate, calendar: calendar)
+        let dateRange = startDate...endDate
 
-        enumerateWeeks(from: startDate, to: endDate) { weekIndex, weekStart in
-            processWeekForMonthTransition(
-                weekIndex: weekIndex,
-                weekStart: weekStart,
-                dateRange: startDate...endDate,
-                state: &state,
-                months: &months
-            )
+        let accumulated = weeks.reduce(initial) { acc, week in
+            acc.processingWeek(week, dateRange: dateRange, calendar: calendar, createMonthInfo: createMonthInfo)
         }
 
-        finalizeMonthLabels(state: state, months: &months)
-        return months
+        return accumulated.finalized(createMonthInfo: createMonthInfo)
+    }
+
+    private func indexedWeeks(from startDate: Date, to endDate: Date) -> [(index: Int, start: Date)] {
+        WeekOps.weekSequence(from: startDate, calendar: calendar)
+            .prefix { $0 <= endDate }
+            .enumerated()
+            .map { (index: $0.offset, start: $0.element) }
     }
 
     /// Generate sequence of dates between two dates
@@ -149,71 +150,102 @@ public final class HeatmapDateCalculator: @unchecked Sendable {
         return buildWeeksArray(from: firstWeek, to: endDate)
     }
 
-    // MARK: - Month Label Generation (Mid Level)
+    // MARK: - Month Accumulator (Pure Reduce Pattern)
 
-    private struct MonthTrackingState {
-        var currentMonth: Int
-        var currentYear: Int
-        var monthStartWeek: Int
-        var weekIndex: Int
-    }
+    private struct MonthAccumulator {
+        let months: [MonthInfo]
+        let currentMonth: Int
+        let currentYear: Int
+        let monthStartWeek: Int
+        let lastWeekIndex: Int
 
-    private func createInitialMonthTrackingState(for startDate: Date) -> MonthTrackingState {
-        MonthTrackingState(
-            currentMonth: calendar.component(.month, from: startDate),
-            currentYear: calendar.component(.year, from: startDate),
-            monthStartWeek: 0,
-            weekIndex: 0
-        )
-    }
-
-    private func enumerateWeeks(
-        from startDate: Date,
-        to endDate: Date,
-        handler: (Int, Date) -> Void
-    ) {
-        WeekOps.weekSequence(from: startDate, calendar: calendar)
-            .prefix { $0 <= endDate }
-            .enumerated()
-            .forEach { handler($0.offset, $0.element) }
-    }
-
-    private func processWeekForMonthTransition(
-        weekIndex: Int,
-        weekStart: Date,
-        dateRange: ClosedRange<Date>,
-        state: inout MonthTrackingState,
-        months: inout [MonthInfo]
-    ) {
-        state.weekIndex = weekIndex
-
-        guard let firstVisibleDay = WeekOps.firstVisibleDay(in: weekStart, within: dateRange, calendar: calendar) else {
-            return
+        static func initial(for startDate: Date, calendar: Calendar) -> MonthAccumulator {
+            MonthAccumulator(
+                months: [],
+                currentMonth: calendar.component(.month, from: startDate),
+                currentYear: calendar.component(.year, from: startDate),
+                monthStartWeek: 0,
+                lastWeekIndex: 0
+            )
         }
 
-        let dayMonth = calendar.component(.month, from: firstVisibleDay)
-        let dayYear = calendar.component(.year, from: firstVisibleDay)
+        func processingWeek(
+            _ week: (index: Int, start: Date),
+            dateRange: ClosedRange<Date>,
+            calendar: Calendar,
+            createMonthInfo: (Int, Int, Int, Int) -> MonthInfo
+        ) -> MonthAccumulator {
+            guard let firstVisibleDay = WeekOps.firstVisibleDay(
+                in: week.start,
+                within: dateRange,
+                calendar: calendar
+            ) else {
+                return updatingLastWeek(to: week.index)
+            }
 
-        if MonthOps.hasMonthChanged(from: (state.currentMonth, state.currentYear), to: (dayMonth, dayYear)) {
-            appendCompletedMonth(state: state, to: &months)
-            state.currentMonth = dayMonth
-            state.currentYear = dayYear
-            state.monthStartWeek = weekIndex
+            let dayMonth = calendar.component(.month, from: firstVisibleDay)
+            let dayYear = calendar.component(.year, from: firstVisibleDay)
+
+            guard MonthOps.hasMonthChanged(from: (currentMonth, currentYear), to: (dayMonth, dayYear)) else {
+                return updatingLastWeek(to: week.index)
+            }
+
+            return transitioningToMonth(dayMonth, year: dayYear, at: week.index, createMonthInfo: createMonthInfo)
         }
-    }
 
-    private func finalizeMonthLabels(state: MonthTrackingState, months: inout [MonthInfo]) {
-        let finalWeekIndex = state.weekIndex + 1
-        guard finalWeekIndex > state.monthStartWeek else { return }
+        func finalized(createMonthInfo: (Int, Int, Int, Int) -> MonthInfo) -> [MonthInfo] {
+            let finalWeekIndex = lastWeekIndex + 1
+            guard finalWeekIndex > monthStartWeek else { return months }
 
-        let monthAbbrev = MonthOps.abbreviatedName(for: state.currentMonth, calendar: calendar)
-        let isDuplicateOfFirst = months.first?.name == monthAbbrev &&
-                                  months.first?.monthNumber == state.currentMonth
+            let finalMonth = createMonthInfo(currentMonth, currentYear, monthStartWeek, lastWeekIndex)
+            return appendingOrExtendingFirst(with: finalMonth)
+        }
 
-        if isDuplicateOfFirst {
-            extendFirstMonthToIncludeFinalWeeks(finalWeekIndex: finalWeekIndex - 1, months: &months)
-        } else {
-            appendFinalMonth(state: state, lastWeek: finalWeekIndex - 1, to: &months)
+        private func updatingLastWeek(to index: Int) -> MonthAccumulator {
+            MonthAccumulator(
+                months: months,
+                currentMonth: currentMonth,
+                currentYear: currentYear,
+                monthStartWeek: monthStartWeek,
+                lastWeekIndex: index
+            )
+        }
+
+        private func transitioningToMonth(
+            _ newMonth: Int,
+            year newYear: Int,
+            at weekIndex: Int,
+            createMonthInfo: (Int, Int, Int, Int) -> MonthInfo
+        ) -> MonthAccumulator {
+            let completedMonth = (months.isEmpty && weekIndex == 0)
+                ? nil
+                : createMonthInfo(currentMonth, currentYear, monthStartWeek, weekIndex - 1)
+
+            return MonthAccumulator(
+                months: completedMonth.map { months + [$0] } ?? months,
+                currentMonth: newMonth,
+                currentYear: newYear,
+                monthStartWeek: weekIndex,
+                lastWeekIndex: weekIndex
+            )
+        }
+
+        private func appendingOrExtendingFirst(with finalMonth: MonthInfo) -> [MonthInfo] {
+            guard let firstMonth = months.first,
+                  firstMonth.name == finalMonth.name,
+                  firstMonth.monthNumber == finalMonth.monthNumber else {
+                return months + [finalMonth]
+            }
+
+            let extended = MonthInfo(
+                name: firstMonth.name,
+                fullName: firstMonth.fullName,
+                monthNumber: firstMonth.monthNumber,
+                year: firstMonth.year,
+                firstWeek: firstMonth.firstWeek,
+                lastWeek: finalMonth.lastWeek
+            )
+            return [extended] + Array(months.dropFirst())
         }
     }
 
@@ -237,39 +269,6 @@ public final class HeatmapDateCalculator: @unchecked Sendable {
     }
 
     // MARK: - Month Info Construction (Low Level)
-
-    private func appendCompletedMonth(state: MonthTrackingState, to months: inout [MonthInfo]) {
-        guard !months.isEmpty || state.weekIndex > 0 else { return }
-
-        months.append(createMonthInfo(
-            month: state.currentMonth,
-            year: state.currentYear,
-            firstWeek: state.monthStartWeek,
-            lastWeek: state.weekIndex - 1
-        ))
-    }
-
-    private func appendFinalMonth(state: MonthTrackingState, lastWeek: Int, to months: inout [MonthInfo]) {
-        months.append(createMonthInfo(
-            month: state.currentMonth,
-            year: state.currentYear,
-            firstWeek: state.monthStartWeek,
-            lastWeek: lastWeek
-        ))
-    }
-
-    private func extendFirstMonthToIncludeFinalWeeks(finalWeekIndex: Int, months: inout [MonthInfo]) {
-        guard let firstMonth = months.first else { return }
-
-        months[0] = MonthInfo(
-            name: firstMonth.name,
-            fullName: firstMonth.fullName,
-            monthNumber: firstMonth.monthNumber,
-            year: firstMonth.year,
-            firstWeek: firstMonth.firstWeek,
-            lastWeek: finalWeekIndex
-        )
-    }
 
     private func createMonthInfo(month: Int, year: Int, firstWeek: Int, lastWeek: Int) -> MonthInfo {
         MonthInfo(
