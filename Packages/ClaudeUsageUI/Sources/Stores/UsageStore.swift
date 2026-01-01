@@ -7,6 +7,9 @@ import SwiftUI
 import Observation
 import ClaudeUsageCore
 import ClaudeUsageData
+import OSLog
+
+private let logger = Logger(subsystem: "com.claudecodeusage", category: "Store")
 
 // MARK: - Usage Store
 
@@ -113,7 +116,11 @@ public final class UsageStore {
     }
 
     func loadData(invalidateCache: Bool = true) async {
-        guard canStartLoad else { return }
+        guard canStartLoad else {
+            logger.debug("Load blocked: isLoading=\(self.isCurrentlyLoading), recentlyLoaded=\(self.isLoadedRecently)")
+            return
+        }
+        logger.info("Loading data (invalidateCache=\(invalidateCache))")
         await trackLoadExecution { try await executeLoad(invalidateCache: invalidateCache) }
     }
 
@@ -161,9 +168,15 @@ public final class UsageStore {
     // MARK: - State Transitions
 
     private func apply(_ result: TodayLoadResult) {
+        let oldCost = todaysCost
+        let oldCount = todayEntries.count
+
         activeSession = result.session
         burnRate = result.burnRate
         todayEntries = result.todayEntries
+
+        let newCost = todaysCost
+        logger.info("Entries: \(oldCount) → \(result.todayEntries.count), Cost: $\(oldCost, format: .fixed(precision: 2)) → $\(newCost, format: .fixed(precision: 2))")
 
         if case .loaded = state { return }
         state = .loadedToday(result.todayStats)

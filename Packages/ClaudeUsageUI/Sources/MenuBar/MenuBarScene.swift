@@ -34,6 +34,7 @@ public struct MenuBarScene: Scene {
 
     private var menuLabel: some View {
         MenuBarLabel(store: env.store)
+            .id(env.store.formattedTodaysCost)
             .withAppEnvironment(env)
             .task { await initializeOnce() }
             .contextMenu { contextMenu }

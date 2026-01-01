@@ -75,53 +75,7 @@ actor LoadTrace {
 
     private func printSummary(duration: TimeInterval) {
         let output = buildSummary(duration: duration)
-        logOutput(output, isSlow: duration > Threshold.slowLoad)
-    }
-
-    private func buildSummary(duration: TimeInterval) -> String {
-        [
-            headerLine,
-            todayPhaseLine,
-            sessionLine,
-            historyPhaseLine,
-            footerLine(duration: duration)
-        ]
-        .compactMap { $0 }
-        .joined(separator: "\n")
-    }
-
-    private var headerLine: String {
-        "┌─ Data Load " + String(repeating: "─", count: 40)
-    }
-
-    private var todayPhaseLine: String {
-        let duration = phaseDurations[.today].map { " (\(formatDuration($0)))" } ?? ""
-        return "│ Phase 1: Today\(duration)"
-    }
-
-    private var sessionLine: String? {
-        sessionFound.map { found in
-            let status = found ? "active" : "none"
-            let timing = sessionCached ? "cached" : formatDuration(sessionDuration)
-            let limitInfo = tokenLimit.map { ", limit: \(formatNumber($0))" } ?? ""
-            return "│   Session: \(status) [\(timing)]\(limitInfo)"
-        }
-    }
-
-    private var historyPhaseLine: String {
-        if historySkipped {
-            return "│ Phase 2: History (skipped - same day)"
-        }
-        let duration = phaseDurations[.history].map { " (\(formatDuration($0)))" } ?? ""
-        return "│ Phase 2: History\(duration)"
-    }
-
-    private func footerLine(duration: TimeInterval) -> String {
-        let status = duration > Threshold.slowLoad ? " [slow]" : ""
-        return "└─ Total: \(formatDuration(duration))\(status) " + String(repeating: "─", count: 28)
-    }
-
-    private func logOutput(_ output: String, isSlow: Bool) {
+        let isSlow = duration > Threshold.slowLoad
         if isSlow {
             logger.warning("\(output)")
         } else {
@@ -129,14 +83,36 @@ actor LoadTrace {
         }
     }
 
+    private func buildSummary(duration: TimeInterval) -> String {
+        var parts: [String] = []
+
+        // Today phase
+        if let todayDuration = phaseDurations[.today] {
+            parts.append("today \(formatDuration(todayDuration))")
+        }
+
+        // Session info
+        if let found = sessionFound {
+            let status = found ? "session" : "no session"
+            parts.append(status)
+        }
+
+        // History phase
+        if historySkipped {
+            parts.append("history skipped")
+        } else if let historyDuration = phaseDurations[.history] {
+            parts.append("history \(formatDuration(historyDuration))")
+        }
+
+        let details = parts.isEmpty ? "" : " [\(parts.joined(separator: ", "))]"
+        let slow = duration > Threshold.slowLoad ? " [slow]" : ""
+        return "Load: \(formatDuration(duration))\(details)\(slow)"
+    }
+
     // MARK: - Formatting
 
     private func formatDuration(_ seconds: TimeInterval) -> String {
         DurationFormatter.format(seconds)
-    }
-
-    private func formatNumber(_ n: Int) -> String {
-        NumberFormat.decimal(n)
     }
 }
 
@@ -160,17 +136,5 @@ private enum DurationFormatter {
         case ..<1.0: String(format: "%.0fms", seconds * 1000)
         default: String(format: "%.2fs", seconds)
         }
-    }
-}
-
-private enum NumberFormat {
-    private static let decimalFormatter: NumberFormatter = {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
-        return formatter
-    }()
-
-    static func decimal(_ n: Int) -> String {
-        decimalFormatter.string(from: NSNumber(value: n)) ?? "\(n)"
     }
 }

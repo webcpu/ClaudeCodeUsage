@@ -2,7 +2,7 @@
 //  DirectoryMonitor.swift
 //  ClaudeUsageData
 //
-//  File system monitoring for usage data changes
+//  File system monitoring for usage data changes using FSEvents (recursive)
 //
 
 import Foundation
@@ -15,8 +15,7 @@ private let logger = Logger(subsystem: "com.claudecodeusage", category: "Directo
 public final class DirectoryMonitor: @unchecked Sendable {
     private let path: String
     private let debounceInterval: TimeInterval
-    private var source: DispatchSourceFileSystemObject?
-    private var fileDescriptor: Int32 = -1
+    private var stream: FSEventStreamRef?
     private var debounceTask: Task<Void, Never>?
     private let queue = DispatchQueue(label: "DirectoryMonitor", qos: .utility)
 
@@ -35,40 +34,81 @@ public final class DirectoryMonitor: @unchecked Sendable {
     // MARK: - Public API
 
     public func start() {
-        stop()
+        guard stream == nil else { return }  // Already running
 
-        fileDescriptor = open(path, O_EVTONLY)
-        guard fileDescriptor >= 0 else {
-            logger.error("Failed to open \(self.path)")
+        var context = FSEventStreamContext(
+            version: 0,
+            info: Unmanaged.passRetained(self).toOpaque(),
+            retain: { info in
+                guard let info else { return nil }
+                _ = Unmanaged<DirectoryMonitor>.fromOpaque(info).retain()
+                return info
+            },
+            release: { info in
+                guard let info else { return }
+                Unmanaged<DirectoryMonitor>.fromOpaque(info).release()
+            },
+            copyDescription: nil
+        )
+
+        let paths = [path] as CFArray
+        let flags = UInt32(
+            kFSEventStreamCreateFlagUseCFTypes |
+            kFSEventStreamCreateFlagFileEvents
+        )
+
+        stream = FSEventStreamCreate(
+            kCFAllocatorDefault,
+            { _, info, numEvents, eventPaths, eventFlags, _ in
+                guard let info else { return }
+                let monitor = Unmanaged<DirectoryMonitor>.fromOpaque(info).takeUnretainedValue()
+
+                if let paths = Unmanaged<CFArray>.fromOpaque(eventPaths).takeUnretainedValue() as? [String], numEvents > 0 {
+                    logger.debug("FSEvents: \(numEvents) event(s) received")
+                    for (i, path) in paths.enumerated() {
+                        let flags = eventFlags[i]
+                        logger.debug("  [\(i)] \(path, privacy: .public) flags=\(flags)")
+                    }
+
+                    let jsonlPaths = paths.filter { $0.hasSuffix(".jsonl") }
+                    if !jsonlPaths.isEmpty {
+                        logger.info("JSONL change detected: \(jsonlPaths.count) file(s)")
+                        monitor.handleEvent()
+                    }
+                }
+            },
+            &context,
+            paths,
+            FSEventStreamEventId(kFSEventStreamEventIdSinceNow),
+            0.1,  // Coalesce events within 100ms
+            flags
+        )
+
+        guard let stream else {
+            logger.error("Failed to create FSEventStream for \(self.path)")
             return
         }
 
-        source = DispatchSource.makeFileSystemObjectSource(
-            fileDescriptor: fileDescriptor,
-            eventMask: [.write, .extend, .attrib, .link, .rename, .revoke],
-            queue: queue
-        )
-
-        source?.setEventHandler { [weak self] in
-            self?.handleEvent()
+        FSEventStreamSetDispatchQueue(stream, queue)
+        let started = FSEventStreamStart(stream)
+        if started {
+            logger.info("Started watching \(self.path, privacy: .public) (recursive)")
+        } else {
+            logger.error("FSEventStreamStart failed for \(self.path, privacy: .public)")
         }
-
-        source?.setCancelHandler { [weak self] in
-            guard let self, self.fileDescriptor >= 0 else { return }
-            close(self.fileDescriptor)
-            self.fileDescriptor = -1
-        }
-
-        source?.resume()
-        logger.debug("Started watching \(self.path)")
     }
 
     public func stop() {
         debounceTask?.cancel()
         debounceTask = nil
 
-        source?.cancel()
-        source = nil
+        if let stream {
+            logger.debug("Stopping FSEventStream")
+            FSEventStreamStop(stream)
+            FSEventStreamInvalidate(stream)
+            FSEventStreamRelease(stream)
+        }
+        stream = nil
     }
 
     // MARK: - Private
@@ -81,6 +121,7 @@ public final class DirectoryMonitor: @unchecked Sendable {
             do {
                 try await Task.sleep(for: .seconds(self.debounceInterval))
                 guard !Task.isCancelled else { return }
+                logger.info("Triggering onChange callback")
                 self.onChange?()
             } catch {
                 // Task cancelled

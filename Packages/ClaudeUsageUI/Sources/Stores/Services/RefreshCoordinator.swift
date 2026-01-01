@@ -6,6 +6,9 @@
 import Foundation
 import AppKit
 import ClaudeUsageData
+import OSLog
+
+private let logger = Logger(subsystem: "com.claudecodeusage", category: "Refresh")
 
 // MARK: - Home Directory Helper
 
@@ -85,8 +88,7 @@ final class RefreshCoordinator {
     // MARK: - Public API
 
     func start() {
-        stop()
-        directoryMonitor.start()
+        directoryMonitor.start()  // Idempotent - FSEvents handles duplicate starts
         startFallbackTimer()
         startDayChangeMonitoring()
     }
@@ -103,7 +105,9 @@ final class RefreshCoordinator {
     }
 
     func handleAppResignActive() {
-        stop()
+        // Only pause the timer. Keep monitoring file changes and day changes—
+        // they're passive and menu bar apps lose focus constantly.
+        stopFallbackTimer()
     }
 
     func handleWindowFocus() {
@@ -118,6 +122,7 @@ final class RefreshCoordinator {
     }
 
     private func triggerRefresh(reason: RefreshReason) {
+        logger.info("Refresh triggered: \(String(describing: reason), privacy: .public)")
         lastRefreshTime = clock.now
         Task { await onRefresh?(reason) }
     }
