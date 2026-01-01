@@ -68,34 +68,61 @@ public struct HourlyChartDataset: Equatable {
         errorMessage: String = ""
     ) {
         self.bars = bars
-        self.totalCost = totalCost == 0 ? bars.reduce(0) { $0 + $1.cost } : totalCost
-        
-        // Calculate peak hour and cost if not provided
-        if let peakHour = peakHour {
-            self.peakHour = peakHour
-            self.peakCost = peakCost
-        } else {
-            let maxBar = bars.max { $0.cost < $1.cost }
-            self.peakHour = maxBar?.cost ?? 0 > 0 ? maxBar?.hour : nil
-            self.peakCost = maxBar?.cost ?? 0
-        }
-        
+        self.totalCost = totalCost == 0 ? Self.calculateTotalCost(from: bars) : totalCost
+
+        let resolvedPeak = Self.resolvePeak(
+            providedHour: peakHour,
+            providedCost: peakCost,
+            from: bars
+        )
+        self.peakHour = resolvedPeak.hour
+        self.peakCost = resolvedPeak.cost
+
         self.hasError = hasError
         self.errorMessage = errorMessage
     }
-    
+
     /// Create an error state chart data
     public static func error(_ message: String) -> HourlyChartDataset {
-        // Create empty bars for all 24 hours
-        let emptyBars = (0..<24).map { HourlyBar(hour: $0, cost: 0, entryCount: 0) }
-        return HourlyChartDataset(
-            bars: emptyBars,
+        HourlyChartDataset(
+            bars: emptyBars(),
             totalCost: 0,
             peakHour: nil,
             peakCost: 0,
             hasError: true,
             errorMessage: message
         )
+    }
+}
+
+// MARK: - Pure Calculations
+
+private extension HourlyChartDataset {
+    static func calculateTotalCost(from bars: [HourlyBar]) -> Double {
+        bars.reduce(0) { $0 + $1.cost }
+    }
+
+    static func resolvePeak(
+        providedHour: Int?,
+        providedCost: Double,
+        from bars: [HourlyBar]
+    ) -> (hour: Int?, cost: Double) {
+        if let providedHour {
+            return (providedHour, providedCost)
+        }
+        return findPeak(from: bars)
+    }
+
+    static func findPeak(from bars: [HourlyBar]) -> (hour: Int?, cost: Double) {
+        guard let maxBar = bars.max(by: { $0.cost < $1.cost }),
+              maxBar.cost > 0 else {
+            return (nil, 0)
+        }
+        return (maxBar.hour, maxBar.cost)
+    }
+
+    static func emptyBars() -> [HourlyBar] {
+        (0..<24).map { HourlyBar(hour: $0, cost: 0, entryCount: 0) }
     }
 }
 
