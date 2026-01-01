@@ -8,7 +8,7 @@ import SwiftUI
 // MARK: - App Environment
 
 @MainActor
-public struct AppEnvironment {
+public struct AppEnvironment: @unchecked Sendable {
     public let store: UsageStore
     public let settings: AppSettingsService
 

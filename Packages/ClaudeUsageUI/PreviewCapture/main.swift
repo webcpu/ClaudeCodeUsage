@@ -142,19 +142,29 @@ func runCapture<M: CaptureManifest>(_ manifest: M.Type, targetFilter: String?) a
 
     try FileManager.default.createDirectory(at: M.outputDirectory, withIntermediateDirectories: true)
 
-    let results = captureAllTargets(targets, env: env, outputDir: M.outputDirectory)
+    let results = await captureAllTargets(targets, env: env, outputDir: M.outputDirectory)
     try writeManifest(results, to: M.outputDirectory)
 }
 
 @MainActor
-private func captureAllTargets<E>(
+private func captureAllTargets<E: Sendable>(
     _ targets: [CaptureTarget<E>],
     env: E,
     outputDir: URL
-) -> [CaptureResult] {
-    targets.map { target in
-        captureTarget(target, env: env, outputDir: outputDir)
-            .also { print($0.logMessage) }
+) async -> [CaptureResult] {
+    await withTaskGroup(of: CaptureResult.self, returning: [CaptureResult].self) { group in
+        for target in targets {
+            group.addTask { @MainActor in
+                captureTarget(target, env: env, outputDir: outputDir)
+            }
+        }
+
+        var results: [CaptureResult] = []
+        for await result in group {
+            print(result.logMessage)
+            results.append(result)
+        }
+        return results
     }
 }
 

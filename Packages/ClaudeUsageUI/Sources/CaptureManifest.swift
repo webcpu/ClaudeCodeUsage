@@ -28,7 +28,7 @@ public struct CaptureTarget<Environment>: Sendable {
 
 @MainActor
 public protocol CaptureManifest {
-    associatedtype Environment
+    associatedtype Environment: Sendable
     static var outputDirectory: URL { get }
     static var targets: [CaptureTarget<Environment>] { get }
     static func makeEnvironment() async throws -> Environment
