@@ -22,16 +22,6 @@ public struct AppEnvironment: @unchecked Sendable {
     }
 }
 
-// MARK: - View Extension
-
-public extension View {
-    func withAppEnvironment(_ env: AppEnvironment) -> some View {
-        self
-            .environment(env.store)
-            .environment(env.settings)
-    }
-}
-
 // MARK: - Preview Modifier
 
 #if DEBUG
@@ -43,7 +33,9 @@ public struct PreviewEnvironment: PreviewModifier {
     }
 
     public func body(content: Content, context: AppEnvironment) -> some View {
-        content.withAppEnvironment(context)
+        content
+            .environment(context.store)
+            .environment(context.settings)
     }
 }
 

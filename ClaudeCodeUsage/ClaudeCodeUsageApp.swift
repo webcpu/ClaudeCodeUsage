@@ -22,7 +22,8 @@ struct ClaudeCodeUsageApp: App {
     private var mainWindow: some Scene {
         Window(AppMetadata.name, id: "main") {
             MainView()
-                .withAppEnvironment(env)
+                .environment(env.store)
+                .environment(env.settings)
         }
         .defaultLaunchBehavior(.suppressed)
         .windowStyle(.automatic)

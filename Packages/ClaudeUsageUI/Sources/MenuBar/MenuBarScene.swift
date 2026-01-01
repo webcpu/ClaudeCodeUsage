@@ -29,20 +29,23 @@ public struct MenuBarScene: Scene {
 
     private var menuContent: some View {
         MenuBarContentView()
-            .withAppEnvironment(env)
+            .environment(env.store)
+            .environment(env.settings)
     }
 
     private var menuLabel: some View {
         MenuBarLabel(store: env.store)
             .id(env.store.formattedTodaysCost)
-            .withAppEnvironment(env)
+            .environment(env.store)
+            .environment(env.settings)
             .task { await initializeOnce() }
             .contextMenu { contextMenu }
     }
 
     private var contextMenu: some View {
         MenuBarContextMenu()
-            .withAppEnvironment(env)
+            .environment(env.store)
+            .environment(env.settings)
     }
 
     private func initializeOnce() async {

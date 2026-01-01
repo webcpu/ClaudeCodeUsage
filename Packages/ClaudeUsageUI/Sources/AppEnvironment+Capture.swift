@@ -51,6 +51,11 @@ private func capture<V: View>(
     @ViewBuilder _ view: @escaping @MainActor @Sendable () -> V
 ) -> CaptureTarget<AppEnvironment> {
     .init(name: name, width: width, height: height) { env in
-        AnyView(view().withAppEnvironment(env).environment(\.isCaptureMode, true))
+        AnyView(
+            view()
+                .environment(env.store)
+                .environment(env.settings)
+                .environment(\.isCaptureMode, true)
+        )
     }
 }
