@@ -108,8 +108,16 @@ final class RefreshCoordinator {
     }
 
     func handleAppResignActive() {
-        // Only pause the timer. Keep monitoring file changes and day changes—
-        // they're passive and menu bar apps lose focus constantly.
+        pauseActiveRefreshingButKeepPassiveMonitoring()
+    }
+
+    // MARK: - Pause Logic
+
+    /// Pauses the active polling timer while keeping passive monitors running.
+    ///
+    /// Only pause the timer. Keep monitoring file changes and day changes—
+    /// they're passive and menu bar apps lose focus constantly.
+    private func pauseActiveRefreshingButKeepPassiveMonitoring() {
         stopFallbackTimer()
     }
 
