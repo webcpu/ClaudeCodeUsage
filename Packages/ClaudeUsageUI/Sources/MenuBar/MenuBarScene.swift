@@ -47,7 +47,7 @@ public struct MenuBarScene: Scene {
         if isRunningForPreviews {
             Image(systemName: "dollarsign.circle")
         } else {
-            MenuBarLabel(store: env.store)
+            MenuBarLabel()
                 .withAppEnvironment(env)
                 .task { await initializeOnce() }
                 .contextMenu { contextMenu }
@@ -70,7 +70,7 @@ public struct MenuBarScene: Scene {
 // MARK: - Menu Bar Label
 
 struct MenuBarLabel: View {
-    let store: UsageStore
+    @Environment(UsageStore.self) private var store
 
     var body: some View {
         HStack(spacing: 4) {
@@ -190,8 +190,8 @@ extension UsageStore {
 // MARK: - Preview
 
 #if DEBUG
-#Preview("Menu Bar Label", traits: .sizeThatFitsLayout) {
-    MenuBarLabel(store: UsageStore())
+#Preview("Menu Bar Label", traits: .appEnvironment) {
+    MenuBarLabel()
         .padding()
         .background(Color(nsColor: .windowBackgroundColor))
         .cornerRadius(8)
