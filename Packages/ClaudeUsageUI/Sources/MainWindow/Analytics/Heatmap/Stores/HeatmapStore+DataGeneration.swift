@@ -157,9 +157,12 @@ extension HeatmapStore {
     }
 
     func calculateValidDateRange() throws -> (start: Date, end: Date) {
-        let dateRange = dateCalculator.rollingDateRangeWithCompleteWeeks(
+        guard let dateRange = dateCalculator.rollingDateRangeWithCompleteWeeks(
             numberOfDays: DataGenerationConstants.rollingDateRangeDays
-        )
+        ) else {
+            throw HeatmapError.invalidDateRange("Failed to calculate date range")
+        }
+
         let validationErrors = dateCalculator.validateDateRange(
             startDate: dateRange.start,
             endDate: dateRange.end

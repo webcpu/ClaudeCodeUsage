@@ -59,9 +59,11 @@ public final class HeatmapDateCalculator: @unchecked Sendable {
     public func rollingDateRange(
         endingOn endDate: Date = Date(),
         numberOfDays: Int = 365
-    ) -> (start: Date, end: Date) {
+    ) -> (start: Date, end: Date)? {
         let end = calendar.startOfDay(for: endDate)
-        let start = calendar.date(byAdding: .day, value: -(numberOfDays - 1), to: end)!
+        guard let start = calendar.date(byAdding: .day, value: -(numberOfDays - 1), to: end) else {
+            return nil
+        }
         return (start: start, end: end)
     }
 
@@ -69,9 +71,11 @@ public final class HeatmapDateCalculator: @unchecked Sendable {
     public func rollingDateRangeWithCompleteWeeks(
         endingOn endDate: Date = Date(),
         numberOfDays: Int = 365
-    ) -> (start: Date, end: Date) {
+    ) -> (start: Date, end: Date)? {
         let end = calendar.startOfDay(for: endDate)
-        let initialStart = calendar.date(byAdding: .day, value: -(numberOfDays - 1), to: end)!
+        guard let initialStart = calendar.date(byAdding: .day, value: -(numberOfDays - 1), to: end) else {
+            return nil
+        }
         let adjustedStart = MonthOps.adjustStartForSameMonth(start: initialStart, end: end, calendar: calendar) ?? initialStart
         let finalStart = WeekOps.adjustToCompleteWeek(adjustedStart, calendar: calendar)
         return (start: finalStart, end: end)
@@ -254,10 +258,11 @@ public final class HeatmapDateCalculator: @unchecked Sendable {
     private func findFirstCompleteWeekStart(for startDate: Date) -> Date {
         let weekStartDate = WeekOps.weekStart(for: startDate, calendar: calendar)
 
-        if WeekOps.isPartialWeek(weekStart: weekStartDate, rangeStart: startDate, calendar: calendar) {
-            return calendar.date(byAdding: .weekOfYear, value: 1, to: weekStartDate)!
+        guard WeekOps.isPartialWeek(weekStart: weekStartDate, rangeStart: startDate, calendar: calendar) else {
+            return weekStartDate
         }
-        return weekStartDate
+        // Fallback to weekStartDate if date arithmetic fails (practically impossible)
+        return calendar.date(byAdding: .weekOfYear, value: 1, to: weekStartDate) ?? weekStartDate
     }
 
     private func buildWeeksArray(from weekStart: Date, to endDate: Date) -> [[Date?]] {
