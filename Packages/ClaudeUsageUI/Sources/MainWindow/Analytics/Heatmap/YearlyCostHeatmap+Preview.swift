@@ -53,7 +53,7 @@ struct YearlyCostHeatmap_Previews: PreviewProvider {
         let today = Date()
         let dateFormatter = makeDateFormatter()
 
-        return (0..<365).map { dayOffset in
+        return (0..<365).compactMap { dayOffset in
             makeDailyUsage(
                 dayOffset: dayOffset,
                 today: today,
@@ -74,8 +74,10 @@ struct YearlyCostHeatmap_Previews: PreviewProvider {
         today: Date,
         calendar: Calendar,
         dateFormatter: DateFormatter
-    ) -> DailyUsage {
-        let date = calendar.date(byAdding: .day, value: -dayOffset, to: today)!
+    ) -> DailyUsage? {
+        guard let date = calendar.date(byAdding: .day, value: -dayOffset, to: today) else {
+            return nil
+        }
         let cost = calculateSampleCost(for: date, dayOffset: dayOffset, calendar: calendar)
         return DailyUsage(
             date: dateFormatter.string(from: date),
