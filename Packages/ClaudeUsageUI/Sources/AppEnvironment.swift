@@ -21,27 +21,3 @@ public struct AppEnvironment: @unchecked Sendable {
         AppEnvironment()
     }
 }
-
-// MARK: - Preview Modifier
-
-#if DEBUG
-public struct PreviewEnvironment: PreviewModifier {
-    public static func makeSharedContext() async throws -> AppEnvironment {
-        let env = AppEnvironment.live()
-        await env.store.loadData()
-        return env
-    }
-
-    public func body(content: Content, context: AppEnvironment) -> some View {
-        content
-            .environment(context.store)
-            .environment(context.settings)
-    }
-}
-
-public extension PreviewTrait where T == Preview.ViewTraits {
-    static var appEnvironment: PreviewTrait<T> {
-        .modifier(PreviewEnvironment())
-    }
-}
-#endif
