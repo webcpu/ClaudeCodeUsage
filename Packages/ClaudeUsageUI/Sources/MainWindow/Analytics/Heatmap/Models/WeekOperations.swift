@@ -12,7 +12,7 @@ enum WeekOps {
         let startOfDay = calendar.startOfDay(for: date)
         let weekday = calendar.component(.weekday, from: startOfDay)
         let daysToSunday = weekday - 1
-        return calendar.date(byAdding: .day, value: -daysToSunday, to: startOfDay)!
+        return calendar.date(byAdding: .day, value: -daysToSunday, to: startOfDay) ?? startOfDay
     }
 
     /// Check if week start is before range start (partial week)
@@ -25,10 +25,8 @@ enum WeekOps {
     /// Advance to next complete week if current is partial
     static func adjustToCompleteWeek(_ date: Date, calendar: Calendar) -> Date {
         let weekStartDate = weekStart(for: date, calendar: calendar)
-        if weekStartDate < date {
-            return calendar.date(byAdding: .weekOfYear, value: 1, to: weekStartDate)!
-        }
-        return weekStartDate
+        guard weekStartDate < date else { return weekStartDate }
+        return calendar.date(byAdding: .weekOfYear, value: 1, to: weekStartDate) ?? date
     }
 
     /// Generate sequence of week start dates
