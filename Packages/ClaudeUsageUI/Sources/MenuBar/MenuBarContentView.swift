@@ -57,8 +57,9 @@ struct MenuBarContentView: View {
         }
     }
 
+    @ViewBuilder
     private var usageSection: some View {
-        Group {
+        if store.activeSession != nil {
             SectionHeader(
                 title: "Usage",
                 icon: "chart.bar.fill",
