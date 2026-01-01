@@ -69,7 +69,6 @@ public final class UsageStore {
     // MARK: - Internal State
 
     private var isCurrentlyLoading = false
-    private var lastLoadStartTime: Date?
     private var hasInitialized = false
     private var lastHistoryLoadDate: Date?
 
@@ -116,8 +115,8 @@ public final class UsageStore {
     }
 
     func loadData(invalidateCache: Bool = true) async {
-        guard canStartLoad else {
-            logger.debug("Load blocked: isLoading=\(self.isCurrentlyLoading), recentlyLoaded=\(self.isLoadedRecently)")
+        guard !isCurrentlyLoading else {
+            logger.debug("Load blocked: already loading")
             return
         }
         logger.info("Loading data (invalidateCache=\(invalidateCache))")
@@ -126,13 +125,8 @@ public final class UsageStore {
 
     // MARK: - Load Execution
 
-    private var canStartLoad: Bool {
-        !isCurrentlyLoading && !isLoadedRecently
-    }
-
     private func trackLoadExecution(_ load: () async throws -> Void) async {
         isCurrentlyLoading = true
-        lastLoadStartTime = clock.now
         _ = await LoadTrace.shared.start()
         defer { isCurrentlyLoading = false }
 
@@ -206,13 +200,6 @@ public final class UsageStore {
 
     func stopRefreshTimer() {
         refreshCoordinator.stop()
-    }
-
-    // MARK: - Helpers
-
-    private var isLoadedRecently: Bool {
-        guard let lastTime = lastLoadStartTime else { return false }
-        return clock.now.timeIntervalSince(lastTime) < 2.0
     }
 }
 

@@ -51,11 +51,13 @@ enum RefreshReason: Sendable {
 final class RefreshCoordinator {
     private var fallbackTimerTask: Task<Void, Never>?
     private var dayChangeObserver: NSObjectProtocol?
+    private var clockChangeObserver: NSObjectProtocol?
     private var lastKnownDay: String
     private var lastRefreshTime: Date
     private let clock: any ClockProtocol
     private let monitoredPath: String
-    private let directoryMonitor: DirectoryMonitor
+
+    private var directoryMonitor: DirectoryMonitor?
 
     var onRefresh: ((RefreshReason) async -> Void)?
 
@@ -76,25 +78,26 @@ final class RefreshCoordinator {
         self.lastRefreshTime = clock.now
         self.lastKnownDay = Self.formatDay(clock.now)
         self.monitoredPath = basePath + "/projects"
-        self.directoryMonitor = DirectoryMonitor(path: monitoredPath, debounceInterval: Timing.debounceInterval)
-
-        setupDirectoryMonitor()
-    }
-
-    deinit {
-        NotificationCenter.default.removeObserver(self)
     }
 
     // MARK: - Public API
 
     func start() {
-        directoryMonitor.start()  // Idempotent - FSEvents handles duplicate starts
+        if directoryMonitor == nil {
+            directoryMonitor = DirectoryMonitor(
+                path: monitoredPath,
+                debounceInterval: Timing.debounceInterval
+            ) { [weak self] in
+                self?.triggerRefreshIfNeeded(reason: .fileChange)
+            }
+        }
+        Task { await directoryMonitor?.start() }
         startFallbackTimer()
         startDayChangeMonitoring()
     }
 
     func stop() {
-        directoryMonitor.stop()
+        Task { await directoryMonitor?.stop() }
         stopFallbackTimer()
         stopDayChangeMonitoring()
     }
@@ -131,16 +134,6 @@ final class RefreshCoordinator {
         clock.now.timeIntervalSince(lastRefreshTime) > Timing.refreshThreshold
     }
 
-    // MARK: - Directory Monitoring
-
-    private func setupDirectoryMonitor() {
-        directoryMonitor.onChange = { [weak self] in
-            Task { @MainActor [weak self] in
-                self?.triggerRefreshIfNeeded(reason: .fileChange)
-            }
-        }
-    }
-
     // MARK: - Fallback Timer
 
     private func startFallbackTimer() {
@@ -173,6 +166,8 @@ final class RefreshCoordinator {
     private func stopDayChangeMonitoring() {
         dayChangeObserver.map { NotificationCenter.default.removeObserver($0) }
         dayChangeObserver = nil
+        clockChangeObserver.map { NotificationCenter.default.removeObserver($0) }
+        clockChangeObserver = nil
     }
 
     private func observeCalendarDayChange() {
@@ -188,12 +183,15 @@ final class RefreshCoordinator {
     }
 
     private func observeSystemClockChange() {
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(handleSignificantTimeChange),
-            name: NSNotification.Name.NSSystemClockDidChange,
-            object: nil
-        )
+        clockChangeObserver = NotificationCenter.default.addObserver(
+            forName: .NSSystemClockDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.handleSystemClockChange()
+            }
+        }
     }
 
     private func handleDayChange() {
@@ -201,13 +199,11 @@ final class RefreshCoordinator {
         triggerRefresh(reason: .dayChange)
     }
 
-    @objc private func handleSignificantTimeChange() {
-        Task { @MainActor in
-            let currentDay = Self.formatDay(clock.now)
-            guard currentDay != lastKnownDay else { return }
-            lastKnownDay = currentDay
-            triggerRefresh(reason: .dayChange)
-        }
+    private func handleSystemClockChange() {
+        let currentDay = Self.formatDay(clock.now)
+        guard currentDay != lastKnownDay else { return }
+        lastKnownDay = currentDay
+        triggerRefresh(reason: .dayChange)
     }
 
     // MARK: - Pure Functions
