@@ -12,52 +12,128 @@ struct HourlyTooltipView: View {
     let cost: Double
     let isCompact: Bool
 
-    private var formattedHour: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = isCompact ? "HH:mm" : "h:mm a"
-
-        let calendar = Calendar.current
-        let now = Date()
-        let components = calendar.dateComponents([.year, .month, .day], from: now)
-        var hourComponents = components
-        hourComponents.hour = hour
-        hourComponents.minute = 0
-
-        if let date = calendar.date(from: hourComponents) {
-            return formatter.string(from: date)
-        }
-        return String(format: "%02d:00", hour)
-    }
-
-    private var formattedCost: String {
-        if cost == 0 {
-            return "$0.00"
-        }
-        return cost.asCurrency
-    }
-
     var body: some View {
-        VStack(spacing: 2) {
-            Text(formattedHour)
-                .font(.system(size: isCompact ? 9 : 10, weight: .semibold, design: .monospaced))
-                .foregroundColor(.primary)
-
-            Text(formattedCost)
-                .font(.system(size: isCompact ? 8 : 9, weight: .medium, design: .monospaced))
-                .foregroundColor(cost > 0 ? .blue : .secondary)
+        VStack(spacing: Layout.labelSpacing) {
+            hourLabel
+            costLabel
         }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 4)
-        .background(
-            RoundedRectangle(cornerRadius: 4)
-                .fill(.regularMaterial)
-                .stroke(.tertiary, lineWidth: 0.5)
-                .shadow(color: .black.opacity(0.15), radius: 3, x: 0, y: 1)
-        )
+        .padding(.horizontal, Layout.horizontalPadding)
+        .padding(.vertical, Layout.verticalPadding)
+        .background(tooltipBackground)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Hour \(formattedHour), cost \(formattedCost)")
-        .transition(.scale(scale: 0.8).combined(with: .opacity))
-        .animation(.easeInOut(duration: 0.15), value: hour)
+        .accessibilityLabel(accessibilityDescription)
+        .transition(.scale(scale: Animation.scaleAmount).combined(with: .opacity))
+        .animation(.easeInOut(duration: Animation.duration), value: hour)
+    }
+}
+
+// MARK: - Layout Constants
+
+private extension HourlyTooltipView {
+    enum Layout {
+        static let labelSpacing: CGFloat = 2
+        static let horizontalPadding: CGFloat = 6
+        static let verticalPadding: CGFloat = 4
+        static let cornerRadius: CGFloat = 4
+        static let borderWidth: CGFloat = 0.5
+        static let shadowOpacity: Double = 0.15
+        static let shadowRadius: CGFloat = 3
+        static let shadowY: CGFloat = 1
+    }
+
+    enum FontSize {
+        static let hourCompact: CGFloat = 9
+        static let hourRegular: CGFloat = 10
+        static let costCompact: CGFloat = 8
+        static let costRegular: CGFloat = 9
+    }
+
+    enum Animation {
+        static let duration: Double = 0.15
+        static let scaleAmount: CGFloat = 0.8
+    }
+
+    enum DateFormat {
+        static let compact = "HH:mm"
+        static let regular = "h:mm a"
+        static let fallback = "%02d:00"
+    }
+}
+
+// MARK: - View Components
+
+private extension HourlyTooltipView {
+    var hourLabel: some View {
+        Text(formattedHour)
+            .font(.system(size: hourFontSize, weight: .semibold, design: .monospaced))
+            .foregroundColor(.primary)
+    }
+
+    var costLabel: some View {
+        Text(formattedCost)
+            .font(.system(size: costFontSize, weight: .medium, design: .monospaced))
+            .foregroundColor(costColor)
+    }
+
+    var tooltipBackground: some View {
+        RoundedRectangle(cornerRadius: Layout.cornerRadius)
+            .fill(.regularMaterial)
+            .stroke(.tertiary, lineWidth: Layout.borderWidth)
+            .shadow(
+                color: .black.opacity(Layout.shadowOpacity),
+                radius: Layout.shadowRadius,
+                x: 0,
+                y: Layout.shadowY
+            )
+    }
+}
+
+// MARK: - Computed Properties
+
+private extension HourlyTooltipView {
+    var hourFontSize: CGFloat {
+        isCompact ? FontSize.hourCompact : FontSize.hourRegular
+    }
+
+    var costFontSize: CGFloat {
+        isCompact ? FontSize.costCompact : FontSize.costRegular
+    }
+
+    var costColor: Color {
+        cost > 0 ? .blue : .secondary
+    }
+
+    var accessibilityDescription: String {
+        "Hour \(formattedHour), cost \(formattedCost)"
+    }
+}
+
+// MARK: - Formatting
+
+private extension HourlyTooltipView {
+    var formattedHour: String {
+        dateForHour.map(formatDate) ?? fallbackHourString
+    }
+
+    var formattedCost: String {
+        cost == 0 ? "$0.00" : cost.asCurrency
+    }
+
+    var dateForHour: Date? {
+        var components = Calendar.current.dateComponents([.year, .month, .day], from: Date())
+        components.hour = hour
+        components.minute = 0
+        return Calendar.current.date(from: components)
+    }
+
+    func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = isCompact ? DateFormat.compact : DateFormat.regular
+        return formatter.string(from: date)
+    }
+
+    var fallbackHourString: String {
+        String(format: DateFormat.fallback, hour)
     }
 }
 
