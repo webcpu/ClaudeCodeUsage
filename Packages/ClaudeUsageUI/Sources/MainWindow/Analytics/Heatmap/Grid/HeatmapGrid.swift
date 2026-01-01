@@ -7,42 +7,20 @@ import SwiftUI
 
 // MARK: - Heatmap Grid
 
-/// High-performance grid component for rendering heatmap data
 public struct HeatmapGrid: View {
 
     // MARK: - Properties
 
-    /// Heatmap dataset to display
     let dataset: HeatmapDataset
-
-    /// Configuration for grid appearance and behavior
     let configuration: HeatmapConfiguration
-
-    /// Currently hovered day (optional)
     let hoveredDay: HeatmapDay?
-
-    /// Hover event handler
     let onHover: (CGPoint) -> Void
-
-    /// End hover event handler
     let onEndHover: () -> Void
-
-    /// Accessibility configuration
     private let accessibility: HeatmapAccessibility
-
-    /// Capture mode environment value
     @Environment(\.isCaptureMode) private var isCaptureMode
 
     // MARK: - Initialization
 
-    /// Initialize heatmap grid
-    /// - Parameters:
-    ///   - dataset: Data to display
-    ///   - configuration: Grid configuration
-    ///   - hoveredDay: Currently hovered day
-    ///   - accessibility: Accessibility settings
-    ///   - onHover: Hover event handler
-    ///   - onEndHover: End hover handler
     public init(
         dataset: HeatmapDataset,
         configuration: HeatmapConfiguration,
@@ -90,39 +68,45 @@ public struct HeatmapGrid: View {
     @ViewBuilder
     private var scrollableGridWithMonthLabels: some View {
         if isCaptureMode {
-            staticGridWithMonthLabels
+            captureCompatibleStaticGrid
         } else {
-            interactiveScrollableGrid
+            normalModeScrollableGrid
         }
     }
 
-    /// Static grid for capture mode (no ScrollView)
     @ViewBuilder
-    private var staticGridWithMonthLabels: some View {
+    private var captureCompatibleStaticGrid: some View {
+        gridWithMonthLabelsLayout
+            .accessibilityElement(children: accessibilityChildrenBehavior)
+            .accessibilityLabel(gridAccessibilityLabel)
+    }
+
+    @ViewBuilder
+    private var normalModeScrollableGrid: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                gridWithMonthLabelsLayout
+            }
+            .onAppear { scrollToLastWeekWithData(proxy: proxy) }
+        }
+        .accessibilityElement(children: accessibilityChildrenBehavior)
+        .accessibilityLabel(gridAccessibilityLabel)
+    }
+
+    @ViewBuilder
+    private var gridWithMonthLabelsLayout: some View {
         VStack(spacing: 8) {
             monthLabelsRowIfNeeded
             gridWithHoverOverlay
         }
-        .accessibilityElement(children: accessibility.groupAccessibilityElements ? .contain : .ignore)
-        .accessibilityLabel("Heatmap grid showing daily usage over time")
     }
 
-    /// Interactive scrollable grid for normal mode
-    @ViewBuilder
-    private var interactiveScrollableGrid: some View {
-        ScrollViewReader { proxy in
-            ScrollView(.horizontal, showsIndicators: false) {
-                VStack(spacing: 8) {
-                    monthLabelsRowIfNeeded
-                    gridWithHoverOverlay
-                }
-            }
-            .onAppear {
-                scrollToLastWeekWithData(proxy: proxy)
-            }
-        }
-        .accessibilityElement(children: accessibility.groupAccessibilityElements ? .contain : .ignore)
-        .accessibilityLabel("Heatmap grid showing daily usage over time")
+    private var accessibilityChildrenBehavior: AccessibilityChildBehavior {
+        accessibility.groupAccessibilityElements ? .contain : .ignore
+    }
+
+    private var gridAccessibilityLabel: String {
+        "Heatmap grid showing daily usage over time"
     }
 
     private func scrollToLastWeekWithData(proxy: ScrollViewProxy) {
