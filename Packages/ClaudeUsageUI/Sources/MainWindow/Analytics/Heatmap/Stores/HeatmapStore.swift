@@ -170,35 +170,21 @@ public final class HeatmapStore {
     /// Update hovered day based on location
     func updateHoveredDay(at location: CGPoint, in gridBounds: CGRect) {
         guard let dataset else {
-            clearHoveredDay()
+            applyHoverState(.empty)
             return
         }
 
-        let day = findDayAtLocation(location, in: dataset)
-        guard isNewHoveredDay(day) else { return }
-
-        hoveredDay = day
-        updateTooltipIfNeeded(for: day, in: dataset)
-    }
-
-    /// Find day at specific location in heatmap grid
-    func findDayAtLocation(_ location: CGPoint, in dataset: HeatmapDataset) -> HeatmapDay? {
-        let indices = calculateGridIndices(from: location)
-        guard isValidGridPosition(indices, in: dataset) else { return nil }
-        return dataset.weeks[indices.week].days[indices.day]
+        let newState = calculateHoverState(at: location, in: dataset)
+        guard shouldApplyHoverState(newState) else { return }
+        applyHoverState(newState)
     }
 
     // MARK: - Performance Tracking
 
     /// Track hover event performance
     func trackHoverPerformance(_ operation: () -> Void) {
-        performanceMetrics.hoverEventCount += 1
-        let startTime = CFAbsoluteTimeGetCurrent()
-
-        operation()
-
-        let duration = CFAbsoluteTimeGetCurrent() - startTime
-        performanceMetrics.averageHoverTime = (performanceMetrics.averageHoverTime + duration) / 2
+        let duration = measureDuration(operation)
+        updateHoverMetrics(duration: duration)
     }
 
     /// Record dataset generation time
@@ -235,22 +221,56 @@ public extension HeatmapStore {
     }
 }
 
+// MARK: - Hover State Value Type
+
+/// Immutable hover state computed from location
+@MainActor
+private struct HoverState {
+    let day: HeatmapDay?
+    let tooltipPosition: CGPoint
+    let tooltipShouldFlipLeft: Bool
+
+    static let empty = HoverState(day: nil, tooltipPosition: .zero, tooltipShouldFlipLeft: false)
+}
+
 // MARK: - Hover State Helpers
 
 private extension HeatmapStore {
 
-    func clearHoveredDay() {
-        hoveredDay = nil
+    func shouldApplyHoverState(_ newState: HoverState) -> Bool {
+        hoveredDay?.id != newState.day?.id
     }
 
-    func isNewHoveredDay(_ day: HeatmapDay?) -> Bool {
-        hoveredDay?.id != day?.id
+    func applyHoverState(_ state: HoverState) {
+        hoveredDay = state.day
+        tooltipPosition = state.tooltipPosition
+        tooltipShouldFlipLeft = state.tooltipShouldFlipLeft
+    }
+}
+
+// MARK: - Pure Hover State Calculation
+
+private extension HeatmapStore {
+
+    func calculateHoverState(at location: CGPoint, in dataset: HeatmapDataset) -> HoverState {
+        guard let day = findDayAtLocation(location, in: dataset) else {
+            return .empty
+        }
+        return buildHoverState(for: day, totalWeeks: dataset.weeks.count)
     }
 
-    func updateTooltipIfNeeded(for day: HeatmapDay?, in dataset: HeatmapDataset) {
-        guard let day else { return }
-        tooltipPosition = calculateTooltipPosition(for: day)
-        tooltipShouldFlipLeft = shouldFlipTooltipLeft(for: day, totalWeeks: dataset.weeks.count)
+    func findDayAtLocation(_ location: CGPoint, in dataset: HeatmapDataset) -> HeatmapDay? {
+        let indices = calculateGridIndices(from: location)
+        guard isValidGridPosition(indices, in: dataset) else { return nil }
+        return dataset.weeks[indices.week].days[indices.day]
+    }
+
+    func buildHoverState(for day: HeatmapDay, totalWeeks: Int) -> HoverState {
+        HoverState(
+            day: day,
+            tooltipPosition: calculateTooltipPosition(for: day),
+            tooltipShouldFlipLeft: shouldFlipTooltipLeft(for: day, totalWeeks: totalWeeks)
+        )
     }
 
     func calculateTooltipPosition(for day: HeatmapDay) -> CGPoint {
@@ -289,6 +309,29 @@ private extension HeatmapStore {
 
     func isValidDayIndex(_ index: Int) -> Bool {
         index >= 0 && index < ViewModelConstants.daysPerWeek
+    }
+}
+
+// MARK: - Performance Measurement
+
+private extension HeatmapStore {
+
+    func measureDuration(_ operation: () -> Void) -> Double {
+        let startTime = CFAbsoluteTimeGetCurrent()
+        operation()
+        return CFAbsoluteTimeGetCurrent() - startTime
+    }
+
+    func updateHoverMetrics(duration: Double) {
+        performanceMetrics.hoverEventCount += 1
+        performanceMetrics.averageHoverTime = calculateRunningAverage(
+            current: performanceMetrics.averageHoverTime,
+            newValue: duration
+        )
+    }
+
+    func calculateRunningAverage(current: Double, newValue: Double) -> Double {
+        (current + newValue) / 2
     }
 }
 
