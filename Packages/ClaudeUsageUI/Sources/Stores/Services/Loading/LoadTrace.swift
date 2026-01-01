@@ -84,26 +84,32 @@ actor LoadTrace {
     }
 
     private func buildSummary(duration: TimeInterval) -> String {
-        var parts: [String] = []
+        let parts = summaryParts()
+        return formatLoadSummary(duration: duration, parts: parts)
+    }
 
-        // Today phase
-        if let todayDuration = phaseDurations[.today] {
-            parts.append("today \(formatDuration(todayDuration))")
-        }
+    private func summaryParts() -> [String] {
+        [
+            todayPart,
+            sessionPart,
+            historyPart
+        ].compactMap { $0 }
+    }
 
-        // Session info
-        if let found = sessionFound {
-            let status = found ? "session" : "no session"
-            parts.append(status)
-        }
+    private var todayPart: String? {
+        phaseDurations[.today].map { "today \(formatDuration($0))" }
+    }
 
-        // History phase
-        if historySkipped {
-            parts.append("history skipped")
-        } else if let historyDuration = phaseDurations[.history] {
-            parts.append("history \(formatDuration(historyDuration))")
-        }
+    private var sessionPart: String? {
+        sessionFound.map { $0 ? "session" : "no session" }
+    }
 
+    private var historyPart: String? {
+        if historySkipped { return "history skipped" }
+        return phaseDurations[.history].map { "history \(formatDuration($0))" }
+    }
+
+    private func formatLoadSummary(duration: TimeInterval, parts: [String]) -> String {
         let details = parts.isEmpty ? "" : " [\(parts.joined(separator: ", "))]"
         let slow = duration > Threshold.slowLoad ? " [slow]" : ""
         return "Load: \(formatDuration(duration))\(details)\(slow)"
