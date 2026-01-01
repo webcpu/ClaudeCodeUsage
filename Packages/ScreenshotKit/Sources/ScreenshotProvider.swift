@@ -60,7 +60,7 @@ public extension Screenshot where Environment == Void {
 /// For apps without complex dependencies, use ``SimpleScreenshotProvider``:
 ///
 /// ```swift
-/// import PreviewCaptureKit
+/// import ScreenshotKit
 ///
 /// struct Screenshots: SimpleScreenshotProvider {
 ///     static var outputDirectory: URL {
@@ -85,7 +85,7 @@ public extension Screenshot where Environment == Void {
 /// For apps that need to inject dependencies into views:
 ///
 /// ```swift
-/// import PreviewCaptureKit
+/// import ScreenshotKit
 ///
 /// struct Screenshots: ScreenshotProvider {
 ///     typealias Environment = AppEnvironment
@@ -114,10 +114,10 @@ public extension Screenshot where Environment == Void {
 ///
 /// Create an executable with:
 /// ```swift
-/// import PreviewCaptureKit
+/// import ScreenshotKit
 ///
 /// @main
-/// struct ScreenshotCapture {
+/// struct ScreenshotCaptureApp {
 ///     static func main() async { await run(Screenshots.self) }
 /// }
 /// ```

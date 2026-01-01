@@ -1,6 +1,6 @@
 //
 //  Config.swift
-//  Configuration constants for PreviewCapture
+//  Configuration constants for ScreenshotCapture
 //
 
 import Foundation

@@ -1,11 +1,11 @@
 //
 //  Entry.swift
-//  Public entry point for PreviewCapture apps
+//  Public entry point for ScreenshotCapture apps
 //
 
 import Foundation
 
-/// Single entry point for PreviewCapture apps.
+/// Single entry point for ScreenshotCapture apps.
 /// Usage: `await run(Screenshots.self)`
 @MainActor
 public func run<S: ScreenshotProvider>(_ provider: S.Type) async {

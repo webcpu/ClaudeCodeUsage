@@ -1,7 +1,7 @@
-import PreviewCaptureKit
+import ScreenshotKit
 @testable import ClaudeUsageUI
 
 @main
-struct PreviewCaptureApp {
+struct ScreenshotCaptureApp {
     static func main() async { await run(Screenshots.self) }
 }

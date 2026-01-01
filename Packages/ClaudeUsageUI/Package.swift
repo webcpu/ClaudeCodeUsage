@@ -12,13 +12,13 @@ let package = Package(
             name: "ClaudeUsageUI",
             targets: ["ClaudeUsageUI"]),
         .executable(
-            name: "PreviewCapture",
-            targets: ["PreviewCapture"]),
+            name: "ScreenshotCapture",
+            targets: ["ScreenshotCapture"]),
     ],
     dependencies: [
         .package(path: "../ClaudeUsageCore"),
         .package(path: "../ClaudeUsageData"),
-        .package(path: "../PreviewCaptureKit"),
+        .package(path: "../ScreenshotKit"),
     ],
     targets: [
         .target(
@@ -26,17 +26,17 @@ let package = Package(
             dependencies: [
                 "ClaudeUsageCore",
                 "ClaudeUsageData",
-                .product(name: "PreviewCaptureKit", package: "PreviewCaptureKit"),
+                .product(name: "ScreenshotKit", package: "ScreenshotKit"),
             ],
             path: "Sources"),
 
         .executableTarget(
-            name: "PreviewCapture",
+            name: "ScreenshotCapture",
             dependencies: [
                 "ClaudeUsageUI",
-                .product(name: "PreviewCaptureKit", package: "PreviewCaptureKit"),
+                .product(name: "ScreenshotKit", package: "ScreenshotKit"),
             ],
-            path: "PreviewCapture",
+            path: "ScreenshotCapture",
             swiftSettings: [
                 .unsafeFlags(["-enable-testing"]),
             ]),

@@ -3,10 +3,10 @@
 //  Screenshot provider for ClaudeUsageUI
 //
 //  Example of ScreenshotProvider for apps with dependencies.
-//  For simpler apps, see SimpleScreenshotProvider in PreviewCaptureKit.
+//  For simpler apps, see SimpleScreenshotProvider in ScreenshotKit.
 //
 
-import PreviewCaptureKit
+import ScreenshotKit
 import SwiftUI
 
 // MARK: - Screenshot Provider
@@ -18,7 +18,7 @@ public struct Screenshots: ScreenshotProvider {
         URL(fileURLWithPath: "/tmp/ClaudeUsageUI")
     }
 
-    public static var screenshots: [Screenshot<AppEnvironment>] {
+    public static var screenshots: [Screenshot<Environment>] {
         [
             screenshot("MenuBar", width: 360, height: 500) { MenuBarContentView() },
             screenshot("MainWindow-Overview", width: 1100, height: 700) { MainView(initialDestination: .overview) },

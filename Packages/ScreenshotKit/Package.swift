@@ -3,16 +3,16 @@
 import PackageDescription
 
 let package = Package(
-    name: "PreviewCaptureKit",
+    name: "ScreenshotKit",
     platforms: [
         .macOS(.v14),
     ],
     products: [
         .library(
-            name: "PreviewCaptureKit",
-            targets: ["PreviewCaptureKit"]),
+            name: "ScreenshotKit",
+            targets: ["ScreenshotKit"]),
     ],
     targets: [
-        .target(name: "PreviewCaptureKit", path: "Sources"),
+        .target(name: "ScreenshotKit", path: "Sources"),
     ]
 )
