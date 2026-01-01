@@ -72,7 +72,7 @@ public final class HeatmapDateCalculator: @unchecked Sendable {
     ) -> (start: Date, end: Date) {
         let end = calendar.startOfDay(for: endDate)
         let initialStart = calendar.date(byAdding: .day, value: -(numberOfDays - 1), to: end)!
-        let adjustedStart = MonthOps.adjustStartForSameMonth(start: initialStart, end: end, calendar: calendar)
+        let adjustedStart = MonthOps.adjustStartForSameMonth(start: initialStart, end: end, calendar: calendar) ?? initialStart
         let finalStart = WeekOps.adjustToCompleteWeek(adjustedStart, calendar: calendar)
         return (start: finalStart, end: end)
     }
