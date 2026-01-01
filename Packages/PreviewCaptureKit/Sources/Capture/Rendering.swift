@@ -7,10 +7,10 @@ import AppKit
 import SwiftUI
 
 @MainActor
-func renderAndSave<E>(target: CaptureTarget<E>, env: E, to path: URL) throws {
-    let view = target.view(env)
-    let image = try renderImage(from: view, size: target.size, name: target.name)
-    let data = try convertToPNG(image, name: target.name)
+func renderAndSave<E>(screenshot: Screenshot<E>, env: E, to path: URL) throws {
+    let view = screenshot.view(env)
+    let image = try renderImage(from: view, size: screenshot.size, name: screenshot.name)
+    let data = try convertToPNG(image, name: screenshot.name)
     try data.write(to: path)
 }
 

@@ -6,15 +6,15 @@
 import Foundation
 
 @MainActor
-func captureAllTargets<E: Sendable>(
-    _ targets: [CaptureTarget<E>],
+func captureAll<E: Sendable>(
+    _ screenshots: [Screenshot<E>],
     env: E,
     outputDir: URL
 ) async -> [CaptureResult] {
     await withTaskGroup(of: CaptureResult.self, returning: [CaptureResult].self) { group in
-        targets.forEach { target in
+        screenshots.forEach { screenshot in
             group.addTask { @MainActor in
-                captureTarget(target, env: env, outputDir: outputDir)
+                capture(screenshot, env: env, outputDir: outputDir)
             }
         }
         var results: [CaptureResult] = []
@@ -26,12 +26,12 @@ func captureAllTargets<E: Sendable>(
 }
 
 @MainActor
-func captureTarget<E>(_ target: CaptureTarget<E>, env: E, outputDir: URL) -> CaptureResult {
-    let path = outputPath(for: target, in: outputDir)
+func capture<E>(_ screenshot: Screenshot<E>, env: E, outputDir: URL) -> CaptureResult {
+    let path = outputPath(for: screenshot, in: outputDir)
     do {
-        try renderAndSave(target: target, env: env, to: path)
-        return .success(name: target.name, path: path.path, size: target.size)
+        try renderAndSave(screenshot: screenshot, env: env, to: path)
+        return .success(name: screenshot.name, path: path.path, size: screenshot.size)
     } catch {
-        return .failure(name: target.name, path: path.path, size: target.size, error: error)
+        return .failure(name: screenshot.name, path: path.path, size: screenshot.size, error: error)
     }
 }

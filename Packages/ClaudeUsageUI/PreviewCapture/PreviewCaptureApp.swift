@@ -3,5 +3,5 @@ import PreviewCaptureKit
 
 @main
 struct PreviewCaptureApp {
-    static func main() async { await run(ClaudeUsageUICaptures.self) }
+    static func main() async { await run(Screenshots.self) }
 }

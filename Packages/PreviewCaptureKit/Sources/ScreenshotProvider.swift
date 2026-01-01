@@ -1,28 +1,28 @@
 //
-//  CaptureManifest.swift
-//  Protocol for defining capture targets per module
+//  ScreenshotProvider.swift
+//  Protocol for defining screenshots to capture
 //
 
 import SwiftUI
 
-// MARK: - Capture Target
+// MARK: - Screenshot
 
-/// A view to capture as a PNG image.
+/// A view to capture as a PNG screenshot.
 ///
 /// For apps with dependencies (Environment):
 /// ```swift
-/// CaptureTarget<MyEnv>(name: "Main", width: 800, height: 600) { env in
+/// Screenshot<MyEnv>(name: "Main", width: 800, height: 600) { env in
 ///     AnyView(MainView().environmentObject(env.store))
 /// }
 /// ```
 ///
 /// For simple apps (no dependencies):
 /// ```swift
-/// CaptureTarget<Void>(name: "Main", width: 800, height: 600) {
+/// Screenshot<Void>(name: "Main", width: 800, height: 600) {
 ///     MainView()
 /// }
 /// ```
-public struct CaptureTarget<Environment>: Sendable {
+public struct Screenshot<Environment>: Sendable {
     public let name: String
     public let size: CGSize
     public let view: @MainActor @Sendable (Environment) -> AnyView
@@ -40,7 +40,7 @@ public struct CaptureTarget<Environment>: Sendable {
 }
 
 /// Convenience initializer for stateless views (no Environment needed).
-public extension CaptureTarget where Environment == Void {
+public extension Screenshot where Environment == Void {
     init<V: View>(
         name: String,
         width: CGFloat,
@@ -51,23 +51,23 @@ public extension CaptureTarget where Environment == Void {
     }
 }
 
-// MARK: - Capture Manifest Protocol
+// MARK: - Screenshot Provider Protocol
 
 /// Defines what views to capture for visual verification.
 ///
 /// ## Quick Start (Simple App)
 ///
-/// For apps without complex dependencies, use ``SimpleCaptureManifest``:
+/// For apps without complex dependencies, use ``SimpleScreenshotProvider``:
 ///
 /// ```swift
 /// import PreviewCaptureKit
 ///
-/// struct MyCaptures: SimpleCaptureManifest {
+/// struct Screenshots: SimpleScreenshotProvider {
 ///     static var outputDirectory: URL {
 ///         URL(fileURLWithPath: "/tmp/MyApp")
 ///     }
 ///
-///     static var targets: [CaptureTarget<Void>] {
+///     static var screenshots: [Screenshot<Void>] {
 ///         [
 ///             .init(name: "MainView", width: 800, height: 600) {
 ///                 MainView()
@@ -87,15 +87,17 @@ public extension CaptureTarget where Environment == Void {
 /// ```swift
 /// import PreviewCaptureKit
 ///
-/// extension AppEnvironment: CaptureManifest {
+/// struct Screenshots: ScreenshotProvider {
+///     typealias Environment = AppEnvironment
+///
 ///     static var outputDirectory: URL {
 ///         URL(fileURLWithPath: "/tmp/MyApp")
 ///     }
 ///
-///     static var targets: [CaptureTarget<AppEnvironment>] {
+///     static var screenshots: [Screenshot<AppEnvironment>] {
 ///         [
 ///             .init(name: "Main", width: 800, height: 600) { env in
-///                 AnyView(MainView().environmentObject(env.store))
+///                 AnyView(MainView().environment(env.store))
 ///             },
 ///         ]
 ///     }
@@ -115,13 +117,13 @@ public extension CaptureTarget where Environment == Void {
 /// import PreviewCaptureKit
 ///
 /// @main
-/// struct MyPreviewCapture {
-///     static func main() async { await run(MyCaptures.self) }
+/// struct ScreenshotCapture {
+///     static func main() async { await run(Screenshots.self) }
 /// }
 /// ```
 @MainActor
-public protocol CaptureManifest {
-    /// The type passed to each target's view builder.
+public protocol ScreenshotProvider {
+    /// The type passed to each screenshot's view builder.
     /// Use `Void` for simple apps, or your app's environment type for dependency injection.
     associatedtype Environment: Sendable
 
@@ -129,30 +131,30 @@ public protocol CaptureManifest {
     static var outputDirectory: URL { get }
 
     /// Views to capture. Each becomes a PNG file named `{name}.png`.
-    static var targets: [CaptureTarget<Environment>] { get }
+    static var screenshots: [Screenshot<Environment>] { get }
 
-    /// Creates the environment passed to each target's view builder.
-    /// For simple apps using `SimpleCaptureManifest`, this is provided automatically.
+    /// Creates the environment passed to each screenshot's view builder.
+    /// For simple apps using `SimpleScreenshotProvider`, this is provided automatically.
     static func makeEnvironment() async throws -> Environment
 }
 
-public extension CaptureManifest {
+public extension ScreenshotProvider {
     static var renderScale: CGFloat { 2.0 }
 }
 
-// MARK: - Simple Capture Manifest
+// MARK: - Simple Screenshot Provider
 
 /// Simplified protocol for apps without complex dependencies.
 ///
 /// Use this when your views don't need injected dependencies:
 ///
 /// ```swift
-/// struct MyCaptures: SimpleCaptureManifest {
+/// struct Screenshots: SimpleScreenshotProvider {
 ///     static var outputDirectory: URL {
 ///         URL(fileURLWithPath: "/tmp/MyApp")
 ///     }
 ///
-///     static var targets: [CaptureTarget<Void>] {
+///     static var screenshots: [Screenshot<Void>] {
 ///         [
 ///             .init(name: "Main", width: 800, height: 600) {
 ///                 ContentView()
@@ -161,8 +163,8 @@ public extension CaptureManifest {
 ///     }
 /// }
 /// ```
-public protocol SimpleCaptureManifest: CaptureManifest where Environment == Void {}
+public protocol SimpleScreenshotProvider: ScreenshotProvider where Environment == Void {}
 
-public extension SimpleCaptureManifest {
-    static func makeEnvironment() async throws { }
+public extension SimpleScreenshotProvider {
+    static func makeEnvironment() async throws {}
 }

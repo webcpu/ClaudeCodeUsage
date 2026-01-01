@@ -44,16 +44,16 @@ struct CaptureResult: Codable {
 
 // MARK: - Manifest Output
 
-struct CaptureManifestOutput: Codable {
+struct ManifestOutput: Codable {
     let timestamp: String
     let outputDirectory: String
-    let captures: [CaptureResult]
+    let screenshots: [CaptureResult]
 
-    static func from(results: [CaptureResult], directory: URL) -> CaptureManifestOutput {
-        CaptureManifestOutput(
+    static func from(results: [CaptureResult], directory: URL) -> ManifestOutput {
+        ManifestOutput(
             timestamp: ISO8601DateFormatter().string(from: Date()),
             outputDirectory: directory.path,
-            captures: results
+            screenshots: results
         )
     }
 }

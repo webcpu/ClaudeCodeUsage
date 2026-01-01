@@ -6,28 +6,28 @@
 import Foundation
 
 /// Single entry point for PreviewCapture apps.
-/// Usage: `await run(YourManifest.self)`
+/// Usage: `await run(Screenshots.self)`
 @MainActor
-public func run<M: CaptureManifest>(_ manifest: M.Type) async {
-    await execute(Command.parse(Array(CommandLine.arguments.dropFirst())), manifest: manifest)
+public func run<S: ScreenshotProvider>(_ provider: S.Type) async {
+    await execute(Command.parse(Array(CommandLine.arguments.dropFirst())), provider: provider)
 }
 
 @MainActor
-func execute<M: CaptureManifest>(_ command: Command, manifest: M.Type) async {
+func execute<S: ScreenshotProvider>(_ command: Command, provider: S.Type) async {
     switch command {
     case .list:
-        listTargets(manifest)
+        listScreenshots(provider)
     case .help:
         printUsage()
-    case .capture(let target):
-        await executeCapture(manifest, target: target)
+    case .capture(let name):
+        await executeCapture(provider, name: name)
     }
 }
 
 @MainActor
-func executeCapture<M: CaptureManifest>(_ manifest: M.Type, target: String?) async {
+func executeCapture<S: ScreenshotProvider>(_ provider: S.Type, name: String?) async {
     do {
-        try await runCapture(manifest, targetFilter: target)
+        try await captureScreenshots(provider, filter: name)
         print("Capture complete.")
     } catch {
         print("Error: \(error)")
