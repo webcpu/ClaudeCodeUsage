@@ -87,19 +87,11 @@ struct MenuBarContextMenu: View {
 
     var body: some View {
         Group {
-            refreshSection
-            Divider()
             statusSection
             Divider()
             actionsSection
             Divider()
             quitButton
-        }
-    }
-
-    private var refreshSection: some View {
-        Button("Refresh") {
-            Task { await store.loadData() }
         }
     }
 

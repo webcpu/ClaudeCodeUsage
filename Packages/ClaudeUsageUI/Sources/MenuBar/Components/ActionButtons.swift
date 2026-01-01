@@ -10,13 +10,11 @@ import ClaudeUsageCore
 
 struct ActionButtons: View {
     @Environment(\.openWindow) private var openWindow
-    let onRefresh: () -> Void
     let viewMode: MenuBarViewMode
 
     var body: some View {
         HStack(spacing: 12) {
             dashboardButton
-            refreshButton
             menuBarOnlyButtons
         }
         .padding(.bottom, MenuBarTheme.Layout.actionButtonsBottomPadding)
@@ -34,15 +32,6 @@ struct ActionButtons: View {
             .keyboardShortcut("1", modifiers: .command)
             .help("Open the main window (⌘1)")
         }
-    }
-
-    private var refreshButton: some View {
-        Button("Refresh") {
-            onRefresh()
-        }
-        .buttonStyle(MenuButtonStyle(style: .primary))
-        .keyboardShortcut("r", modifiers: .command)
-        .help("Refresh usage data (⌘R)")
     }
 
     @ViewBuilder

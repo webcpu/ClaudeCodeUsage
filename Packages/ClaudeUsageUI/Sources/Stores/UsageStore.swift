@@ -180,10 +180,6 @@ public final class UsageStore {
         state = .loaded(result.fullStats)
     }
 
-    func refresh() async {
-        await loadData()
-    }
-
     // MARK: - Lifecycle
 
     func handleAppBecameActive() {

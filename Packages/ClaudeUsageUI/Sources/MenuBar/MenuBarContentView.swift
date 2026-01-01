@@ -14,7 +14,6 @@ struct MenuBarContentView: View {
     let viewMode: MenuBarViewMode
 
     enum FocusField: Hashable {
-        case refresh
         case settings
         case quit
     }
@@ -91,7 +90,7 @@ struct MenuBarContentView: View {
     }
 
     private var actionsSection: some View {
-        ActionButtons(onRefresh: handleRefresh, viewMode: viewMode)
+        ActionButtons(viewMode: viewMode)
             .padding(.horizontal, 12)
             .padding(.bottom, 8)
     }
@@ -106,9 +105,6 @@ struct MenuBarContentView: View {
         case .escape:
             if viewMode == .menuBar { NSApp.hide(nil) }
             return .handled
-        case KeyEquivalent("r") where press.modifiers.contains(.command):
-            handleRefresh()
-            return .handled
         default:
             return .ignored
         }
@@ -117,21 +113,17 @@ struct MenuBarContentView: View {
     // MARK: - Focus Navigation
     private func switchFocusNext() {
         switch focusedField {
-        case .refresh:
-            focusedField = .settings
         case .settings:
             focusedField = .quit
         case .quit, nil:
-            focusedField = .refresh
+            focusedField = .settings
         }
     }
-    
+
     private func switchFocusPrevious() {
         switch focusedField {
-        case .refresh:
-            focusedField = .quit
         case .settings:
-            focusedField = .refresh
+            focusedField = .quit
         case .quit, nil:
             focusedField = .settings
         }
@@ -141,13 +133,6 @@ struct MenuBarContentView: View {
     private var sectionDivider: some View {
         Divider()
             .padding(.vertical, MenuBarTheme.Layout.dividerVerticalPadding)
-    }
-
-    // MARK: - Actions
-    private func handleRefresh() {
-        Task {
-            await store.loadData()
-        }
     }
 }
 
