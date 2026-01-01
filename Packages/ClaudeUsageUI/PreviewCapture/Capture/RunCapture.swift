@@ -1,6 +1,6 @@
 //
-//  Orchestration.swift
-//  High-level pipeline orchestration
+//  RunCapture.swift
+//  High-level capture orchestration
 //
 
 import Foundation
@@ -14,14 +14,6 @@ func runCapture<M: CaptureManifest>(_ manifest: M.Type, targetFilter: String?) a
     let results = await captureAllTargets(targets, env: env, outputDir: M.outputDirectory)
     results.forEach { print($0.logMessage) }
     try writeManifest(results, to: M.outputDirectory)
-}
-
-@MainActor
-func listTargets<M: CaptureManifest>(_ manifest: M.Type) {
-    print("Available capture targets:")
-    M.targets
-        .map { "  - \($0.name) (\(Int($0.size.width))x\(Int($0.size.height)))" }
-        .forEach { print($0) }
 }
 
 private func filterTargets<E>(

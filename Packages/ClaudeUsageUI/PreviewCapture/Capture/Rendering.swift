@@ -31,3 +31,11 @@ private func convertToPNG(_ image: NSImage, name: String) throws -> Data {
     }
     return data
 }
+
+private extension NSImage {
+    var pngData: Data? {
+        tiffRepresentation
+            .flatMap { NSBitmapImageRep(data: $0) }
+            .flatMap { $0.representation(using: .png, properties: [:]) }
+    }
+}
