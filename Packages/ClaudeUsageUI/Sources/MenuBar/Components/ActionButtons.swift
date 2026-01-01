@@ -63,29 +63,25 @@ struct ActionButtons: View {
     // MARK: - Actions
 
     private func openMainWindow() {
-        // Capture screen at click time (before async operations)
-        let targetScreen = screenAtMouseLocation()
+        let targetScreen = captureCurrentScreen()
+        requestMainWindowOpen()
+        positionWindowAfterCreation(on: targetScreen)
+    }
 
-        // Always call openWindow - SwiftUI handles create vs activate
+    private func captureCurrentScreen() -> NSScreen? {
+        screenAtMouseLocation()
+    }
+
+    private func requestMainWindowOpen() {
         openWindow(id: "main")
         NSApp.activate(ignoringOtherApps: true)
+    }
 
-        // Wait for window to be created, then position
+    private func positionWindowAfterCreation(on targetScreen: NSScreen?) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
             guard let window = findMainWindow() else { return }
-
-            // Move window to current Space (not just current screen)
-            window.collectionBehavior.insert(.moveToActiveSpace)
-
-            if window.isMiniaturized {
-                window.deminiaturize(nil)
-            }
-            window.makeKeyAndOrderFront(nil)
-
-            // Set frame AFTER makeKeyAndOrderFront to override SwiftUI positioning
-            DispatchQueue.main.async {
-                centerWindow(window, on: targetScreen)
-            }
+            bringWindowToFront(window)
+            centerWindowOnNextRunLoop(window, on: targetScreen)
         }
     }
 }
@@ -102,6 +98,22 @@ private func screenAtMouseLocation() -> NSScreen? {
     let mouseLocation = NSEvent.mouseLocation
     return NSScreen.screens.first { NSMouseInRect(mouseLocation, $0.frame, false) }
         ?? NSScreen.main
+}
+
+@MainActor
+private func bringWindowToFront(_ window: NSWindow) {
+    window.collectionBehavior.insert(.moveToActiveSpace)
+    if window.isMiniaturized {
+        window.deminiaturize(nil)
+    }
+    window.makeKeyAndOrderFront(nil)
+}
+
+@MainActor
+private func centerWindowOnNextRunLoop(_ window: NSWindow, on screen: NSScreen?) {
+    DispatchQueue.main.async {
+        centerWindow(window, on: screen)
+    }
 }
 
 @MainActor
