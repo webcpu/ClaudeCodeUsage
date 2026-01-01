@@ -100,22 +100,26 @@ public actor SessionMonitor: SessionDataSource {
     }
 
     private func splitAtSessionGaps(_ entries: [UsageEntry]) -> [[UsageEntry]] {
-        entries.reduce(into: [[UsageEntry]]()) { groups, entry in
-            if shouldStartNewGroup(groups: groups, entry: entry) {
-                groups.append([entry])
-            } else {
-                groups[groups.count - 1].append(entry)
-            }
-        }
+        guard !entries.isEmpty else { return [] }
+        let splitIndices = findSplitIndices(in: entries)
+        return partitionEntries(entries, at: splitIndices)
     }
 
-    private func shouldStartNewGroup(groups: [[UsageEntry]], entry: UsageEntry) -> Bool {
-        guard let lastEntry = groups.last?.last else { return true }
-        return hasSessionGap(from: lastEntry, to: entry)
+    private func findSplitIndices(in entries: [UsageEntry]) -> [Int] {
+        zip(entries, entries.dropFirst())
+            .enumerated()
+            .filter { hasSessionGap(from: $0.element.0, to: $0.element.1) }
+            .map { $0.offset + 1 }
     }
 
-    private func hasSessionGap(from lastEntry: UsageEntry, to entry: UsageEntry) -> Bool {
-        entry.timestamp.timeIntervalSince(lastEntry.timestamp) > sessionDurationSeconds
+    private func partitionEntries(_ entries: [UsageEntry], at splitIndices: [Int]) -> [[UsageEntry]] {
+        let boundaries = [0] + splitIndices + [entries.count]
+        return zip(boundaries, boundaries.dropFirst())
+            .map { start, end in Array(entries[start..<end]) }
+    }
+
+    private func hasSessionGap(from previous: UsageEntry, to next: UsageEntry) -> Bool {
+        next.timestamp.timeIntervalSince(previous.timestamp) > sessionDurationSeconds
     }
 
     private func mapGroupsToBlocks(_ groups: [[UsageEntry]]) -> [SessionBlock] {
