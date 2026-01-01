@@ -165,8 +165,9 @@ public final class HeatmapDateCalculator: @unchecked Sendable {
     }
 
     /// Generate weeks layout for heatmap
+    /// Includes partial weeks at start/end to ensure all dates in range are visible
     public func generateWeeksLayout(from startDate: Date, to endDate: Date) -> [[Date?]] {
-        let firstWeek = findFirstCompleteWeekStart(for: startDate)
+        let firstWeek = WeekOps.weekStart(for: startDate, calendar: calendar)
         return buildWeeksArray(from: firstWeek, to: endDate)
     }
 
@@ -271,16 +272,6 @@ public final class HeatmapDateCalculator: @unchecked Sendable {
     }
 
     // MARK: - Week Layout Generation (Mid Level)
-
-    private func findFirstCompleteWeekStart(for startDate: Date) -> Date {
-        let weekStartDate = WeekOps.weekStart(for: startDate, calendar: calendar)
-
-        guard WeekOps.isPartialWeek(weekStart: weekStartDate, rangeStart: startDate, calendar: calendar) else {
-            return weekStartDate
-        }
-        // Fallback to weekStartDate if date arithmetic fails (practically impossible)
-        return calendar.date(byAdding: .weekOfYear, value: 1, to: weekStartDate) ?? weekStartDate
-    }
 
     private func buildWeeksArray(from weekStart: Date, to endDate: Date) -> [[Date?]] {
         Array(

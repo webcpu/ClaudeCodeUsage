@@ -109,7 +109,7 @@ public final class HeatmapStore {
 
         do {
             let validDailyUsage = try validateDailyUsage(stats.byDate)
-            let dateRange = try calculateValidDateRange()
+            let dateRange = try calculateValidDateRange(from: validDailyUsage)
             dataset = buildDatasetSync(from: validDailyUsage, dateRange: dateRange)
         } catch {
             handleDatasetError(error)

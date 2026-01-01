@@ -156,11 +156,39 @@ extension HeatmapStore {
         return dailyUsage
     }
 
-    func calculateValidDateRange() throws -> (start: Date, end: Date) {
-        guard let dateRange = dateCalculator.rollingDateRangeWithCompleteWeeks(
-            numberOfDays: DataGenerationConstants.rollingDateRangeDays
-        ) else {
-            throw HeatmapError.invalidDateRange("Failed to calculate date range")
+    func calculateValidDateRange(from dailyUsage: [DailyUsage]) throws -> (start: Date, end: Date) {
+        let calendar = Calendar.current
+        let today = Date()
+        let currentYear = calendar.component(.year, from: today)
+
+        // Find earliest date in data
+        let earliestDataDate = findEarliestDate(in: dailyUsage, calendar: calendar)
+
+        // Calculate date range based on whether data spans previous year
+        let dateRange: (start: Date, end: Date)
+        if let earliest = earliestDataDate,
+           calendar.component(.year, from: earliest) < currentYear {
+            // Data spans previous year: show from that month to same month next year
+            // e.g., Dec 2025 data → Dec 2025 to Dec 2026
+            let earliestMonth = calendar.component(.month, from: earliest)
+            let startComponents = DateComponents(year: currentYear - 1, month: earliestMonth, day: 1)
+            let endComponents = DateComponents(year: currentYear, month: earliestMonth + 1, day: 0) // Last day of month
+
+            guard let start = calendar.date(from: startComponents),
+                  let end = calendar.date(from: endComponents) else {
+                throw HeatmapError.invalidDateRange("Failed to calculate date range")
+            }
+            dateRange = (start: start, end: end)
+        } else {
+            // Data only in current year: show Jan 1 to Dec 31
+            let startComponents = DateComponents(year: currentYear, month: 1, day: 1)
+            let endComponents = DateComponents(year: currentYear, month: 12, day: 31)
+
+            guard let start = calendar.date(from: startComponents),
+                  let end = calendar.date(from: endComponents) else {
+                throw HeatmapError.invalidDateRange("Failed to calculate date range")
+            }
+            dateRange = (start: start, end: end)
         }
 
         let validationErrors = dateCalculator.validateDateRange(
@@ -173,6 +201,16 @@ extension HeatmapStore {
         }
 
         return dateRange
+    }
+
+    private func findEarliestDate(in dailyUsage: [DailyUsage], calendar: Calendar) -> Date? {
+        let formatter = DateFormatter()
+        formatter.dateFormat = DataGenerationConstants.dateFormat
+        formatter.timeZone = TimeZone.current
+
+        return dailyUsage
+            .compactMap { formatter.date(from: $0.date) }
+            .min()
     }
 }
 
@@ -204,7 +242,7 @@ private extension HeatmapStore {
 
     func processStatsIntoDataset(_ stats: UsageStats) async throws -> HeatmapDataset {
         let validDailyUsage = try validateDailyUsage(stats.byDate)
-        let dateRange = try calculateValidDateRange()
+        let dateRange = try calculateValidDateRange(from: validDailyUsage)
         return await buildDataset(from: validDailyUsage, dateRange: dateRange)
     }
 
