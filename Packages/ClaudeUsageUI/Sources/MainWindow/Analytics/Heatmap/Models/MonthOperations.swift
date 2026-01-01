@@ -25,13 +25,16 @@ enum MonthOps {
         calendar.monthSymbols[month - 1]
     }
 
-    /// Adjust start date to next month if start and end are in same month
+    /// Adjust start date to next month if start and end are in same month AND year
     /// Returns nil only if calendar fails to create a valid date (should not happen with valid input)
     static func adjustStartForSameMonth(start: Date, end: Date, calendar: Calendar) -> Date? {
         let startMonth = calendar.component(.month, from: start)
+        let startYear = calendar.component(.year, from: start)
         let endMonth = calendar.component(.month, from: end)
+        let endYear = calendar.component(.year, from: end)
 
-        guard startMonth == endMonth else { return start }
+        // Only adjust if same month AND same year (Jan 2025 ≠ Jan 2026)
+        guard startMonth == endMonth && startYear == endYear else { return start }
 
         var components = calendar.dateComponents([.year, .month], from: start)
         let currentMonth = components.month ?? 1

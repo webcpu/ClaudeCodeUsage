@@ -127,7 +127,23 @@ public final class HeatmapDateCalculator: @unchecked Sendable {
             acc.processingWeek(week, dateRange: dateRange, calendar: calendar, createMonthInfo: createMonthInfo)
         }
 
-        return accumulated.finalized(createMonthInfo: createMonthInfo)
+        let months = accumulated.finalized(createMonthInfo: createMonthInfo)
+        return appendEndDateMonthIfNeeded(months, endDate: endDate, lastWeekIndex: accumulated.lastWeekIndex)
+    }
+
+    /// Add end date's month if it differs from the last month in the list
+    /// Handles year boundary: Dec 2025 → Jan 2026 in final week
+    private func appendEndDateMonthIfNeeded(_ months: [MonthInfo], endDate: Date, lastWeekIndex: Int) -> [MonthInfo] {
+        let endMonth = calendar.component(.month, from: endDate)
+        let endYear = calendar.component(.year, from: endDate)
+
+        guard let lastMonth = months.last,
+              (lastMonth.monthNumber != endMonth || lastMonth.year != endYear) else {
+            return months
+        }
+
+        let endMonthInfo = createMonthInfo(month: endMonth, year: endYear, firstWeek: lastWeekIndex, lastWeek: lastWeekIndex)
+        return months + [endMonthInfo]
     }
 
     private func indexedWeeks(from startDate: Date, to endDate: Date) -> [(index: Int, start: Date)] {
@@ -235,9 +251,10 @@ public final class HeatmapDateCalculator: @unchecked Sendable {
         }
 
         private func appendingOrExtendingFirst(with finalMonth: MonthInfo) -> [MonthInfo] {
+            // Only merge if same month AND same year (Jan 2025 ≠ Jan 2026)
             guard let firstMonth = months.first,
-                  firstMonth.name == finalMonth.name,
-                  firstMonth.monthNumber == finalMonth.monthNumber else {
+                  firstMonth.monthNumber == finalMonth.monthNumber,
+                  firstMonth.year == finalMonth.year else {
                 return months + [finalMonth]
             }
 
