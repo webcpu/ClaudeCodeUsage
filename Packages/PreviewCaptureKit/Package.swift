@@ -1,0 +1,18 @@
+// swift-tools-version: 6.0
+
+import PackageDescription
+
+let package = Package(
+    name: "PreviewCaptureKit",
+    platforms: [
+        .macOS(.v14),
+    ],
+    products: [
+        .library(
+            name: "PreviewCaptureKit",
+            targets: ["PreviewCaptureKit"]),
+    ],
+    targets: [
+        .target(name: "PreviewCaptureKit", path: "Sources"),
+    ]
+)

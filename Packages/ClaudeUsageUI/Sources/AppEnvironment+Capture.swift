@@ -2,10 +2,14 @@
 //  AppEnvironment+Capture.swift
 //  Capture manifest for ClaudeUsageUI
 //
+//  Example of CaptureManifest for apps with dependencies.
+//  For simpler apps, see SimpleCaptureManifest in PreviewCaptureKit.
+//
 
+import PreviewCaptureKit
 import SwiftUI
 
-// MARK: - Capture Manifest Conformance
+// MARK: - Capture Manifest
 
 extension AppEnvironment: CaptureManifest {
     public static var outputDirectory: URL {
@@ -14,48 +18,12 @@ extension AppEnvironment: CaptureManifest {
 
     public static var targets: [CaptureTarget<AppEnvironment>] {
         [
-            .init(name: "MenuBar", width: 360, height: 500) { env in
-                AnyView(
-                    MenuBarContentView()
-                        .withAppEnvironment(env)
-                        .environment(\.isCaptureMode, true)
-                )
-            },
-            .init(name: "MainWindow-Overview", width: 1100, height: 700) { env in
-                AnyView(
-                    MainView(initialDestination: .overview)
-                        .withAppEnvironment(env)
-                        .environment(\.isCaptureMode, true)
-                )
-            },
-            .init(name: "MainWindow-Models", width: 1100, height: 700) { env in
-                AnyView(
-                    MainView(initialDestination: .models)
-                        .withAppEnvironment(env)
-                        .environment(\.isCaptureMode, true)
-                )
-            },
-            .init(name: "MainWindow-DailyUsage", width: 1100, height: 700) { env in
-                AnyView(
-                    MainView(initialDestination: .dailyUsage)
-                        .withAppEnvironment(env)
-                        .environment(\.isCaptureMode, true)
-                )
-            },
-            .init(name: "MainWindow-Analytics", width: 1100, height: 700) { env in
-                AnyView(
-                    MainView(initialDestination: .analytics)
-                        .withAppEnvironment(env)
-                        .environment(\.isCaptureMode, true)
-                )
-            },
-            .init(name: "MainWindow-LiveMetrics", width: 1100, height: 700) { env in
-                AnyView(
-                    MainView(initialDestination: .liveMetrics)
-                        .withAppEnvironment(env)
-                        .environment(\.isCaptureMode, true)
-                )
-            },
+            capture("MenuBar", width: 360, height: 500) { MenuBarContentView() },
+            capture("MainWindow-Overview", width: 1100, height: 700) { MainView(initialDestination: .overview) },
+            capture("MainWindow-Models", width: 1100, height: 700) { MainView(initialDestination: .models) },
+            capture("MainWindow-DailyUsage", width: 1100, height: 700) { MainView(initialDestination: .dailyUsage) },
+            capture("MainWindow-Analytics", width: 1100, height: 700) { MainView(initialDestination: .analytics) },
+            capture("MainWindow-LiveMetrics", width: 1100, height: 700) { MainView(initialDestination: .liveMetrics) },
         ]
     }
 
@@ -63,12 +31,26 @@ extension AppEnvironment: CaptureManifest {
         let env = AppEnvironment.live()
         await env.store.loadData()
 
+        // Wait for data to load (max 5 seconds)
         for _ in 0..<50 {
             if env.store.state.hasLoaded { return env }
             try await Task.sleep(for: .milliseconds(100))
         }
 
-        struct DataNotLoaded: Error {}
-        throw DataNotLoaded()
+        struct TimeoutError: Error {}
+        throw TimeoutError()
+    }
+}
+
+// MARK: - Helpers
+
+private func capture<V: View>(
+    _ name: String,
+    width: CGFloat,
+    height: CGFloat,
+    @ViewBuilder _ view: @escaping @MainActor @Sendable () -> V
+) -> CaptureTarget<AppEnvironment> {
+    .init(name: name, width: width, height: height) { env in
+        AnyView(view().withAppEnvironment(env).environment(\.isCaptureMode, true))
     }
 }

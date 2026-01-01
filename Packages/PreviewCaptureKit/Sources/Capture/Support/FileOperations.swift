@@ -4,7 +4,6 @@
 //
 
 import Foundation
-@testable import ClaudeUsageUI
 
 // MARK: - Directory Operations
 

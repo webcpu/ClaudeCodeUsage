@@ -3,7 +3,7 @@
 //  Help command output
 //
 
-func printUsage() {
+public func printUsage() {
     print("""
     PreviewCapture - Visual verification tool for SwiftUI views
 
@@ -16,9 +16,5 @@ func printUsage() {
     Output:
       PNG files and manifest.json are written to the output directory.
       Read manifest.json for structured results.
-
-    Example:
-      swift run PreviewCapture MenuBar
-      cat /tmp/ClaudeUsageUI/manifest.json
     """)
 }

@@ -4,7 +4,6 @@
 //
 
 import Foundation
-@testable import ClaudeUsageUI
 
 @MainActor
 func captureAllTargets<E: Sendable>(

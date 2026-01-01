@@ -20,7 +20,7 @@ private func realHomeDirectory() -> String {
 // MARK: - Timing Constants
 
 private enum Timing {
-    static let fallbackInterval: TimeInterval = 300.0
+    static let fallbackInterval: TimeInterval = 3600.0
     static let debounceInterval: TimeInterval = 1.0
     static let refreshThreshold: TimeInterval = 2.0
 }

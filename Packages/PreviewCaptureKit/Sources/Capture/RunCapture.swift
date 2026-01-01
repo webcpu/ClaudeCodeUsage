@@ -4,10 +4,9 @@
 //
 
 import Foundation
-@testable import ClaudeUsageUI
 
 @MainActor
-func runCapture<M: CaptureManifest>(_ manifest: M.Type, targetFilter: String?) async throws {
+public func runCapture<M: CaptureManifest>(_ manifest: M.Type, targetFilter: String?) async throws {
     let env = try await M.makeEnvironment()
     let targets = try filterTargets(M.targets, by: targetFilter)
     try createOutputDirectory(M.outputDirectory)

@@ -5,7 +5,6 @@
 
 import AppKit
 import SwiftUI
-@testable import ClaudeUsageUI
 
 @MainActor
 func renderAndSave<E>(target: CaptureTarget<E>, env: E, to path: URL) throws {

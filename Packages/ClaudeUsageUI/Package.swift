@@ -18,6 +18,7 @@ let package = Package(
     dependencies: [
         .package(path: "../ClaudeUsageCore"),
         .package(path: "../ClaudeUsageData"),
+        .package(path: "../PreviewCaptureKit"),
     ],
     targets: [
         .target(
@@ -25,12 +26,16 @@ let package = Package(
             dependencies: [
                 "ClaudeUsageCore",
                 "ClaudeUsageData",
+                .product(name: "PreviewCaptureKit", package: "PreviewCaptureKit"),
             ],
             path: "Sources"),
 
         .executableTarget(
             name: "PreviewCapture",
-            dependencies: ["ClaudeUsageUI"],
+            dependencies: [
+                "ClaudeUsageUI",
+                .product(name: "PreviewCaptureKit", package: "PreviewCaptureKit"),
+            ],
             path: "PreviewCapture",
             swiftSettings: [
                 .unsafeFlags(["-enable-testing"]),
