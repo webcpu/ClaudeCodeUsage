@@ -65,7 +65,7 @@ public actor SessionMonitor: SessionDataSource {
         guard let allFiles = try? FileDiscovery.discoverFiles(in: basePath) else {
             return []
         }
-        return FileDiscovery.filterFilesModifiedWithin(allFiles, hours: sessionWindowHours)
+        return FileDiscovery.filter(allFiles, by: FileFilters.modifiedWithin(hours: sessionWindowHours))
     }
 
     private func reloadFile(_ file: FileMetadata) {

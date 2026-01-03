@@ -5,6 +5,56 @@
 
 import Foundation
 
+// MARK: - FileFilter
+
+/// A composable predicate for filtering file metadata
+public typealias FileFilter = @Sendable (FileMetadata) -> Bool
+
+// MARK: - FileFilters (Factory Functions)
+
+public enum FileFilters {
+
+    /// Creates a filter for files modified today
+    public static func modifiedToday(
+        calendar: Calendar = .current,
+        now: Date = Date()
+    ) -> FileFilter {
+        let today = calendar.startOfDay(for: now)
+        return { file in
+            calendar.startOfDay(for: file.modificationDate) >= today
+        }
+    }
+
+    /// Creates a filter for files modified within the specified hours
+    public static func modifiedWithin(
+        hours: Double,
+        from now: Date = Date()
+    ) -> FileFilter {
+        let cutoff = now.addingTimeInterval(-hours * 3600)
+        return { $0.modificationDate >= cutoff }
+    }
+
+    /// Creates a filter that matches all files (identity filter)
+    public static var all: FileFilter {
+        { _ in true }
+    }
+
+    /// Combines multiple filters with AND logic
+    public static func all(_ filters: FileFilter...) -> FileFilter {
+        { file in filters.allSatisfy { $0(file) } }
+    }
+
+    /// Combines multiple filters with OR logic
+    public static func any(_ filters: FileFilter...) -> FileFilter {
+        { file in filters.contains { $0(file) } }
+    }
+
+    /// Negates a filter
+    public static func not(_ filter: @escaping FileFilter) -> FileFilter {
+        { file in !filter(file) }
+    }
+}
+
 // MARK: - FileDiscovery
 
 public enum FileDiscovery {
@@ -21,15 +71,12 @@ public enum FileDiscovery {
             .flatMap { discoverJSONLFiles(in: $0) }
     }
 
-    public static func filterFilesModifiedToday(_ files: [FileMetadata]) -> [FileMetadata] {
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        return files.filter { wasModifiedOnOrAfter(file: $0, date: today, calendar: calendar) }
-    }
-
-    public static func filterFilesModifiedWithin(_ files: [FileMetadata], hours: Double) -> [FileMetadata] {
-        let cutoff = Date().addingTimeInterval(-hours * Constants.secondsPerHour)
-        return files.filter { $0.modificationDate >= cutoff }
+    /// Filters files using the provided filter predicate
+    public static func filter(
+        _ files: [FileMetadata],
+        by predicate: FileFilter
+    ) -> [FileMetadata] {
+        files.filter(predicate)
     }
 
     // MARK: - Directory Discovery
@@ -121,10 +168,6 @@ public enum FileDiscovery {
     private static func isJSONLFile(_ url: URL) -> Bool {
         url.pathExtension == Constants.jsonlExtension
     }
-
-    private static func wasModifiedOnOrAfter(file: FileMetadata, date: Date, calendar: Calendar) -> Bool {
-        calendar.startOfDay(for: file.modificationDate) >= date
-    }
 }
 
 // MARK: - Constants
@@ -135,7 +178,6 @@ private extension FileDiscovery {
         static let jsonlExtension = "jsonl"
         static let pathSeparator: Character = "/"
         static let hashPathSeparator: Character = "-"
-        static let secondsPerHour: Double = 3600
         static let fileResourceKeys: [URLResourceKey] = [.contentModificationDateKey, .isRegularFileKey]
     }
 }

@@ -25,7 +25,7 @@ public actor UsageRepository: UsageDataSource {
 
     public func getTodayEntries() async throws -> [UsageEntry] {
         let allFiles = try FileDiscovery.discoverFiles(in: basePath)
-        let todayFiles = FileDiscovery.filterFilesModifiedToday(allFiles)
+        let todayFiles = FileDiscovery.filter(allFiles, by: FileFilters.modifiedToday())
 
         logger.debug("Files: \(todayFiles.count) today / \(allFiles.count) total")
 
