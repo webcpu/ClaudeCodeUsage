@@ -187,6 +187,41 @@ public extension UsageAnalytics {
     }
 }
 
+// MARK: - Magnitude Formatting (OCP-Compliant Registry)
+
+/// A magnitude level for number abbreviation (e.g., thousands, millions)
+public struct MagnitudeLevel: Sendable {
+    public let threshold: Int
+    public let divisor: Double
+    public let suffix: String
+
+    public init(threshold: Int, divisor: Double, suffix: String) {
+        self.threshold = threshold
+        self.divisor = divisor
+        self.suffix = suffix
+    }
+
+    func format(_ value: Int) -> String {
+        String(format: "%.1f%@", Double(value) / divisor, suffix)
+    }
+}
+
+/// Registry of magnitude levels - open for extension via composition
+public enum MagnitudeRegistry {
+    /// Default magnitude levels (billions, millions, thousands)
+    /// Ordered by descending threshold for correct selection
+    public static let defaultLevels: [MagnitudeLevel] = [
+        MagnitudeLevel(threshold: 1_000_000_000, divisor: 1_000_000_000, suffix: "B"),
+        MagnitudeLevel(threshold: 1_000_000, divisor: 1_000_000, suffix: "M"),
+        MagnitudeLevel(threshold: 1_000, divisor: 1_000, suffix: "K")
+    ]
+
+    /// Find the appropriate magnitude level for a value from given levels
+    public static func findLevel(for value: Int, in levels: [MagnitudeLevel] = defaultLevels) -> MagnitudeLevel? {
+        levels.first { value >= $0.threshold }
+    }
+}
+
 // MARK: - Formatting Extensions
 
 public extension Int {
@@ -195,17 +230,11 @@ public extension Int {
     }
 }
 
+/// Composed abbreviation: findLevel >>> format (or identity if no level matches)
 private func abbreviatedNumber(_ value: Int) -> String {
-    switch value {
-    case 1_000_000_000...:
-        return String(format: "%.1fB", Double(value) / 1_000_000_000)
-    case 1_000_000...:
-        return String(format: "%.1fM", Double(value) / 1_000_000)
-    case 1_000...:
-        return String(format: "%.1fK", Double(value) / 1_000)
-    default:
-        return "\(value)"
-    }
+    MagnitudeRegistry.findLevel(for: value)
+        .map { $0.format(value) }
+        ?? "\(value)"
 }
 
 public extension Double {
