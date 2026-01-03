@@ -51,7 +51,7 @@ struct DaySquare: View {
     }
 
     private var borderStyle: BorderStyle {
-        BorderStyle.forDay(day, isHovered: isHovered, config: configuration)
+        BorderStyleRule.forDay(day, isHovered: isHovered, config: configuration)
     }
 
     private var scaleEffect: CGFloat {
