@@ -5,50 +5,85 @@
 
 import Foundation
 
+// MARK: - Monitor Builder (OCP: Open for Extension)
+
+/// Dependencies available to monitor builders
+struct MonitorDependencies: Sendable {
+    let config: RefreshConfig
+    let clock: any ClockProtocol
+    let dayTracker: DayTracker
+    let onRefresh: @MainActor @Sendable (RefreshReason) -> Void
+}
+
+/// Builder function type: dependencies → monitor
+/// Add new monitor types by creating new builders, not modifying factory
+typealias MonitorBuilder = @MainActor (MonitorDependencies) -> any RefreshMonitor
+
+// MARK: - Default Monitor Builders (Composable)
+
+@MainActor
+enum MonitorBuilders {
+    static let fileChange: MonitorBuilder = { deps in
+        FileChangeMonitor(
+            path: deps.config.monitoredPath,
+            debounceInterval: deps.config.debounceInterval,
+            onRefresh: deps.onRefresh
+        )
+    }
+
+    static let fallbackTimer: MonitorBuilder = { deps in
+        FallbackTimer(
+            interval: deps.config.fallbackInterval,
+            onRefresh: deps.onRefresh
+        )
+    }
+
+    static let dayChange: MonitorBuilder = { deps in
+        DayChangeMonitor(
+            clock: deps.clock,
+            dayTracker: deps.dayTracker,
+            onRefresh: deps.onRefresh
+        )
+    }
+
+    static let wake: MonitorBuilder = { deps in
+        WakeMonitor(
+            clock: deps.clock,
+            dayTracker: deps.dayTracker,
+            onRefresh: deps.onRefresh
+        )
+    }
+
+    /// Production monitor set - compose custom sets by combining builders
+    static let production: [MonitorBuilder] = [
+        fileChange,
+        fallbackTimer,
+        dayChange,
+        wake
+    ]
+}
+
+// MARK: - Factory (Closed for Modification)
+
 /// Factory that assembles RefreshCoordinator with production dependencies.
 ///
-/// Encapsulates dependency graph construction. For testing, create
-/// RefreshCoordinator directly with mock monitors.
+/// OCP compliant: extend by passing custom builders, not by modifying this code.
+/// For testing, create RefreshCoordinator directly with mock monitors.
 @MainActor
 enum RefreshCoordinatorFactory {
 
     static func make(
         clock: any ClockProtocol = SystemClock(),
-        config: RefreshConfig
+        config: RefreshConfig,
+        builders: [MonitorBuilder] = MonitorBuilders.production
     ) -> RefreshCoordinator {
-        let dayTracker = DayTracker(clock: clock)
         let coordinator = RefreshCoordinator()
-
-        let monitors: [any RefreshMonitor] = [
-            FileChangeMonitor(
-                path: config.monitoredPath,
-                debounceInterval: config.debounceInterval,
-                onRefresh: { [weak coordinator] reason in
-                    coordinator?.triggerRefresh(reason: reason)
-                }
-            ),
-            FallbackTimer(
-                interval: config.fallbackInterval,
-                onRefresh: { [weak coordinator] reason in
-                    coordinator?.triggerRefresh(reason: reason)
-                }
-            ),
-            DayChangeMonitor(
-                clock: clock,
-                dayTracker: dayTracker,
-                onRefresh: { [weak coordinator] reason in
-                    coordinator?.triggerRefresh(reason: reason)
-                }
-            ),
-            WakeMonitor(
-                clock: clock,
-                dayTracker: dayTracker,
-                onRefresh: { [weak coordinator] reason in
-                    coordinator?.triggerRefresh(reason: reason)
-                }
-            )
-        ]
-
+        let monitors = buildMonitors(
+            using: builders,
+            config: config,
+            clock: clock,
+            coordinator: coordinator
+        )
         coordinator.setMonitors(monitors)
         coordinator.start()
         return coordinator
@@ -59,6 +94,36 @@ enum RefreshCoordinatorFactory {
         basePath: String = realHomeDirectory() + "/.claude"
     ) -> RefreshCoordinator {
         make(clock: clock, config: .standard(basePath: basePath))
+    }
+}
+
+// MARK: - Private Helpers
+
+private extension RefreshCoordinatorFactory {
+
+    static func buildMonitors(
+        using builders: [MonitorBuilder],
+        config: RefreshConfig,
+        clock: any ClockProtocol,
+        coordinator: RefreshCoordinator
+    ) -> [any RefreshMonitor] {
+        let deps = makeDependencies(config: config, clock: clock, coordinator: coordinator)
+        return builders.map { $0(deps) }
+    }
+
+    static func makeDependencies(
+        config: RefreshConfig,
+        clock: any ClockProtocol,
+        coordinator: RefreshCoordinator
+    ) -> MonitorDependencies {
+        MonitorDependencies(
+            config: config,
+            clock: clock,
+            dayTracker: DayTracker(clock: clock),
+            onRefresh: { [weak coordinator] reason in
+                coordinator?.triggerRefresh(reason: reason)
+            }
+        )
     }
 }
 
