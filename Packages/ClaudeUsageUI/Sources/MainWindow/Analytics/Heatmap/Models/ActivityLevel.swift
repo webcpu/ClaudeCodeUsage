@@ -5,39 +5,42 @@
 
 import SwiftUI
 
-// MARK: - Activity Level (Pure Data)
+// MARK: - Activity Level Descriptor (OCP: Open for Extension)
 
-/// Activity level classification based on intensity
-enum ActivityLevel {
-    case none, low, medium, high, veryHigh
+/// Describes an activity level with its threshold, text, and color.
+/// Add new levels by adding entries to the registry, not by modifying code.
+struct ActivityLevelDescriptor: Sendable {
+    let threshold: Double
+    let text: String
+    let color: Color
+
+    /// Registry of activity levels, ordered from lowest to highest threshold.
+    /// Intensity is classified by finding the first descriptor where intensity >= threshold.
+    static let registry: [ActivityLevelDescriptor] = [
+        ActivityLevelDescriptor(threshold: 0.75, text: "Very High", color: .red),
+        ActivityLevelDescriptor(threshold: 0.5, text: "High", color: .orange),
+        ActivityLevelDescriptor(threshold: 0.25, text: "Medium", color: .green),
+        ActivityLevelDescriptor(threshold: 0.001, text: "Low", color: .green.opacity(0.7)),
+        ActivityLevelDescriptor(threshold: 0, text: "None", color: .gray)
+    ]
+
+    /// Classify intensity to find the appropriate descriptor
+    static func classify(intensity: Double) -> ActivityLevelDescriptor {
+        registry.first { intensity >= $0.threshold } ?? registry.last!
+    }
+}
+
+// MARK: - Activity Level (Computed from Descriptor)
+
+/// Activity level classification based on intensity.
+/// Uses ActivityLevelDescriptor registry for OCP-compliant classification.
+struct ActivityLevel: Sendable {
+    private let descriptor: ActivityLevelDescriptor
 
     init(intensity: Double) {
-        switch intensity {
-        case 0: self = .none
-        case ..<0.25: self = .low
-        case ..<0.5: self = .medium
-        case ..<0.75: self = .high
-        default: self = .veryHigh
-        }
+        self.descriptor = ActivityLevelDescriptor.classify(intensity: intensity)
     }
 
-    var text: String {
-        switch self {
-        case .none: "None"
-        case .low: "Low"
-        case .medium: "Medium"
-        case .high: "High"
-        case .veryHigh: "Very High"
-        }
-    }
-
-    var color: Color {
-        switch self {
-        case .none: .gray
-        case .low: .green.opacity(0.7)
-        case .medium: .green
-        case .high: .orange
-        case .veryHigh: .red
-        }
-    }
+    var text: String { descriptor.text }
+    var color: Color { descriptor.color }
 }

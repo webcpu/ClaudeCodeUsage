@@ -8,15 +8,28 @@
 
 import SwiftUI
 
-// MARK: - Color Variation
+// MARK: - Color Variation (OCP: Open for Extension)
 
-/// Different color variations for special states
+/// Different color variations for special states.
+/// Each variation carries its own transformation, eliminating switch statements.
 public enum ColorVariation: Int, CaseIterable, Sendable {
     case normal = 0
     case hovered = 1
     case selected = 2
     case dimmed = 3
     case highlighted = 4
+
+    /// Apply this variation's transformation to a base color.
+    /// Add new variations by adding cases with their transforms here.
+    func apply(to color: Color) -> Color {
+        switch self {
+        case .normal: color
+        case .hovered: color.opacity(0.8)
+        case .selected: color.brightness(0.2)
+        case .dimmed: color.opacity(0.5)
+        case .highlighted: color.saturation(1.3)
+        }
+    }
 }
 
 // MARK: - Theme Color Grid (Immutable)
@@ -100,18 +113,8 @@ private extension ThemeColorGrid {
     static func buildColorGrid(for theme: HeatmapColorTheme) -> [[Color]] {
         theme.colors.map { baseColor in
             ColorVariation.allCases.map { variation in
-                applyVariation(variation, to: baseColor)
+                variation.apply(to: baseColor)
             }
-        }
-    }
-
-    static func applyVariation(_ variation: ColorVariation, to baseColor: Color) -> Color {
-        switch variation {
-        case .normal: baseColor
-        case .hovered: baseColor.opacity(0.8)
-        case .selected: baseColor.brightness(0.2)
-        case .dimmed: baseColor.opacity(0.5)
-        case .highlighted: baseColor.saturation(1.3)
         }
     }
 }

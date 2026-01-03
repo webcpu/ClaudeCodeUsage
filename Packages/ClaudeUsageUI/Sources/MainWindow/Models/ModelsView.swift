@@ -225,30 +225,4 @@ private enum ModelColorResolver {
     }
 }
 
-private enum ModelNameFormatter {
-    private static let knownFamilies = ["opus", "sonnet", "haiku"]
-
-    static func format(_ model: String) -> String {
-        let parts = model.lowercased().components(separatedBy: "-")
-        let family = extractFamily(from: parts)
-        let version = extractVersion(from: parts)
-        return buildDisplayName(family: family, version: version, fallback: model)
-    }
-
-    private static func extractFamily(from parts: [String]) -> String? {
-        parts.first { knownFamilies.contains($0) }
-    }
-
-    private static func extractVersion(from parts: [String]) -> String {
-        let numbers = parts.compactMap { Int($0) }
-        return numbers.count >= 2
-            ? "\(numbers[0]).\(numbers[1])"
-            : numbers.first.map { "\($0)" } ?? ""
-    }
-
-    private static func buildDisplayName(family: String?, version: String, fallback: String) -> String {
-        guard let family = family else { return fallback }
-        let capitalizedFamily = family.capitalized
-        return version.isEmpty ? "Claude \(capitalizedFamily)" : "Claude \(capitalizedFamily) \(version)"
-    }
-}
+// ModelNameFormatter is now provided by ClaudeUsageCore

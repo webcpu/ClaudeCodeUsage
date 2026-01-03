@@ -199,31 +199,4 @@ private struct CostBreakdownRow: View {
     }
 }
 
-// MARK: - Pure Transformations
-
-private enum ModelNameFormatter {
-    /// Formats model ID to display name: "claude-opus-4-5-20251101" → "Claude Opus 4.5"
-    static func format(_ model: String) -> String {
-        let parts = model.lowercased().components(separatedBy: "-")
-        let family = extractFamily(from: parts)
-        let version = extractVersion(from: parts)
-        return buildDisplayName(family: family, version: version, fallback: model)
-    }
-
-    private static func extractFamily(from parts: [String]) -> String? {
-        parts.first { ["opus", "sonnet", "haiku"].contains($0) }
-    }
-
-    private static func extractVersion(from parts: [String]) -> String {
-        let numbers = parts.compactMap { Int($0) }
-        return numbers.count >= 2
-            ? "\(numbers[0]).\(numbers[1])"
-            : numbers.first.map { "\($0)" } ?? ""
-    }
-
-    private static func buildDisplayName(family: String?, version: String, fallback: String) -> String {
-        guard let family else { return fallback }
-        let name = "Claude \(family.capitalized)"
-        return version.isEmpty ? name : "\(name) \(version)"
-    }
-}
+// ModelNameFormatter is now provided by ClaudeUsageCore
