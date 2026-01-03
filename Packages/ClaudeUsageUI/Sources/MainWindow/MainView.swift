@@ -129,48 +129,66 @@ private struct DetailView: View {
     }
 }
 
+// MARK: - Destination Descriptor
+
+/// Holds all properties for a navigation destination, enabling OCP compliance.
+/// Adding a new destination requires only adding an entry to the registry.
+@MainActor
+private struct DestinationDescriptor {
+    let title: String
+    let icon: String
+    let viewBuilder: @MainActor () -> AnyView
+
+    static let registry: [Destination: DestinationDescriptor] = [
+        .overview: DestinationDescriptor(
+            title: "Overview",
+            icon: "chart.line.uptrend.xyaxis",
+            viewBuilder: { AnyView(OverviewView()) }
+        ),
+        .models: DestinationDescriptor(
+            title: "Models",
+            icon: "cpu",
+            viewBuilder: { AnyView(ModelsView()) }
+        ),
+        .dailyUsage: DestinationDescriptor(
+            title: "Daily Usage",
+            icon: "calendar",
+            viewBuilder: { AnyView(DailyUsageView()) }
+        ),
+        .analytics: DestinationDescriptor(
+            title: "Analytics",
+            icon: "chart.bar.xaxis",
+            viewBuilder: { AnyView(AnalyticsView()) }
+        ),
+        .liveMetrics: DestinationDescriptor(
+            title: "Live Metrics",
+            icon: "arrow.triangle.2.circlepath",
+            viewBuilder: { AnyView(MenuBarContentView(viewMode: .liveMetrics)) }
+        )
+    ]
+}
+
 // MARK: - Navigation Destination
-public enum Destination: Hashable, CaseIterable {
+
+public enum Destination: Hashable, CaseIterable, Sendable {
     case overview
     case models
     case dailyUsage
     case analytics
     case liveMetrics
 
-    var title: String {
-        switch self {
-        case .overview: "Overview"
-        case .models: "Models"
-        case .dailyUsage: "Daily Usage"
-        case .analytics: "Analytics"
-        case .liveMetrics: "Live Metrics"
+    @MainActor
+    private var descriptor: DestinationDescriptor {
+        guard let descriptor = DestinationDescriptor.registry[self] else {
+            fatalError("Missing descriptor for destination: \(self)")
         }
+        return descriptor
     }
 
-    var icon: String {
-        switch self {
-        case .overview: "chart.line.uptrend.xyaxis"
-        case .models: "cpu"
-        case .dailyUsage: "calendar"
-        case .analytics: "chart.bar.xaxis"
-        case .liveMetrics: "arrow.triangle.2.circlepath"
-        }
-    }
+    @MainActor var title: String { descriptor.title }
 
-    @ViewBuilder
-    func makeView() -> some View {
-        switch self {
-        case .overview:
-            OverviewView()
-        case .models:
-            ModelsView()
-        case .dailyUsage:
-            DailyUsageView()
-        case .analytics:
-            AnalyticsView()
-        case .liveMetrics:
-            MenuBarContentView(viewMode: .liveMetrics)
-        }
-    }
+    @MainActor var icon: String { descriptor.icon }
+
+    @MainActor func makeView() -> some View { descriptor.viewBuilder() }
 }
 
