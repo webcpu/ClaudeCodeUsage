@@ -58,9 +58,4 @@ public extension ClosedRange where Bound == Date {
         let components = calendar.dateComponents([.day], from: startDay, to: endDay)
         return (components.day ?? 0) + 1
     }
-
-    /// Array of all dates in the range
-    var allDates: [Date] {
-        HeatmapDateCalculator.shared.dateSequence(from: lowerBound, to: upperBound)
-    }
 }
