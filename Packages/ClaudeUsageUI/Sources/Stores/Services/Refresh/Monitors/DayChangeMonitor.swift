@@ -6,7 +6,7 @@
 import Foundation
 
 @MainActor
-final class DayChangeMonitor {
+final class DayChangeMonitor: RefreshMonitor {
     private var dayChangeObserver: NSObjectProtocol?
     private var clockChangeObserver: NSObjectProtocol?
     private var dayTracker: DayTracker

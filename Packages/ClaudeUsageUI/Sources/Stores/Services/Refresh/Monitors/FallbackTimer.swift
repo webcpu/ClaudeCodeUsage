@@ -6,23 +6,24 @@
 import Foundation
 
 @MainActor
-final class FallbackTimer {
+final class FallbackTimer: RefreshMonitor {
     private var task: Task<Void, Never>?
     private let interval: TimeInterval
-    private let onTick: () -> Void
+    private let onRefresh: (RefreshReason) -> Void
 
-    init(interval: TimeInterval, onTick: @escaping () -> Void) {
+    init(interval: TimeInterval, onRefresh: @escaping (RefreshReason) -> Void) {
         self.interval = interval
-        self.onTick = onTick
+        self.onRefresh = onRefresh
     }
 
     func start() {
+        stop()
         task = Task { @MainActor in
             while !Task.isCancelled {
                 do {
                     try await Task.sleep(for: .seconds(interval))
                     guard !Task.isCancelled else { break }
-                    onTick()
+                    onRefresh(.timer)
                 } catch {
                     break
                 }

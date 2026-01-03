@@ -7,7 +7,7 @@ import Foundation
 import AppKit
 
 @MainActor
-final class WakeMonitor {
+final class WakeMonitor: RefreshMonitor {
     private var observer: NSObjectProtocol?
     private var dayTracker: DayTracker
     private let clock: any ClockProtocol

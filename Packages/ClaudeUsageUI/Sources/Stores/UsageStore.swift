@@ -91,9 +91,8 @@ public final class UsageStore {
         self.dataLoader = UsageDataLoader(repository: repo, sessionMonitorService: sessionService)
         self.clock = clock
         self.defaultThreshold = config.configuration.dailyCostThreshold
-        self.refreshCoordinator = RefreshCoordinator(
+        self.refreshCoordinator = RefreshCoordinatorFactory.make(
             clock: clock,
-            refreshInterval: config.configuration.refreshInterval,
             basePath: config.configuration.basePath
         )
 
@@ -111,7 +110,6 @@ public final class UsageStore {
         if !state.hasLoaded {
             await loadData(invalidateCache: true)
         }
-        refreshCoordinator.start()
     }
 
     func loadData(invalidateCache: Bool = true) async {

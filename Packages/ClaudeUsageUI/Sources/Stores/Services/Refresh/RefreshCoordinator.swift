@@ -1,112 +1,57 @@
 //
 //  RefreshCoordinator.swift
-//  Manages refresh via file monitoring, lifecycle events, and day change detection
+//  Facade that coordinates refresh monitors
 //
 
 import Foundation
-import ClaudeUsageData
 import OSLog
 
 private let logger = Logger(subsystem: "com.claudecodeusage", category: "Refresh")
 
-// MARK: - Home Directory Helper
-
-private func realHomeDirectory() -> String {
-    guard let pw = getpwuid(getuid()) else { return NSHomeDirectory() }
-    return String(cString: pw.pointee.pw_dir)
-}
-
-// MARK: - Timing Constants
-
-private enum Timing {
-    static let fallbackInterval: TimeInterval = 3600.0
-    static let debounceInterval: TimeInterval = 1.0
-    static let refreshThreshold: TimeInterval = 2.0
-}
-
-// MARK: - Refresh Coordinator
-
+/// Coordinates multiple refresh monitors.
+///
+/// This is a facade that depends on abstractions (RefreshMonitor protocol),
+/// not concrete implementations (DIP). Monitors are injected and auto-started.
 @MainActor
 final class RefreshCoordinator {
-    private var lastRefreshTime: Date
-    private let clock: any ClockProtocol
-
-    private var directoryMonitor: DirectoryMonitor?
-    private var fallbackTimer: FallbackTimer?
-    private var dayChangeMonitor: DayChangeMonitor?
-    private var wakeMonitor: WakeMonitor?
+    private var monitors: [any RefreshMonitor]
 
     var onRefresh: ((RefreshReason) async -> Void)?
 
     // MARK: - Initialization
 
-    init(
-        clock: any ClockProtocol = SystemClock(),
-        refreshInterval: TimeInterval,
-        basePath: String = realHomeDirectory() + "/.claude"
-    ) {
-        self.clock = clock
-        self.lastRefreshTime = clock.now
-
-        let dayTracker = DayTracker(clock: clock)
-        let monitoredPath = basePath + "/projects"
-
-        directoryMonitor = DirectoryMonitor(
-            path: monitoredPath,
-            debounceInterval: Timing.debounceInterval
-        ) { [weak self] in
-            self?.triggerRefreshIfNeeded(reason: .fileChange)
-        }
-
-        fallbackTimer = FallbackTimer(interval: Timing.fallbackInterval) { [weak self] in
-            self?.triggerRefresh(reason: .timer)
-        }
-
-        dayChangeMonitor = DayChangeMonitor(clock: clock, dayTracker: dayTracker) { [weak self] reason in
-            self?.triggerRefresh(reason: reason)
-        }
-
-        wakeMonitor = WakeMonitor(clock: clock, dayTracker: dayTracker) { [weak self] reason in
-            self?.triggerRefresh(reason: reason)
-        }
+    init(monitors: [any RefreshMonitor] = []) {
+        self.monitors = monitors
     }
 
-    // MARK: - Public API
+    /// Sets monitors after initialization. Used by factory to resolve circular dependency.
+    func setMonitors(_ monitors: [any RefreshMonitor]) {
+        self.monitors = monitors
+    }
 
+    /// Starts all monitors. Called once by factory after construction.
     func start() {
-        Task { await directoryMonitor?.start() }
-        fallbackTimer?.start()
-        dayChangeMonitor?.start()
-        wakeMonitor?.start()
+        monitors.forEach { $0.start() }
     }
+
+    // MARK: - Lifecycle Events
 
     func handleAppBecameActive() {
-        triggerRefreshIfNeeded(reason: .appBecameActive)
-        start()
+        triggerRefresh(reason: .appBecameActive)
     }
 
     func handleAppResignActive() {
-        fallbackTimer?.stop()
+        // Menu bar apps: passive monitors keep running
     }
 
     func handleWindowFocus() {
-        triggerRefreshIfNeeded(reason: .windowFocus)
+        triggerRefresh(reason: .windowFocus)
     }
 
-    // MARK: - Refresh Logic
+    // MARK: - Refresh Dispatch
 
-    private func triggerRefreshIfNeeded(reason: RefreshReason) {
-        guard shouldRefresh() else { return }
-        triggerRefresh(reason: reason)
-    }
-
-    private func triggerRefresh(reason: RefreshReason) {
+    func triggerRefresh(reason: RefreshReason) {
         logger.info("Refresh triggered: \(String(describing: reason), privacy: .public)")
-        lastRefreshTime = clock.now
         Task { await onRefresh?(reason) }
-    }
-
-    private func shouldRefresh() -> Bool {
-        clock.now.timeIntervalSince(lastRefreshTime) > Timing.refreshThreshold
     }
 }
