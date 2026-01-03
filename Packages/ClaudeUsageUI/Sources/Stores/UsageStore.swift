@@ -193,10 +193,6 @@ public final class UsageStore {
     func handleWindowFocus() {
         refreshCoordinator.handleWindowFocus()
     }
-
-    func stopRefreshTimer() {
-        refreshCoordinator.stop()
-    }
 }
 
 // MARK: - Supporting Types
