@@ -6,12 +6,46 @@
 import Foundation
 import ClaudeUsageCore
 
+// MARK: - Load Pipeline
+
+/// Async load stage that transforms input to output
+typealias LoadStage<In, Out> = @Sendable (In) async throws -> Out
+
+/// Forward composition for async load stages: `f >>> g` means "first f, then g"
+func >>> <A, B, C>(
+    _ f: @escaping LoadStage<A, B>,
+    _ g: @escaping LoadStage<B, C>
+) -> LoadStage<A, C> {
+    { a in try await g(f(a)) }
+}
+
+// MARK: - Pipeline Configuration
+
+/// Configuration passed through the load pipeline
+struct LoadPipelineInput: Sendable {
+    let invalidateCache: Bool
+
+    static let standard = LoadPipelineInput(invalidateCache: false)
+    static let refresh = LoadPipelineInput(invalidateCache: true)
+}
+
+/// Intermediate result after today phase
+struct TodayPhaseOutput: Sendable {
+    let input: LoadPipelineInput
+    let today: TodayLoadResult
+}
+
 // MARK: - UsageDataLoader
 
 actor UsageDataLoader {
     private let repository: any UsageDataSource
     private let sessionMonitorService: SessionMonitorService
     private let loadTrace: any LoadTracing
+
+    /// The composed load pipeline: today >>> history >>> combine
+    private var loadPipeline: LoadStage<LoadPipelineInput, UsageLoadResult> {
+        todayStage >>> historyStage >>> combineStage
+    }
 
     init(
         repository: any UsageDataSource,
@@ -39,9 +73,43 @@ actor UsageDataLoader {
     }
 
     func loadAll(invalidateCache: Bool = false) async throws -> UsageLoadResult {
-        let today = try await loadToday(invalidateCache: invalidateCache)
-        let history = try await loadHistory()
-        return combineResults(today: today, history: history)
+        let input = invalidateCache ? LoadPipelineInput.refresh : LoadPipelineInput.standard
+        return try await loadPipeline(input)
+    }
+}
+
+// MARK: - Pipeline Stages
+
+private extension UsageDataLoader {
+    /// Stage 1: Load today's data with optional cache invalidation
+    var todayStage: LoadStage<LoadPipelineInput, TodayPhaseOutput> {
+        { [self] input in
+            let today = try await loadToday(invalidateCache: input.invalidateCache)
+            return TodayPhaseOutput(input: input, today: today)
+        }
+    }
+
+    /// Stage 2: Load historical data
+    var historyStage: LoadStage<TodayPhaseOutput, (TodayLoadResult, FullLoadResult)> {
+        { [self] phaseOutput in
+            let history = try await loadHistory()
+            return (phaseOutput.today, history)
+        }
+    }
+
+    /// Stage 3: Combine results into final output
+    var combineStage: LoadStage<(TodayLoadResult, FullLoadResult), UsageLoadResult> {
+        { pair in
+            let (today, history) = pair
+            return UsageLoadResult(
+                todayEntries: today.todayEntries,
+                todayStats: today.todayStats,
+                fullStats: history.fullStats,
+                session: today.session,
+                burnRate: today.burnRate,
+                autoTokenLimit: today.autoTokenLimit
+            )
+        }
     }
 }
 
@@ -79,17 +147,6 @@ private extension UsageDataLoader {
             session: session,
             burnRate: burnRate,
             autoTokenLimit: session?.tokenLimit
-        )
-    }
-
-    func combineResults(today: TodayLoadResult, history: FullLoadResult) -> UsageLoadResult {
-        UsageLoadResult(
-            todayEntries: today.todayEntries,
-            todayStats: today.todayStats,
-            fullStats: history.fullStats,
-            session: today.session,
-            burnRate: today.burnRate,
-            autoTokenLimit: today.autoTokenLimit
         )
     }
 }
