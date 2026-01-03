@@ -22,14 +22,14 @@ struct TrendsCard: View {
 
     @ViewBuilder
     private var weeklyTrendSection: some View {
-        if let trend = TrendCalculator.weeklyTrend(from: stats) {
+        if let trend = calculateTrend(stats, windowSize: 7) {
             TrendRow(trend: trend)
         }
     }
 
     @ViewBuilder
     private var peakDaySection: some View {
-        if let peak = TrendCalculator.peakDay(from: stats) {
+        if let peak = findPeakDay(stats.byDate) {
             InfoRow(
                 label: "Peak Usage Day",
                 value: DateFormatting.formatMedium(peak.date),
@@ -39,28 +39,72 @@ struct TrendsCard: View {
     }
 }
 
-// MARK: - Pure Transformations
+// MARK: - Trend Calculation Pipeline
 
-private enum TrendCalculator {
-    static func weeklyTrend(from stats: UsageStats) -> UsageTrend? {
-        guard stats.byDate.count >= 2 else { return nil }
+/// Configuration for trend window comparison
+private struct TrendWindow: Sendable {
+    let recentDays: ArraySlice<DailyUsage>
+    let previousDays: ArraySlice<DailyUsage>
+}
 
-        let recent = stats.byDate.suffix(7)
-        let previous = stats.byDate.dropLast(7).suffix(7)
+/// Result of comparing two windows
+private struct WindowComparison: Sendable {
+    let recentAverage: Double
+    let previousAverage: Double
+    let percentageChange: Double
+}
+
+// MARK: - Pure Pipeline Steps
+
+/// Extract windows from daily usage data
+private func extractWindows(_ windowSize: Int) -> @Sendable ([DailyUsage]) -> TrendWindow? {
+    { days in
+        guard days.count >= 2 else { return nil }
+
+        let recent = days.suffix(windowSize)
+        let previous = days.dropLast(windowSize).suffix(windowSize)
 
         guard !recent.isEmpty, !previous.isEmpty else { return nil }
 
-        let recentAvg = recent.map(\.totalCost).reduce(0, +) / Double(recent.count)
-        let previousAvg = previous.map(\.totalCost).reduce(0, +) / Double(previous.count)
-
-        let change = ((recentAvg - previousAvg) / previousAvg) * 100
-        return UsageTrend(direction: change > 0 ? .up : .down, percentage: abs(change))
-    }
-
-    static func peakDay(from stats: UsageStats) -> DailyUsage? {
-        stats.byDate.max { $0.totalCost < $1.totalCost }
+        return TrendWindow(recentDays: recent, previousDays: previous)
     }
 }
+
+/// Calculate averages for both windows
+private let calculateAverages: @Sendable (TrendWindow) -> WindowComparison = { window in
+    let recentAvg = window.recentDays.map(\.totalCost).reduce(0, +) / Double(window.recentDays.count)
+    let previousAvg = window.previousDays.map(\.totalCost).reduce(0, +) / Double(window.previousDays.count)
+    let change = previousAvg > 0 ? ((recentAvg - previousAvg) / previousAvg) * 100 : 0
+
+    return WindowComparison(
+        recentAverage: recentAvg,
+        previousAverage: previousAvg,
+        percentageChange: change
+    )
+}
+
+/// Map comparison to trend direction
+private let mapToTrend: @Sendable (WindowComparison) -> UsageTrend = { comparison in
+    UsageTrend(
+        direction: comparison.percentageChange > 0 ? .up : .down,
+        percentage: abs(comparison.percentageChange)
+    )
+}
+
+// MARK: - Composed Pipeline
+
+/// Calculate trend by composing: extractWindows >>> calculateAverages >>> mapToTrend
+private func calculateTrend(_ stats: UsageStats, windowSize: Int) -> UsageTrend? {
+    let transform: (TrendWindow) -> UsageTrend = calculateAverages >>> mapToTrend
+    return extractWindows(windowSize)(stats.byDate).map(transform)
+}
+
+/// Find peak day by maximum cost
+private let findPeakDay: @Sendable ([DailyUsage]) -> DailyUsage? = { days in
+    days.max { $0.totalCost < $1.totalCost }
+}
+
+// MARK: - Date Formatting
 
 private enum DateFormatting {
     private static let inputFormatter: DateFormatter = {
@@ -79,8 +123,8 @@ private enum DateFormatting {
 
 // MARK: - Supporting Types
 
-struct UsageTrend {
-    enum Direction { case up, down }
+struct UsageTrend: Sendable {
+    enum Direction: Sendable { case up, down }
 
     let direction: Direction
     let percentage: Double

@@ -78,8 +78,8 @@ struct MenuBarLabel: View {
             .font(.system(.body, design: .monospaced))
     }
 
-    private var appearance: MenuBarAppearance {
-        MenuBarAppearance.from(store: store)
+    private var appearance: MenuBarAppearanceConfig {
+        MenuBarAppearanceRegistry.select(from: store)
     }
 }
 
@@ -127,32 +127,37 @@ struct MenuBarContextMenu: View {
 
 // MARK: - Menu Bar Appearance
 
+/// Configuration for a menu bar appearance state.
+/// Registry pattern: each appearance is a configuration bundle, not a switch case.
+struct MenuBarAppearanceConfig {
+    let icon: String
+    let color: Color
+}
+
+/// Registry of menu bar appearance configurations.
+/// Open for extension (add new appearances), closed for modification (no switch changes needed).
 @MainActor
-enum MenuBarAppearance {
-    case active
-    case warning
-    case normal
+enum MenuBarAppearanceRegistry {
+    static let active = MenuBarAppearanceConfig(
+        icon: "dollarsign.circle.fill",
+        color: .green
+    )
 
-    var icon: String {
-        switch self {
-        case .active: "dollarsign.circle.fill"
-        case .warning: "exclamationmark.triangle.fill"
-        case .normal: "dollarsign.circle"
-        }
-    }
+    static let warning = MenuBarAppearanceConfig(
+        icon: "exclamationmark.triangle.fill",
+        color: .orange
+    )
 
-    var color: Color {
-        switch self {
-        case .active: .green
-        case .warning: .orange
-        case .normal: .primary
-        }
-    }
+    static let normal = MenuBarAppearanceConfig(
+        icon: "dollarsign.circle",
+        color: .primary
+    )
 
-    static func from(store: UsageStore) -> MenuBarAppearance {
-        if store.hasActiveSession { return .active }
-        if store.isOverBudget { return .warning }
-        return .normal
+    /// Selects the appropriate appearance configuration based on store state.
+    static func select(from store: UsageStore) -> MenuBarAppearanceConfig {
+        if store.hasActiveSession { return active }
+        if store.isOverBudget { return warning }
+        return normal
     }
 }
 

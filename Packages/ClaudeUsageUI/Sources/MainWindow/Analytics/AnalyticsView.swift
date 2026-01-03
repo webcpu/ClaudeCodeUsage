@@ -13,47 +13,38 @@ struct AnalyticsView: View {
         CaptureCompatibleScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 AnalyticsHeader()
-                AnalyticsContent(state: ContentState.from(store: store))
+                ContentStateRouterView(
+                    state: contentState(from: store),
+                    router: AnalyticsRouter()
+                )
             }
             .padding()
         }
         .frame(minWidth: 600, idealWidth: 840)
     }
-}
 
-// MARK: - Content State
-
-@MainActor
-private enum ContentState {
-    case loading
-    case loaded(UsageStats)
-    case error
-
-    static func from(store: UsageStore) -> ContentState {
+    private func contentState(from store: UsageStore) -> RoutableState<UsageStats> {
         if store.isLoading { return .loading }
         guard let stats = store.stats else { return .error }
         return .loaded(stats)
     }
 }
 
-// MARK: - Content Router
+// MARK: - Router
 
-private struct AnalyticsContent: View {
-    let state: ContentState
+private struct AnalyticsRouter: ContentStateRouting {
+    var loadingMessage: String { "Analyzing data..." }
 
-    var body: some View {
-        switch state {
-        case .loading:
-            LoadingView(message: "Analyzing data...")
-        case .loaded(let stats):
-            AnalyticsCards(stats: stats)
-        case .error:
-            EmptyStateView(
-                icon: "chart.bar.xaxis",
-                title: "No Analytics Available",
-                message: "Analytics will appear once you have usage data."
-            )
-        }
+    var errorDisplay: ErrorDisplay {
+        ErrorDisplay(
+            icon: "chart.bar.xaxis",
+            title: "No Analytics Available",
+            message: "Analytics will appear once you have usage data."
+        )
+    }
+
+    func loadedView(for stats: UsageStats) -> some View {
+        AnalyticsCards(stats: stats)
     }
 }
 
@@ -93,14 +84,3 @@ private struct AnalyticsHeader: View {
     }
 }
 
-// MARK: - Loading View
-
-private struct LoadingView: View {
-    let message: String
-
-    var body: some View {
-        ProgressView(message)
-            .frame(maxWidth: .infinity)
-            .padding(.top, 50)
-    }
-}

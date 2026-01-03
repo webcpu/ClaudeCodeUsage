@@ -243,74 +243,91 @@ struct HourlyCostChartSimple_Previews: PreviewProvider {
 
 // MARK: Cost Intensity
 
-enum CostIntensity {
-    case zero
-    case low
-    case medium
-    case high
-    case peak
+/// Strategy struct that stores color directly, eliminating multi-switch OCP violation.
+/// New intensity levels can be added by defining new static properties.
+struct CostIntensity {
+    let color: Color
 
     init(cost: Double, maxValue: Double) {
-        guard cost > 0 else {
-            self = .zero
-            return
-        }
-        self = Self.classify(intensity: cost / max(maxValue, 1.0))
+        let intensity = cost > 0 ? min(cost / max(maxValue, 1.0), 1.0) : 0
+        self = Self.classify(intensity)
     }
 
-    var color: Color {
-        switch self {
-        case .zero: .gray.opacity(0.2)
-        case .low: .mint
-        case .medium: .teal
-        case .high: .cyan
-        case .peak: .blue
-        }
+    private init(color: Color) {
+        self.color = color
     }
 }
 
-private extension CostIntensity {
-    static func classify(intensity: Double) -> CostIntensity {
-        let clamped = min(intensity, 1.0)
-        switch clamped {
-        case 0.8...: return .peak
-        case 0.5...: return .high
-        case 0.2...: return .medium
-        default: return .low
+extension CostIntensity {
+    // Predefined intensity levels - open for extension via new static properties
+    static let zero = CostIntensity(color: .gray.opacity(0.2))
+    static let low = CostIntensity(color: .mint)
+    static let medium = CostIntensity(color: .teal)
+    static let high = CostIntensity(color: .cyan)
+    static let peak = CostIntensity(color: .blue)
+
+    /// Classification pipeline: normalize intensity -> select strategy
+    private static func classify(_ intensity: Double) -> CostIntensity {
+        switch intensity {
+        case 0: .zero
+        case 0.8...: .peak
+        case 0.5...: .high
+        case 0.2...: .medium
+        default: .low
         }
     }
 }
 
 // MARK: Y-Axis Scale
 
-enum YAxisScale {
-    case small(max: Double)
-    case medium(max: Double)
-    case large(max: Double)
-    case extraLarge(max: Double)
+/// Strategy struct that stores rounding and tick behavior, eliminating multi-switch OCP violation.
+/// The roundingFactor and tickCount determine behavior, making each scale self-contained.
+struct YAxisScale {
+    let roundedMax: Double
+    let tickValues: [Double]
 
     init(maxValue: Double) {
+        let strategy = Self.selectStrategy(for: maxValue)
+        self.roundedMax = strategy.roundMax(maxValue)
+        self.tickValues = strategy.tickValues(roundedMax)
+    }
+}
+
+private extension YAxisScale {
+    /// A scale strategy encapsulates rounding and tick generation behavior.
+    struct Strategy: Sendable {
+        let roundMax: @Sendable (Double) -> Double
+        let tickValues: @Sendable (Double) -> [Double]
+    }
+
+    // Predefined strategies - open for extension via new static properties
+    static let small = Strategy(
+        roundMax: { ceil($0) },
+        tickValues: { max in [0, max / 2, max] }
+    )
+
+    static let medium = Strategy(
+        roundMax: { ceil($0 / 10) * 10 },
+        tickValues: { max in [0, max / 3, max * 2 / 3, max] }
+    )
+
+    static let large = Strategy(
+        roundMax: { ceil($0 / 20) * 20 },
+        tickValues: { max in [0, max / 3, max * 2 / 3, max] }
+    )
+
+    static let extraLarge = Strategy(
+        roundMax: { ceil($0 / 50) * 50 },
+        tickValues: { max in [0, max / 3, max * 2 / 3, max] }
+    )
+
+    /// Selection pipeline: value range -> strategy
+    static func selectStrategy(for maxValue: Double) -> Strategy {
         switch maxValue {
-        case ...10: self = .small(max: maxValue)
-        case ...50: self = .medium(max: maxValue)
-        case ...100: self = .large(max: maxValue)
-        default: self = .extraLarge(max: maxValue)
-        }
-    }
-
-    var roundedMax: Double {
-        switch self {
-        case .small(let max): ceil(max)
-        case .medium(let max): ceil(max / 10) * 10
-        case .large(let max): ceil(max / 20) * 20
-        case .extraLarge(let max): ceil(max / 50) * 50
-        }
-    }
-
-    var tickValues: [Double] {
-        switch self {
-        case .small: [0, roundedMax / 2, roundedMax]
-        default: [0, roundedMax / 3, roundedMax * 2 / 3, roundedMax]
+        case ...10: small
+        case ...50: medium
+        case ...100: large
+        default: extraLarge
         }
     }
 }

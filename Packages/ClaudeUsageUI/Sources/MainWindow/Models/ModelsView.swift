@@ -13,55 +13,44 @@ struct ModelsView: View {
         CaptureCompatibleScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 ModelsHeader()
-                ModelsContent(state: ContentState.from(store: store))
+                ContentStateRouterView(
+                    state: contentState(from: store),
+                    router: ModelsRouter()
+                )
             }
             .padding()
         }
         .frame(minWidth: 600, idealWidth: 840)
     }
-}
 
-// MARK: - Content State
-
-@MainActor
-private enum ContentState {
-    case loading
-    case empty
-    case loaded(models: [ModelUsage], totalCost: Double)
-    case error
-
-    static func from(store: UsageStore) -> ContentState {
+    private func contentState(from store: UsageStore) -> RoutableState<ModelsData> {
         if store.isLoading { return .loading }
         guard let stats = store.stats else { return .error }
         let sortedModels = stats.byModel.sorted { $0.totalCost > $1.totalCost }
-        return sortedModels.isEmpty ? .empty : .loaded(models: sortedModels, totalCost: stats.totalCost)
+        return sortedModels.isEmpty ? .empty : .loaded(ModelsData(models: sortedModels, totalCost: stats.totalCost))
     }
 }
 
-// MARK: - Content Router
+// MARK: - Router
 
-private struct ModelsContent: View {
-    let state: ContentState
+private struct ModelsData {
+    let models: [ModelUsage]
+    let totalCost: Double
+}
 
-    var body: some View {
-        switch state {
-        case .loading:
-            LoadingView(message: "Loading models...")
-        case .empty:
-            EmptyStateView(
-                icon: "cpu",
-                title: "No Model Data",
-                message: "Model usage will appear here once you start using Claude Code."
-            )
-        case .loaded(let models, let totalCost):
-            ModelsList(models: models, totalCost: totalCost)
-        case .error:
-            EmptyStateView(
-                icon: "cpu",
-                title: "No Data Available",
-                message: "Unable to load model usage data."
-            )
-        }
+private struct ModelsRouter: ContentStateRouting {
+    var loadingMessage: String { "Loading models..." }
+
+    var errorDisplay: ErrorDisplay {
+        ErrorDisplay(
+            icon: "cpu",
+            title: "No Data Available",
+            message: "Model usage will appear here once you start using Claude Code."
+        )
+    }
+
+    func loadedView(for data: ModelsData) -> some View {
+        ModelsList(models: data.models, totalCost: data.totalCost)
     }
 }
 
@@ -85,18 +74,6 @@ private struct ModelsHeader: View {
         Text("Breakdown by AI model")
             .font(.subheadline)
             .foregroundColor(.secondary)
-    }
-}
-
-// MARK: - Loading View
-
-private struct LoadingView: View {
-    let message: String
-
-    var body: some View {
-        ProgressView(message)
-            .frame(maxWidth: .infinity)
-            .padding(.top, 50)
     }
 }
 

@@ -13,54 +13,38 @@ struct DailyUsageView: View {
         CaptureCompatibleScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 DailyUsageHeader()
-                DailyUsageContent(state: ContentState.from(store: store))
+                ContentStateRouterView(
+                    state: contentState(from: store),
+                    router: DailyUsageRouter()
+                )
             }
             .padding()
         }
         .frame(minWidth: 600, idealWidth: 840)
     }
-}
 
-// MARK: - Content State
-
-@MainActor
-private enum ContentState {
-    case loading
-    case empty
-    case loaded([DailyUsage])
-    case error
-
-    static func from(store: UsageStore) -> ContentState {
+    private func contentState(from store: UsageStore) -> RoutableState<[DailyUsage]> {
         if store.isLoading { return .loading }
         guard let stats = store.stats else { return .error }
         return stats.byDate.isEmpty ? .empty : .loaded(stats.byDate)
     }
 }
 
-// MARK: - Content Router
+// MARK: - Router
 
-private struct DailyUsageContent: View {
-    let state: ContentState
+private struct DailyUsageRouter: ContentStateRouting {
+    var loadingMessage: String { "Loading daily usage..." }
 
-    var body: some View {
-        switch state {
-        case .loading:
-            LoadingView(message: "Loading daily usage...")
-        case .empty:
-            EmptyStateView(
-                icon: "calendar",
-                title: "No Usage Data",
-                message: "Daily usage statistics will appear here once you start using Claude Code.\nData is collected from ~/.claude/projects/"
-            )
-        case .loaded(let dates):
-            DailyUsageList(dates: dates)
-        case .error:
-            EmptyStateView(
-                icon: "calendar",
-                title: "No Data Available",
-                message: "Unable to load daily usage data."
-            )
-        }
+    var errorDisplay: ErrorDisplay {
+        ErrorDisplay(
+            icon: "calendar",
+            title: "No Data Available",
+            message: "Daily usage statistics will appear here once you start using Claude Code.\nData is collected from ~/.claude/projects/"
+        )
+    }
+
+    func loadedView(for dates: [DailyUsage]) -> some View {
+        DailyUsageList(dates: dates)
     }
 }
 
@@ -84,18 +68,6 @@ private struct DailyUsageHeader: View {
         Text("Day-by-day breakdown of your usage")
             .font(.subheadline)
             .foregroundColor(.secondary)
-    }
-}
-
-// MARK: - Loading View
-
-private struct LoadingView: View {
-    let message: String
-
-    var body: some View {
-        ProgressView(message)
-            .frame(maxWidth: .infinity)
-            .padding(.top, 50)
     }
 }
 

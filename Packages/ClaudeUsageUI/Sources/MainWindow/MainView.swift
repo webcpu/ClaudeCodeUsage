@@ -123,25 +123,9 @@ private struct DetailView: View {
     let store: UsageStore
 
     var body: some View {
-        content
+        destination.makeView()
             .environment(store)
             .frame(minWidth: 700)
-    }
-
-    @ViewBuilder
-    private var content: some View {
-        switch destination {
-        case .overview:
-            OverviewView()
-        case .models:
-            ModelsView()
-        case .dailyUsage:
-            DailyUsageView()
-        case .analytics:
-            AnalyticsView()
-        case .liveMetrics:
-            MenuBarContentView(viewMode: .liveMetrics)
-        }
     }
 }
 
@@ -170,6 +154,22 @@ public enum Destination: Hashable, CaseIterable {
         case .dailyUsage: "calendar"
         case .analytics: "chart.bar.xaxis"
         case .liveMetrics: "arrow.triangle.2.circlepath"
+        }
+    }
+
+    @ViewBuilder
+    func makeView() -> some View {
+        switch self {
+        case .overview:
+            OverviewView()
+        case .models:
+            ModelsView()
+        case .dailyUsage:
+            DailyUsageView()
+        case .analytics:
+            AnalyticsView()
+        case .liveMetrics:
+            MenuBarContentView(viewMode: .liveMetrics)
         }
     }
 }

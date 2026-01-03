@@ -1,34 +1,74 @@
 //
 //  FormatterService.swift
-//  Formatting utilities for display values
+//  Composable formatting functions for display values
 //
 
 import Foundation
+import ClaudeUsageCore
 
-struct FormatterService {
+// MARK: - Formatter Type Aliases
+
+typealias Formatter<T> = @Sendable (T) -> String
+
+// MARK: - Formatters Namespace
+
+/// Composable formatting functions organized by category.
+/// Each formatter is a pure function that can be composed with `>>>`.
+///
+/// Example composition:
+/// ```
+/// let formatTokenRate = Formatters.tokenCount >>> Formatters.appendSuffix(" tokens/min")
+/// ```
+enum Formatters {
 
     // MARK: - Token Formatting
 
-    static func formatTokenCount(_ count: Int) -> String {
+    /// Format token count with K/M suffixes for readability
+    static let tokenCount: Formatter<Int> = { count in
         TokenThreshold.format(count)
     }
 
     // MARK: - Percentage Formatting
 
-    static func formatPercentage(_ percentage: Double) -> String {
+    /// Format percentage as integer with % suffix
+    static let percentage: Formatter<Double> = { percentage in
         "\(Int(percentage))%"
     }
 
-    // MARK: - Time Duration Formatting
+    // MARK: - Currency Formatting
 
-    static func formatTimeInterval(_ interval: TimeInterval, totalInterval: TimeInterval) -> String {
-        let hours = interval / TimeConstants.secondsPerHour
-        let totalHours = totalInterval / TimeConstants.secondsPerHour
-        return String(format: "%.1fh / %.0fh", hours, totalHours)
+    /// Format amount as USD currency
+    static let currency: Formatter<Double> = { amount in
+        String(format: "$%.2f", amount)
     }
 
+    // MARK: - Rate Formatting
+
+    /// Format tokens per minute rate
+    static let tokenRate: Formatter<Int> = tokenCount >>> appendSuffix(" tokens/min")
+
+    /// Format cost per hour rate
+    static let costRate: Formatter<Double> = currency >>> appendSuffix("/hr")
+
+    // MARK: - Session Formatting
+
+    /// Format active session count
+    static let sessionCount: Formatter<Int> = { count in
+        count > 0 ? "\(count) active" : "No active"
+    }
+
+    // MARK: - Composed Formatters (aliases for semantic clarity)
+
+    /// Format daily average cost (composed from currency)
+    static let dailyAverage: Formatter<Double> = currency
+
+    /// Format large numbers with K/M suffixes (composed from token count)
+    static let largeNumber: Formatter<Int> = tokenCount
+
+    // MARK: - Time Duration Formatting
+
     /// Format countdown time like "Resets in 3 hr 24 min"
-    static func formatCountdown(_ interval: TimeInterval) -> String {
+    static let countdown: Formatter<TimeInterval> = { interval in
         guard interval > 0 else { return "Resetting..." }
         let hours = Int(interval / TimeConstants.secondsPerHour)
         let minutes = Int((interval.truncatingRemainder(dividingBy: TimeConstants.secondsPerHour)) / TimeConstants.secondsPerMinute)
@@ -39,52 +79,88 @@ struct FormatterService {
         }
     }
 
-    // MARK: - Currency Formatting
-
-    static func formatCurrency(_ amount: Double) -> String {
-        String(format: "$%.2f", amount)
-    }
-
-    // MARK: - Rate Formatting
-
-    static func formatTokenRate(_ tokensPerMinute: Int) -> String {
-        "\(formatTokenCount(tokensPerMinute)) tokens/min"
-    }
-
-    static func formatCostRate(_ costPerHour: Double) -> String {
-        "\(formatCurrency(costPerHour))/hr"
-    }
-
-    // MARK: - Session Count Formatting
-
-    static func formatSessionCount(_ count: Int) -> String {
-        count > 0 ? "\(count) active" : "No active"
-    }
-
-    // MARK: - Value with Limit Formatting
-
-    static func formatValueWithLimit<T: BinaryInteger>(_ current: T, limit: T) -> String {
-        "\(formatTokenCount(Int(current))) / \(formatTokenCount(Int(limit)))"
-    }
-
-    // MARK: - Daily Average Formatting
-
-    static func formatDailyAverage(_ average: Double) -> String {
-        formatCurrency(average)
-    }
-
-    // MARK: - Large Number Formatting
-
-    static func formatLargeNumber(_ number: Int) -> String {
-        formatTokenCount(number)
-    }
-
     // MARK: - Relative Time Formatting
 
-    static func formatRelativeTime(_ date: Date?) -> String {
+    /// Format relative time from date (e.g., "5m ago", "2h ago")
+    static let relativeTime: Formatter<Date?> = { date in
         guard let date else { return "Never" }
         let interval = Date().timeIntervalSince(date)
         return RelativeTimeThreshold.format(interval)
+    }
+
+    // MARK: - Composition Helpers
+
+    /// Create a formatter that appends a suffix to any string
+    static func appendSuffix(_ suffix: String) -> Formatter<String> {
+        { string in string + suffix }
+    }
+
+    // MARK: - Multi-Parameter Formatters
+
+    /// Format a value with its limit (e.g., "1.5K / 10K")
+    static func valueWithLimit<T: BinaryInteger>(_ current: T, limit: T) -> String {
+        "\(tokenCount(Int(current))) / \(tokenCount(Int(limit)))"
+    }
+
+    /// Format time interval with total context
+    static func timeInterval(_ interval: TimeInterval, totalInterval: TimeInterval) -> String {
+        let hours = interval / TimeConstants.secondsPerHour
+        let totalHours = totalInterval / TimeConstants.secondsPerHour
+        return String(format: "%.1fh / %.0fh", hours, totalHours)
+    }
+}
+
+// MARK: - Legacy API (for backward compatibility)
+
+/// Backward-compatible static API wrapping the composable functions.
+/// New code should use `Formatters` namespace directly.
+enum FormatterService {
+    static func formatTokenCount(_ count: Int) -> String {
+        Formatters.tokenCount(count)
+    }
+
+    static func formatPercentage(_ percentage: Double) -> String {
+        Formatters.percentage(percentage)
+    }
+
+    static func formatTimeInterval(_ interval: TimeInterval, totalInterval: TimeInterval) -> String {
+        Formatters.timeInterval(interval, totalInterval: totalInterval)
+    }
+
+    static func formatCountdown(_ interval: TimeInterval) -> String {
+        Formatters.countdown(interval)
+    }
+
+    static func formatCurrency(_ amount: Double) -> String {
+        Formatters.currency(amount)
+    }
+
+    static func formatTokenRate(_ tokensPerMinute: Int) -> String {
+        Formatters.tokenRate(tokensPerMinute)
+    }
+
+    static func formatCostRate(_ costPerHour: Double) -> String {
+        Formatters.costRate(costPerHour)
+    }
+
+    static func formatSessionCount(_ count: Int) -> String {
+        Formatters.sessionCount(count)
+    }
+
+    static func formatValueWithLimit<T: BinaryInteger>(_ current: T, limit: T) -> String {
+        Formatters.valueWithLimit(current, limit: limit)
+    }
+
+    static func formatDailyAverage(_ average: Double) -> String {
+        Formatters.dailyAverage(average)
+    }
+
+    static func formatLargeNumber(_ number: Int) -> String {
+        Formatters.largeNumber(number)
+    }
+
+    static func formatRelativeTime(_ date: Date?) -> String {
+        Formatters.relativeTime(date)
     }
 }
 
