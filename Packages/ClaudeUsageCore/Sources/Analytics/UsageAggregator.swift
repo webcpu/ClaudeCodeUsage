@@ -5,6 +5,113 @@
 
 import Foundation
 
+// MARK: - Aggregation Strategy
+
+/// An aggregation strategy transforms usage entries into aggregated output
+public typealias AggregationStrategy<Output> = @Sendable ([UsageEntry]) -> Output
+
+// MARK: - Strategy Builders
+
+/// Builds an aggregation strategy from its components:
+/// group >>> build >>> sort
+public func buildStrategy<Key: Hashable, Output>(
+    groupBy: @escaping @Sendable (UsageEntry) -> Key,
+    build: @escaping @Sendable ((key: Key, value: [UsageEntry])) -> Output,
+    sort: @escaping @Sendable ([Output]) -> [Output]
+) -> AggregationStrategy<[Output]> {
+    let group: AggregationStrategy<[Key: [UsageEntry]]> = { entries in
+        Dictionary(grouping: entries, by: groupBy)
+    }
+
+    let mapBuild: @Sendable ([Key: [UsageEntry]]) -> [Output] = { dict in
+        dict.map(build)
+    }
+
+    return group >>> mapBuild >>> sort
+}
+
+// MARK: - Predefined Strategies
+
+public enum AggregationStrategies {
+
+    // MARK: - Model Strategy
+
+    public static let byModel: AggregationStrategy<[ModelUsage]> = buildStrategy(
+        groupBy: \.model,
+        build: ModelUsageBuilder.build,
+        sort: { $0.sorted { $0.totalCost > $1.totalCost } }
+    )
+
+    // MARK: - Date Strategy
+
+    public static let byDate: AggregationStrategy<[DailyUsage]> = buildStrategy(
+        groupBy: { DateFormatters.yearMonthDay.string(from: $0.timestamp) },
+        build: DailyUsageBuilder.build,
+        sort: { $0.sorted { $0.date < $1.date } }
+    )
+
+    // MARK: - Project Strategy
+
+    public static let byProject: AggregationStrategy<[ProjectUsage]> = buildStrategy(
+        groupBy: \.project,
+        build: ProjectUsageBuilder.build,
+        sort: { $0.sorted { $0.totalCost > $1.totalCost } }
+    )
+}
+
+// MARK: - Model Usage Builder
+
+private enum ModelUsageBuilder {
+    static let build: @Sendable ((key: String, value: [UsageEntry])) -> ModelUsage = { pair in
+        ModelUsage(
+            model: pair.key,
+            totalCost: pair.value.reduce(0.0) { $0 + $1.costUSD },
+            tokens: pair.value.reduce(.zero) { $0 + $1.tokens },
+            sessionCount: Set(pair.value.compactMap(\.sessionId)).count
+        )
+    }
+}
+
+// MARK: - Daily Usage Builder
+
+private enum DailyUsageBuilder {
+    static let build: @Sendable ((key: String, value: [UsageEntry])) -> DailyUsage = { pair in
+        DailyUsage(
+            date: pair.key,
+            totalCost: pair.value.reduce(0.0) { $0 + $1.costUSD },
+            totalTokens: pair.value.reduce(0) { $0 + $1.totalTokens },
+            modelsUsed: Array(Set(pair.value.map(\.model))),
+            hourlyCosts: calculateHourlyCosts(pair.value)
+        )
+    }
+
+    private static func calculateHourlyCosts(_ entries: [UsageEntry]) -> [Double] {
+        entries.reduce(into: Array(repeating: 0.0, count: 24)) { costs, entry in
+            let hour = Calendar.current.component(.hour, from: entry.timestamp)
+            costs[hour] += entry.costUSD
+        }
+    }
+}
+
+// MARK: - Project Usage Builder
+
+private enum ProjectUsageBuilder {
+    static let build: @Sendable ((key: String, value: [UsageEntry])) -> ProjectUsage = { pair in
+        ProjectUsage(
+            projectPath: pair.key,
+            projectName: extractProjectName(from: pair.key),
+            totalCost: pair.value.reduce(0.0) { $0 + $1.costUSD },
+            totalTokens: pair.value.reduce(0) { $0 + $1.totalTokens },
+            sessionCount: Set(pair.value.compactMap(\.sessionId)).count,
+            lastUsed: pair.value.map(\.timestamp).max() ?? Date()
+        )
+    }
+
+    private static func extractProjectName(from path: String) -> String {
+        path.split(separator: "/").last.map(String.init) ?? path
+    }
+}
+
 // MARK: - UsageAggregator
 
 public enum UsageAggregator {
@@ -18,28 +125,43 @@ public enum UsageAggregator {
             totalCost: sumCosts(entries),
             tokens: sumTokens(entries),
             sessionCount: countUniqueSessions(entries),
-            byModel: aggregateByModel(entries),
-            byDate: aggregateByDate(entries),
-            byProject: aggregateByProject(entries)
+            byModel: AggregationStrategies.byModel(entries),
+            byDate: AggregationStrategies.byDate(entries),
+            byProject: AggregationStrategies.byProject(entries)
         )
     }
 
+    /// Aggregate with custom strategies - open for extension
+    public static func aggregate(
+        _ entries: [UsageEntry],
+        modelStrategy: AggregationStrategy<[ModelUsage]> = AggregationStrategies.byModel,
+        dateStrategy: AggregationStrategy<[DailyUsage]> = AggregationStrategies.byDate,
+        projectStrategy: AggregationStrategy<[ProjectUsage]> = AggregationStrategies.byProject
+    ) -> UsageStats {
+        guard !entries.isEmpty else { return .empty }
+
+        return UsageStats(
+            totalCost: sumCosts(entries),
+            tokens: sumTokens(entries),
+            sessionCount: countUniqueSessions(entries),
+            byModel: modelStrategy(entries),
+            byDate: dateStrategy(entries),
+            byProject: projectStrategy(entries)
+        )
+    }
+
+    // MARK: - Individual Aggregations (for direct use)
+
     public static func aggregateByModel(_ entries: [UsageEntry]) -> [ModelUsage] {
-        groupByModel(entries)
-            .map(buildModelUsage)
-            .sortedByTotalCostDescending()
+        AggregationStrategies.byModel(entries)
     }
 
     public static func aggregateByDate(_ entries: [UsageEntry]) -> [DailyUsage] {
-        groupByDateString(entries)
-            .map(buildDailyUsage)
-            .sortedByDateAscending()
+        AggregationStrategies.byDate(entries)
     }
 
     public static func aggregateByProject(_ entries: [UsageEntry]) -> [ProjectUsage] {
-        groupByProject(entries)
-            .map(buildProjectUsage)
-            .sortedByTotalCostDescending()
+        AggregationStrategies.byProject(entries)
     }
 
     // MARK: - Today Filtering
@@ -77,107 +199,14 @@ private extension UsageAggregator {
     }
 
     static func calculateHourlyCosts(_ entries: [UsageEntry]) -> [Double] {
-        entries.reduce(into: emptyHourlyCostsArray()) { costs, entry in
-            costs[hourOfDay(from: entry.timestamp)] += entry.costUSD
+        entries.reduce(into: Array(repeating: 0.0, count: Constants.hoursPerDay)) { costs, entry in
+            let hour = Calendar.current.component(.hour, from: entry.timestamp)
+            costs[hour] += entry.costUSD
         }
-    }
-
-    static func emptyHourlyCostsArray() -> [Double] {
-        Array(repeating: 0.0, count: Constants.hoursPerDay)
-    }
-
-    static func hourOfDay(from date: Date) -> Int {
-        Calendar.current.component(.hour, from: date)
     }
 
     static func isOnDate(_ entry: UsageEntry, targetDate: Date) -> Bool {
         Calendar.current.startOfDay(for: entry.timestamp) == targetDate
-    }
-}
-
-// MARK: - Grouping Functions
-
-private extension UsageAggregator {
-    static func groupByModel(_ entries: [UsageEntry]) -> [String: [UsageEntry]] {
-        Dictionary(grouping: entries, by: \.model)
-    }
-
-    static func groupByDateString(_ entries: [UsageEntry]) -> [String: [UsageEntry]] {
-        Dictionary(grouping: entries) { formatDateString($0.timestamp) }
-    }
-
-    static func groupByProject(_ entries: [UsageEntry]) -> [String: [UsageEntry]] {
-        Dictionary(grouping: entries, by: \.project)
-    }
-
-    static func formatDateString(_ date: Date) -> String {
-        DateFormatters.yearMonthDay.string(from: date)
-    }
-}
-
-// MARK: - Builder Functions
-
-private extension UsageAggregator {
-    static func buildModelUsage(_ pair: (key: String, value: [UsageEntry])) -> ModelUsage {
-        ModelUsage(
-            model: pair.key,
-            totalCost: sumCosts(pair.value),
-            tokens: sumTokens(pair.value),
-            sessionCount: Set(pair.value.compactMap(\.sessionId)).count
-        )
-    }
-
-    static func buildDailyUsage(_ pair: (key: String, value: [UsageEntry])) -> DailyUsage {
-        DailyUsage(
-            date: pair.key,
-            totalCost: sumCosts(pair.value),
-            totalTokens: pair.value.reduce(0) { $0 + $1.totalTokens },
-            modelsUsed: uniqueModels(from: pair.value),
-            hourlyCosts: calculateHourlyCosts(pair.value)
-        )
-    }
-
-    static func buildProjectUsage(_ pair: (key: String, value: [UsageEntry])) -> ProjectUsage {
-        ProjectUsage(
-            projectPath: pair.key,
-            projectName: extractProjectName(from: pair.key),
-            totalCost: sumCosts(pair.value),
-            totalTokens: pair.value.reduce(0) { $0 + $1.totalTokens },
-            sessionCount: Set(pair.value.compactMap(\.sessionId)).count,
-            lastUsed: latestTimestamp(from: pair.value)
-        )
-    }
-
-    static func uniqueModels(from entries: [UsageEntry]) -> [String] {
-        Array(Set(entries.map(\.model)))
-    }
-
-    static func latestTimestamp(from entries: [UsageEntry]) -> Date {
-        entries.map(\.timestamp).max() ?? Date()
-    }
-
-    static func extractProjectName(from path: String) -> String {
-        path.split(separator: "/").last.map(String.init) ?? path
-    }
-}
-
-// MARK: - Sorting Extensions
-
-private extension Array where Element == ModelUsage {
-    func sortedByTotalCostDescending() -> [ModelUsage] {
-        sorted { $0.totalCost > $1.totalCost }
-    }
-}
-
-private extension Array where Element == DailyUsage {
-    func sortedByDateAscending() -> [DailyUsage] {
-        sorted { $0.date < $1.date }
-    }
-}
-
-private extension Array where Element == ProjectUsage {
-    func sortedByTotalCostDescending() -> [ProjectUsage] {
-        sorted { $0.totalCost > $1.totalCost }
     }
 }
 
