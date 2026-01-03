@@ -188,17 +188,20 @@ private struct ModelMetrics {
 
     static func from(model: ModelUsage, totalCost: Double) -> ModelMetrics {
         let pct = totalCost > 0 ? (model.totalCost / totalCost) * 100 : 0
-        let color = ModelColorResolver.color(for: model.model)
+        let color = ModelColorRegistry.color(for: model.model)
         return ModelMetrics(percentage: pct, color: color)
     }
 }
 
-private enum ModelColorResolver {
+private enum ModelColorRegistry {
+    static let mappings: [(pattern: String, color: Color)] = [
+        ("opus", .purple),
+        ("sonnet", .blue),
+        ("haiku", .green)
+    ]
+
     static func color(for modelName: String) -> Color {
-        if modelName.contains("opus") { return .purple }
-        if modelName.contains("sonnet") { return .blue }
-        if modelName.contains("haiku") { return .green }
-        return .gray
+        mappings.first { modelName.contains($0.pattern) }?.color ?? .gray
     }
 }
 
