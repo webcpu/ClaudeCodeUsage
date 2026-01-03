@@ -1,0 +1,52 @@
+//
+//  DayChangeMonitor.swift
+//  Monitors calendar day changes and system clock adjustments
+//
+
+import Foundation
+
+@MainActor
+final class DayChangeMonitor {
+    private var dayChangeObserver: NSObjectProtocol?
+    private var clockChangeObserver: NSObjectProtocol?
+    private var dayTracker: DayTracker
+    private let clock: any ClockProtocol
+    private let onRefresh: (RefreshReason) -> Void
+
+    init(clock: any ClockProtocol, dayTracker: DayTracker, onRefresh: @escaping (RefreshReason) -> Void) {
+        self.clock = clock
+        self.dayTracker = dayTracker
+        self.onRefresh = onRefresh
+    }
+
+    func start() {
+        stop()
+        dayChangeObserver = NotificationCenter.default.addObserver(
+            forName: .NSCalendarDayChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                onRefresh(dayTracker.refreshReasonForDayChange(clock: clock))
+            }
+        }
+        clockChangeObserver = NotificationCenter.default.addObserver(
+            forName: .NSSystemClockDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self, let reason = dayTracker.refreshReasonForClockChange(clock: clock) else { return }
+                onRefresh(reason)
+            }
+        }
+    }
+
+    func stop() {
+        dayChangeObserver.map { NotificationCenter.default.removeObserver($0) }
+        dayChangeObserver = nil
+        clockChangeObserver.map { NotificationCenter.default.removeObserver($0) }
+        clockChangeObserver = nil
+    }
+}
