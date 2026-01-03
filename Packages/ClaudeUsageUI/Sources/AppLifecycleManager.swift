@@ -48,6 +48,7 @@ public final class AppLifecycleManager {
     }
 
     private func handleWindowWillClose() {
-        store?.stopRefreshTimer()
+        // Menu bar popover closing should NOT stop monitoring.
+        // Day change and file change observers must stay active.
     }
 }

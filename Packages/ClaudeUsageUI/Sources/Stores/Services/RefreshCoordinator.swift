@@ -34,12 +34,13 @@ enum RefreshReason: Sendable {
     case timer
     case appBecameActive
     case windowFocus
+    case wakeFromSleep
 
     var shouldInvalidateCache: Bool {
         switch self {
         case .timer:
             false
-        case .manual, .fileChange, .dayChange, .appBecameActive, .windowFocus:
+        case .manual, .fileChange, .dayChange, .appBecameActive, .windowFocus, .wakeFromSleep:
             true
         }
     }
@@ -52,6 +53,7 @@ final class RefreshCoordinator {
     private var fallbackTimerTask: Task<Void, Never>?
     private var dayChangeObserver: NSObjectProtocol?
     private var clockChangeObserver: NSObjectProtocol?
+    private var wakeObserver: NSObjectProtocol?
     private var lastKnownDay: String
     private var lastRefreshTime: Date
     private let clock: any ClockProtocol
@@ -94,12 +96,14 @@ final class RefreshCoordinator {
         Task { await directoryMonitor?.start() }
         startFallbackTimer()
         startDayChangeMonitoring()
+        startWakeMonitoring()
     }
 
     func stop() {
         Task { await directoryMonitor?.stop() }
         stopFallbackTimer()
         stopDayChangeMonitoring()
+        stopWakeMonitoring()
     }
 
     func handleAppBecameActive() {
@@ -212,6 +216,36 @@ final class RefreshCoordinator {
         guard currentDay != lastKnownDay else { return }
         lastKnownDay = currentDay
         triggerRefresh(reason: .dayChange)
+    }
+
+    // MARK: - Wake From Sleep Monitoring
+
+    private func startWakeMonitoring() {
+        stopWakeMonitoring()
+        wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.handleWakeFromSleep()
+            }
+        }
+    }
+
+    private func stopWakeMonitoring() {
+        wakeObserver.map { NSWorkspace.shared.notificationCenter.removeObserver($0) }
+        wakeObserver = nil
+    }
+
+    private func handleWakeFromSleep() {
+        let currentDay = Self.formatDay(clock.now)
+        if currentDay != lastKnownDay {
+            lastKnownDay = currentDay
+            triggerRefresh(reason: .dayChange)
+        } else {
+            triggerRefresh(reason: .wakeFromSleep)
+        }
     }
 
     // MARK: - Pure Functions
