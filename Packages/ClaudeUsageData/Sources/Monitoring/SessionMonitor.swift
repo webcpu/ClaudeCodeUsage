@@ -123,28 +123,42 @@ public actor SessionMonitor: SessionDataSource {
     }
 
     private func mapGroupsToBlocks(_ groups: [[UsageEntry]]) -> [SessionBlock] {
-        groups.enumerated().compactMap { index, entries in
-            createBlockFromGroup(entries: entries, isLastGroup: index == groups.count - 1)
-        }
+        guard !groups.isEmpty else { return [] }
+        let historicalBlocks = groups.dropLast().compactMap(createHistoricalBlock)
+        let finalBlock = groups.last.flatMap(createFinalBlock)
+        return historicalBlocks + [finalBlock].compactMap { $0 }
     }
 
-    private func createBlockFromGroup(entries: [UsageEntry], isLastGroup: Bool) -> SessionBlock? {
-        guard let startTime = entries.first?.timestamp else { return nil }
-        let isActive = isLastGroup && isFinalGroupActive(entries: entries)
-        return createBlock(entries: entries, startTime: startTime, isActive: isActive)
+    // MARK: - Block Creation Strategies
+
+    /// Historical blocks are always inactive - they represent completed sessions
+    /// Uses exact session start time (no windowing needed)
+    private func createHistoricalBlock(entries: [UsageEntry]) -> SessionBlock? {
+        guard let sessionStart = entries.first?.timestamp else { return nil }
+        let displayTime = exactSessionStartTime(sessionStart)
+        return createBlock(entries: entries, displayStartTime: displayTime, isActive: false)
     }
 
-    private func isFinalGroupActive(entries: [UsageEntry]) -> Bool {
+    /// Final block may be active if recent activity detected
+    /// Active sessions use modulo windowing; inactive use exact time
+    private func createFinalBlock(entries: [UsageEntry]) -> SessionBlock? {
+        guard let sessionStart = entries.first?.timestamp else { return nil }
+        let isActive = hasRecentActivity(entries: entries)
+        let displayTime = isActive
+            ? rollingWindowStartTime(from: sessionStart)
+            : exactSessionStartTime(sessionStart)
+        return createBlock(entries: entries, displayStartTime: displayTime, isActive: isActive)
+    }
+
+    private func hasRecentActivity(entries: [UsageEntry]) -> Bool {
         guard let lastEntryTime = entries.last?.timestamp else { return false }
         return Date().timeIntervalSince(lastEntryTime) < sessionDurationSeconds
     }
 
     // MARK: - Block Creation
 
-    private func createBlock(entries: [UsageEntry], startTime: Date, isActive: Bool) -> SessionBlock? {
+    private func createBlock(entries: [UsageEntry], displayStartTime: Date, isActive: Bool) -> SessionBlock? {
         guard !entries.isEmpty else { return nil }
-
-        let displayStartTime = displayStartTime(for: startTime, isActive: isActive)
 
         return SessionBlock(
             id: UUID().uuidString,
@@ -160,11 +174,17 @@ public actor SessionMonitor: SessionDataSource {
         )
     }
 
-    private func displayStartTime(for sessionStart: Date, isActive: Bool) -> Date {
-        isActive ? windowStartTimeUsingModulo(sessionStart: sessionStart) : sessionStart
+    // MARK: - Time Calculation Strategies
+
+    /// Exact time: used for historical/completed sessions
+    /// Returns the actual session start timestamp unchanged
+    private func exactSessionStartTime(_ sessionStart: Date) -> Date {
+        sessionStart
     }
 
-    private func windowStartTimeUsingModulo(sessionStart: Date) -> Date {
+    /// Rolling window: used for active sessions
+    /// Calculates start of current window using modulo arithmetic
+    private func rollingWindowStartTime(from sessionStart: Date) -> Date {
         let totalDuration = Date().timeIntervalSince(sessionStart)
         let elapsedInCurrentWindow = totalDuration.truncatingRemainder(dividingBy: sessionDurationSeconds)
         return Date().addingTimeInterval(-elapsedInCurrentWindow)
