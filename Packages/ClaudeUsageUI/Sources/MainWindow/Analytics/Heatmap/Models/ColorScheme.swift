@@ -138,7 +138,8 @@ public final class HeatmapColorManager: Sendable {
     /// Lazily initialized color grids per theme (computed once, immutable thereafter)
     private let grids: [HeatmapColorTheme: ThemeColorGrid]
 
-    private init() {
+    /// Package-internal initializer for testing
+    init() {
         // Pre-compute grids for all themes at initialization
         self.grids = Dictionary(uniqueKeysWithValues: HeatmapColorTheme.allCases.map { theme in
             (theme, ThemeColorGrid(theme: theme))

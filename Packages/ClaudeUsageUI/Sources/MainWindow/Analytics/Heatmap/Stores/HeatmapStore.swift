@@ -71,21 +71,30 @@ public final class HeatmapStore {
     /// Current usage stats
     var currentStats: UsageStats?
 
-    /// Date calculator utility
-    let dateCalculator = HeatmapDateCalculator.shared
+    /// Date calculator utility (injected for DIP)
+    let dateCalculator: any HeatmapDateCalculating
 
-    /// Color manager for optimized color calculations
-    let colorManager = HeatmapColorManager.shared
+    /// Color manager for optimized color calculations (injected for DIP)
+    let colorManager: any HeatmapColorProviding
 
     /// Performance metrics
     var performanceMetrics = PerformanceMetrics()
 
     // MARK: - Initialization
 
-    /// Initialize with configuration
-    /// - Parameter configuration: Heatmap configuration (defaults to standard)
-    public init(configuration: HeatmapConfiguration = .default) {
+    /// Initialize with configuration and optional dependencies
+    /// - Parameters:
+    ///   - configuration: Heatmap configuration (defaults to standard)
+    ///   - dateCalculator: Date calculator (defaults to shared instance)
+    ///   - colorManager: Color manager (defaults to shared instance)
+    public init(
+        configuration: HeatmapConfiguration = .default,
+        dateCalculator: any HeatmapDateCalculating = HeatmapDateCalculator.shared,
+        colorManager: any HeatmapColorProviding = HeatmapColorManager.shared
+    ) {
         self.configuration = configuration
+        self.dateCalculator = dateCalculator
+        self.colorManager = colorManager
     }
 
     // MARK: - Public Interface (High Level)

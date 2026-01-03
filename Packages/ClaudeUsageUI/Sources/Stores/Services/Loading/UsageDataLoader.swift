@@ -11,10 +11,16 @@ import ClaudeUsageCore
 actor UsageDataLoader {
     private let repository: any UsageDataSource
     private let sessionMonitorService: SessionMonitorService
+    private let loadTrace: any LoadTracing
 
-    init(repository: any UsageDataSource, sessionMonitorService: SessionMonitorService) {
+    init(
+        repository: any UsageDataSource,
+        sessionMonitorService: SessionMonitorService,
+        loadTrace: any LoadTracing = LoadTrace.shared
+    ) {
         self.repository = repository
         self.sessionMonitorService = sessionMonitorService
+        self.loadTrace = loadTrace
     }
 
     func loadToday(invalidateCache: Bool = false) async throws -> TodayLoadResult {
@@ -96,14 +102,14 @@ private extension UsageDataLoader {
     }
 
     func tracePhase<T>(_ phase: LoadPhase, operation: () async throws -> T) async rethrows -> T {
-        await LoadTrace.shared.phaseStart(phase)
+        await loadTrace.phaseStart(phase)
         let result = try await operation()
-        await LoadTrace.shared.phaseComplete(phase)
+        await loadTrace.phaseComplete(phase)
         return result
     }
 
     func recordSessionTrace(session: SessionBlock?, timing: TimeInterval) async {
-        await LoadTrace.shared.recordSession(
+        await loadTrace.recordSession(
             found: session != nil,
             cached: timing < TracingThreshold.cachedResponseTime,
             duration: timing,

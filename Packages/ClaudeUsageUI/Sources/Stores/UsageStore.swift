@@ -65,6 +65,7 @@ public final class UsageStore {
     private let dataLoader: UsageDataLoader
     private let clock: any ClockProtocol
     private let refreshCoordinator: RefreshCoordinator
+    private let loadTrace: any LoadTracing
 
     // MARK: - Internal State
 
@@ -75,22 +76,24 @@ public final class UsageStore {
     // MARK: - Initialization
 
     public convenience init() {
-        self.init(repository: nil, sessionMonitorService: nil, configurationService: nil, clock: SystemClock())
+        self.init(repository: nil, sessionMonitorService: nil, configurationService: nil, clock: SystemClock(), loadTrace: LoadTrace.shared)
     }
 
     init(
         repository: (any UsageDataSource)? = nil,
         sessionMonitorService: SessionMonitorService? = nil,
         configurationService: ConfigurationService? = nil,
-        clock: any ClockProtocol = SystemClock()
+        clock: any ClockProtocol = SystemClock(),
+        loadTrace: any LoadTracing = LoadTrace.shared
     ) {
         let config = configurationService ?? DefaultConfigurationService()
         let repo = repository ?? UsageRepository(basePath: config.configuration.basePath)
         let sessionService = sessionMonitorService ?? DefaultSessionMonitorService(configuration: config.configuration)
 
-        self.dataLoader = UsageDataLoader(repository: repo, sessionMonitorService: sessionService)
+        self.dataLoader = UsageDataLoader(repository: repo, sessionMonitorService: sessionService, loadTrace: loadTrace)
         self.clock = clock
         self.defaultThreshold = config.configuration.dailyCostThreshold
+        self.loadTrace = loadTrace
         self.refreshCoordinator = RefreshCoordinatorFactory.make(
             clock: clock,
             basePath: config.configuration.basePath
@@ -125,12 +128,12 @@ public final class UsageStore {
 
     private func trackLoadExecution(_ load: () async throws -> Void) async {
         isCurrentlyLoading = true
-        _ = await LoadTrace.shared.start()
+        _ = await loadTrace.start()
         defer { isCurrentlyLoading = false }
 
         do {
             try await load()
-            await LoadTrace.shared.complete()
+            await loadTrace.complete()
         } catch {
             state = .error(error)
         }
@@ -144,7 +147,7 @@ public final class UsageStore {
 
     private func loadHistoryIfNeeded() async throws {
         guard shouldLoadHistory else {
-            await LoadTrace.shared.skipHistory()
+            await loadTrace.skipHistory()
             return
         }
         let historyResult = try await dataLoader.loadHistory()

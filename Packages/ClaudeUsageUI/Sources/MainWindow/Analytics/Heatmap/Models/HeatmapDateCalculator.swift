@@ -11,7 +11,9 @@ public final class HeatmapDateCalculator: @unchecked Sendable {
     // MARK: - Singleton
 
     public static let shared = HeatmapDateCalculator()
-    private init() {}
+
+    /// Package-internal initializer for testing
+    init() {}
 
     // MARK: - Cached Formatters
 

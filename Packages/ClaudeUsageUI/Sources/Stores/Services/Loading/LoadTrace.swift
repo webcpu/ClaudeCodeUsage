@@ -11,6 +11,9 @@ import OSLog
 actor LoadTrace {
     static let shared = LoadTrace()
 
+    /// Package-internal initializer for testing
+    init() {}
+
     private let logger = Logger(subsystem: "com.claudecodeusage", category: "DataFlow")
 
     private var loadStartTime: Date?
@@ -124,7 +127,7 @@ actor LoadTrace {
 
 // MARK: - Supporting Types
 
-enum LoadPhase: String {
+public enum LoadPhase: String, Sendable {
     case today = "Today"
     case history = "History"
 }
