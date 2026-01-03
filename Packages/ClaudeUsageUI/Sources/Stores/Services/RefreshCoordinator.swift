@@ -25,6 +25,40 @@ private enum Timing {
     static let refreshThreshold: TimeInterval = 2.0
 }
 
+// MARK: - Day Tracker
+
+@MainActor
+struct DayTracker {
+    private(set) var lastKnownDay: String
+
+    init(clock: any ClockProtocol) {
+        self.lastKnownDay = Self.formatDay(clock.now)
+    }
+
+    /// Checks if the day changed and updates if so. Returns true if day changed.
+    mutating func checkAndUpdateIfChanged(clock: any ClockProtocol) -> Bool {
+        let currentDay = Self.formatDay(clock.now)
+        guard currentDay != lastKnownDay else { return false }
+        lastKnownDay = currentDay
+        return true
+    }
+
+    /// Unconditionally updates to current day.
+    mutating func updateToCurrentDay(clock: any ClockProtocol) {
+        lastKnownDay = Self.formatDay(clock.now)
+    }
+
+    private static let dayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
+    private static func formatDay(_ date: Date) -> String {
+        dayFormatter.string(from: date)
+    }
+}
+
 // MARK: - Refresh Reason
 
 enum RefreshReason: Sendable {
@@ -54,7 +88,7 @@ final class RefreshCoordinator {
     private var dayChangeObserver: NSObjectProtocol?
     private var clockChangeObserver: NSObjectProtocol?
     private var wakeObserver: NSObjectProtocol?
-    private var lastKnownDay: String
+    private var dayTracker: DayTracker
     private var lastRefreshTime: Date
     private let clock: any ClockProtocol
     private let monitoredPath: String
@@ -62,12 +96,6 @@ final class RefreshCoordinator {
     private var directoryMonitor: DirectoryMonitor?
 
     var onRefresh: ((RefreshReason) async -> Void)?
-
-    private static let dayFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter
-    }()
 
     // MARK: - Initialization
 
@@ -78,7 +106,7 @@ final class RefreshCoordinator {
     ) {
         self.clock = clock
         self.lastRefreshTime = clock.now
-        self.lastKnownDay = Self.formatDay(clock.now)
+        self.dayTracker = DayTracker(clock: clock)
         self.monitoredPath = basePath + "/projects"
     }
 
@@ -97,13 +125,6 @@ final class RefreshCoordinator {
         startFallbackTimer()
         startDayChangeMonitoring()
         startWakeMonitoring()
-    }
-
-    func stop() {
-        Task { await directoryMonitor?.stop() }
-        stopFallbackTimer()
-        stopDayChangeMonitoring()
-        stopWakeMonitoring()
     }
 
     func handleAppBecameActive() {
@@ -207,14 +228,12 @@ final class RefreshCoordinator {
     }
 
     private func handleDayChange() {
-        lastKnownDay = Self.formatDay(clock.now)
+        dayTracker.updateToCurrentDay(clock: clock)
         triggerRefresh(reason: .dayChange)
     }
 
     private func handleSystemClockChange() {
-        let currentDay = Self.formatDay(clock.now)
-        guard currentDay != lastKnownDay else { return }
-        lastKnownDay = currentDay
+        guard dayTracker.checkAndUpdateIfChanged(clock: clock) else { return }
         triggerRefresh(reason: .dayChange)
     }
 
@@ -239,18 +258,10 @@ final class RefreshCoordinator {
     }
 
     private func handleWakeFromSleep() {
-        let currentDay = Self.formatDay(clock.now)
-        if currentDay != lastKnownDay {
-            lastKnownDay = currentDay
+        if dayTracker.checkAndUpdateIfChanged(clock: clock) {
             triggerRefresh(reason: .dayChange)
         } else {
             triggerRefresh(reason: .wakeFromSleep)
         }
-    }
-
-    // MARK: - Pure Functions
-
-    private static func formatDay(_ date: Date) -> String {
-        dayFormatter.string(from: date)
     }
 }
