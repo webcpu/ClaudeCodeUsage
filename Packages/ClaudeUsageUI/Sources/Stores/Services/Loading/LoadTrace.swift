@@ -5,6 +5,7 @@
 
 import Foundation
 import OSLog
+import ClaudeUsageCore
 
 // MARK: - Load Speed Classification (OCP: Extensible logging behavior)
 
@@ -127,11 +128,6 @@ actor LoadTrace {
 
 // MARK: - Supporting Types
 
-public enum LoadPhase: String, Sendable {
-    case today = "Today"
-    case history = "History"
-}
-
 private enum Threshold {
     static let slowLoad: TimeInterval = 2.0
 }
@@ -157,3 +153,7 @@ private enum DurationFormatter {
             .format(seconds) ?? String(format: "%.2fs", seconds)
     }
 }
+
+// MARK: - Protocol Conformance
+
+extension LoadTrace: LoadTracing {}

@@ -135,10 +135,3 @@ private extension RefreshCoordinatorFactory {
         )
     }
 }
-
-// MARK: - Home Directory Helper
-
-private func realHomeDirectory() -> String {
-    guard let pw = getpwuid(getuid()) else { return NSHomeDirectory() }
-    return String(cString: pw.pointee.pw_dir)
-}

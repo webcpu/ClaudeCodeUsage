@@ -5,6 +5,15 @@
 
 import Foundation
 
+// MARK: - Load Phase
+
+public enum LoadPhase: String, Sendable {
+    case today = "Today"
+    case history = "History"
+}
+
+// MARK: - Load Tracing Protocol
+
 /// Protocol for load operation tracing.
 /// Enables dependency injection and testability.
 public protocol LoadTracing: Actor {
@@ -26,7 +35,3 @@ public protocol LoadTracing: Actor {
     /// Complete the load trace and log summary
     func complete()
 }
-
-// MARK: - Default Implementation
-
-extension LoadTrace: LoadTracing {}
