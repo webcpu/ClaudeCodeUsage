@@ -5,8 +5,34 @@
 
 import Foundation
 
+// MARK: - RefreshReasonDescriptor
+
+/// Describes the behavior characteristics of a refresh reason.
+/// Adding new properties here automatically extends all RefreshReason cases.
+struct RefreshReasonDescriptor: Sendable {
+    let shouldInvalidateCache: Bool
+}
+
+// MARK: - Registry
+
+extension RefreshReasonDescriptor {
+    /// Registry mapping each refresh reason to its descriptor.
+    /// To add a new RefreshReason: add the case and register its descriptor here.
+    static let descriptors: [RefreshReason: RefreshReasonDescriptor] = [
+        .manual: RefreshReasonDescriptor(shouldInvalidateCache: true),
+        .fileChange: RefreshReasonDescriptor(shouldInvalidateCache: true),
+        .dayChange: RefreshReasonDescriptor(shouldInvalidateCache: true),
+        .timer: RefreshReasonDescriptor(shouldInvalidateCache: false),
+        .appBecameActive: RefreshReasonDescriptor(shouldInvalidateCache: true),
+        .windowFocus: RefreshReasonDescriptor(shouldInvalidateCache: true),
+        .wakeFromSleep: RefreshReasonDescriptor(shouldInvalidateCache: true),
+    ]
+}
+
+// MARK: - RefreshReason
+
 /// Describes why a refresh was triggered, used for cache invalidation decisions.
-enum RefreshReason: Sendable {
+enum RefreshReason: Sendable, Hashable {
     case manual
     case fileChange
     case dayChange
@@ -15,13 +41,10 @@ enum RefreshReason: Sendable {
     case windowFocus
     case wakeFromSleep
 
-    /// Whether this refresh reason should invalidate cached data.
-    var shouldInvalidateCache: Bool {
-        switch self {
-        case .timer:
-            false
-        case .manual, .fileChange, .dayChange, .appBecameActive, .windowFocus, .wakeFromSleep:
-            true
-        }
+    private var descriptor: RefreshReasonDescriptor {
+        RefreshReasonDescriptor.descriptors[self]!
     }
+
+    /// Whether this refresh reason should invalidate cached data.
+    var shouldInvalidateCache: Bool { descriptor.shouldInvalidateCache }
 }
