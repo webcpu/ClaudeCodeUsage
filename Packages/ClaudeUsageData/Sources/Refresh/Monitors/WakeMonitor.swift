@@ -5,21 +5,22 @@
 
 import Foundation
 import AppKit
+import ClaudeUsageCore
 
 @MainActor
-final class WakeMonitor: RefreshMonitor {
+public final class WakeMonitor: RefreshMonitor {
     private var observer: NSObjectProtocol?
     private var dayTracker: DayTracker
     private let clock: any ClockProtocol
     private let onRefresh: (RefreshReason) -> Void
 
-    init(clock: any ClockProtocol, dayTracker: DayTracker, onRefresh: @escaping (RefreshReason) -> Void) {
+    public init(clock: any ClockProtocol, dayTracker: DayTracker, onRefresh: @escaping (RefreshReason) -> Void) {
         self.clock = clock
         self.dayTracker = dayTracker
         self.onRefresh = onRefresh
     }
 
-    func start() {
+    public func start() {
         stop()
         observer = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didWakeNotification,
@@ -33,7 +34,7 @@ final class WakeMonitor: RefreshMonitor {
         }
     }
 
-    func stop() {
+    public func stop() {
         observer.map { NSWorkspace.shared.notificationCenter.removeObserver($0) }
         observer = nil
     }

@@ -11,7 +11,7 @@ import Foundation
 /// and emit RefreshReason through a callback. RefreshCoordinator depends on this
 /// abstraction, not concrete implementations (DIP).
 @MainActor
-protocol RefreshMonitor {
+public protocol RefreshMonitor {
     /// Starts monitoring for events.
     func start()
 

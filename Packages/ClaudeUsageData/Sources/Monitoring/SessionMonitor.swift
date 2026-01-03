@@ -18,6 +18,7 @@ public actor SessionMonitor: SessionDataSource {
     private var lastFileTimestamps: [String: Date] = [:]
     private var allEntries: [UsageEntry] = []
     private var cachedTokenLimit: Int = 0
+    private var cachedSession: (session: SessionBlock?, timestamp: Date)?
 
     public init(basePath: String = NSHomeDirectory() + "/.claude", sessionDurationHours: Double = 5.0) {
         self.basePath = basePath
@@ -27,6 +28,16 @@ public actor SessionMonitor: SessionDataSource {
     // MARK: - SessionDataSource
 
     public func getActiveSession() async -> SessionBlock? {
+        if let cached = cachedSession, isCacheValid(timestamp: cached.timestamp) {
+            return cached.session
+        }
+
+        let session = loadActiveSession()
+        cachedSession = (session, Date())
+        return session
+    }
+
+    private func loadActiveSession() -> SessionBlock? {
         loadModifiedFiles()
         let blocks = identifySessionBlocks()
         cachedTokenLimit = maxTokensFromCompletedBlocks(blocks)
@@ -49,6 +60,7 @@ public actor SessionMonitor: SessionDataSource {
         lastFileTimestamps.removeAll()
         allEntries.removeAll()
         cachedTokenLimit = 0
+        cachedSession = nil
     }
 
     // MARK: - File Loading
@@ -259,6 +271,16 @@ public actor SessionMonitor: SessionDataSource {
     private var sessionWindowHours: Double {
         sessionDurationHours * TimeConstants.sessionWindowMultiplier
     }
+}
+
+// MARK: - Cache Validation
+
+private func isCacheValid(timestamp: Date, ttl: TimeInterval = CacheConfig.ttl) -> Bool {
+    Date().timeIntervalSince(timestamp) < ttl
+}
+
+private enum CacheConfig {
+    static let ttl: TimeInterval = 2.0
 }
 
 // MARK: - Time Constants

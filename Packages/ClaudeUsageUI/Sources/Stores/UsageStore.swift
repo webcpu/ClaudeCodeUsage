@@ -78,7 +78,7 @@ public final class UsageStore {
     public convenience init() {
         self.init(
             repository: UsageStoreDefaults.repository,
-            sessionMonitorService: UsageStoreDefaults.sessionMonitorService,
+            sessionDataSource: UsageStoreDefaults.sessionDataSource,
             configurationService: UsageStoreDefaults.configurationService,
             clock: UsageStoreDefaults.clock,
             loadTrace: UsageStoreDefaults.loadTrace
@@ -87,16 +87,19 @@ public final class UsageStore {
 
     init(
         repository: (any UsageDataSource)? = nil,
-        sessionMonitorService: SessionMonitorService? = nil,
+        sessionDataSource: (any SessionDataSource)? = nil,
         configurationService: ConfigurationService? = nil,
         clock: any ClockProtocol = SystemClock(),
         loadTrace: any LoadTracing = LoadTrace.shared
     ) {
         let config = configurationService ?? DefaultConfigurationService()
         let repo = repository ?? UsageRepository(basePath: config.configuration.basePath)
-        let sessionService = sessionMonitorService ?? DefaultSessionMonitorService(configuration: config.configuration)
+        let sessionSource = sessionDataSource ?? SessionMonitor(
+            basePath: config.configuration.basePath,
+            sessionDurationHours: config.configuration.sessionDurationHours
+        )
 
-        self.dataLoader = UsageDataLoader(repository: repo, sessionMonitorService: sessionService, loadTrace: loadTrace)
+        self.dataLoader = UsageDataLoader(repository: repo, sessionDataSource: sessionSource, loadTrace: loadTrace)
         self.clock = clock
         self.defaultThreshold = config.configuration.dailyCostThreshold
         self.loadTrace = loadTrace
@@ -206,11 +209,12 @@ public final class UsageStore {
 
 /// Provides default dependencies for UsageStore construction.
 /// Separates construction policy from the UsageStore class itself.
+@MainActor
 enum UsageStoreDefaults {
     static var clock: any ClockProtocol { SystemClock() }
     static var loadTrace: any LoadTracing { LoadTrace.shared }
     static var repository: (any UsageDataSource)? { nil }
-    static var sessionMonitorService: SessionMonitorService? { nil }
+    static var sessionDataSource: (any SessionDataSource)? { nil }
     static var configurationService: ConfigurationService? { nil }
 }
 

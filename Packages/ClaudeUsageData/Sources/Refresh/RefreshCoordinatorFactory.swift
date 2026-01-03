@@ -4,26 +4,34 @@
 //
 
 import Foundation
+import ClaudeUsageCore
 
 // MARK: - Monitor Builder (OCP: Open for Extension)
 
 /// Dependencies available to monitor builders
-struct MonitorDependencies: Sendable {
-    let config: RefreshConfig
-    let clock: any ClockProtocol
-    let dayTracker: DayTracker
-    let onRefresh: @MainActor @Sendable (RefreshReason) -> Void
+public struct MonitorDependencies: Sendable {
+    public let config: RefreshConfig
+    public let clock: any ClockProtocol
+    public let dayTracker: DayTracker
+    public let onRefresh: @MainActor @Sendable (RefreshReason) -> Void
+
+    public init(config: RefreshConfig, clock: any ClockProtocol, dayTracker: DayTracker, onRefresh: @escaping @MainActor @Sendable (RefreshReason) -> Void) {
+        self.config = config
+        self.clock = clock
+        self.dayTracker = dayTracker
+        self.onRefresh = onRefresh
+    }
 }
 
 /// Builder function type: dependencies → monitor
 /// Add new monitor types by creating new builders, not modifying factory
-typealias MonitorBuilder = @MainActor (MonitorDependencies) -> any RefreshMonitor
+public typealias MonitorBuilder = @MainActor (MonitorDependencies) -> any RefreshMonitor
 
 // MARK: - Default Monitor Builders (Composable)
 
 @MainActor
-enum MonitorBuilders {
-    static let fileChange: MonitorBuilder = { deps in
+public enum MonitorBuilders {
+    public static let fileChange: MonitorBuilder = { deps in
         FileChangeMonitor(
             path: deps.config.monitoredPath,
             debounceInterval: deps.config.debounceInterval,
@@ -31,14 +39,14 @@ enum MonitorBuilders {
         )
     }
 
-    static let fallbackTimer: MonitorBuilder = { deps in
+    public static let fallbackTimer: MonitorBuilder = { deps in
         FallbackTimer(
             interval: deps.config.fallbackInterval,
             onRefresh: deps.onRefresh
         )
     }
 
-    static let dayChange: MonitorBuilder = { deps in
+    public static let dayChange: MonitorBuilder = { deps in
         DayChangeMonitor(
             clock: deps.clock,
             dayTracker: deps.dayTracker,
@@ -46,7 +54,7 @@ enum MonitorBuilders {
         )
     }
 
-    static let wake: MonitorBuilder = { deps in
+    public static let wake: MonitorBuilder = { deps in
         WakeMonitor(
             clock: deps.clock,
             dayTracker: deps.dayTracker,
@@ -55,7 +63,7 @@ enum MonitorBuilders {
     }
 
     /// Production monitor set - compose custom sets by combining builders
-    static let production: [MonitorBuilder] = [
+    public static let production: [MonitorBuilder] = [
         fileChange,
         fallbackTimer,
         dayChange,
@@ -70,9 +78,9 @@ enum MonitorBuilders {
 /// OCP compliant: extend by passing custom builders, not by modifying this code.
 /// For testing, create RefreshCoordinator directly with mock monitors.
 @MainActor
-enum RefreshCoordinatorFactory {
+public enum RefreshCoordinatorFactory {
 
-    static func make(
+    public static func make(
         clock: any ClockProtocol = SystemClock(),
         config: RefreshConfig,
         builders: [MonitorBuilder] = MonitorBuilders.production
@@ -89,11 +97,12 @@ enum RefreshCoordinatorFactory {
         return coordinator
     }
 
-    static func make(
+    public static func make(
         clock: any ClockProtocol = SystemClock(),
-        basePath: String = realHomeDirectory() + "/.claude"
+        basePath: String? = nil
     ) -> RefreshCoordinator {
-        make(clock: clock, config: .standard(basePath: basePath))
+        let path = basePath ?? (realHomeDirectory() + "/.claude")
+        return make(clock: clock, config: .standard(basePath: path))
     }
 }
 

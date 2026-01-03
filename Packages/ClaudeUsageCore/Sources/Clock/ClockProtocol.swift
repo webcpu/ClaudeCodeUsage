@@ -9,7 +9,7 @@ import Foundation
 
 /// Protocol for abstracting time operations, enabling testable time-dependent code
 @MainActor
-protocol ClockProtocol: Sendable {
+public protocol ClockProtocol: Sendable {
     /// Current date and time
     var now: Date { get }
 
@@ -22,7 +22,7 @@ protocol ClockProtocol: Sendable {
 
 // MARK: - Default Implementations
 
-extension ClockProtocol {
+public extension ClockProtocol {
     /// Format date as string
     func format(date: Date, format: String) -> String {
         DateFormatting.formatted(date, using: format)
@@ -34,30 +34,6 @@ extension ClockProtocol {
             of: (hour: hour, minute: minute, second: second),
             from: now
         )
-    }
-}
-
-// MARK: - Clock Provider
-
-/// Manages clock instance for dependency injection
-@MainActor
-struct ClockProvider {
-    private static var _current: ClockProtocol?
-
-    /// Current clock instance (defaults to SystemClock in production)
-    static var current: ClockProtocol {
-        get { _current ?? SystemClock() }
-        set { _current = newValue }
-    }
-
-    /// Reset to default (SystemClock)
-    static func reset() {
-        _current = nil
-    }
-
-    /// Use test clock for testing
-    static func useTestClock(_ clock: TestClock) {
-        _current = clock
     }
 }
 

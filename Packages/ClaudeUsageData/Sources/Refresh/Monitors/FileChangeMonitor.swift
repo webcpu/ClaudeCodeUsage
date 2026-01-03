@@ -4,22 +4,22 @@
 //
 
 import Foundation
-import ClaudeUsageData
+import ClaudeUsageCore
 
 @MainActor
-final class FileChangeMonitor: RefreshMonitor {
+public final class FileChangeMonitor: RefreshMonitor {
     private var directoryMonitor: DirectoryMonitor?
     private let path: String
     private let debounceInterval: TimeInterval
     private let onRefresh: (RefreshReason) -> Void
 
-    init(path: String, debounceInterval: TimeInterval, onRefresh: @escaping (RefreshReason) -> Void) {
+    public init(path: String, debounceInterval: TimeInterval, onRefresh: @escaping (RefreshReason) -> Void) {
         self.path = path
         self.debounceInterval = debounceInterval
         self.onRefresh = onRefresh
     }
 
-    func start() {
+    public func start() {
         stop()
         directoryMonitor = DirectoryMonitor(
             path: path,
@@ -30,7 +30,7 @@ final class FileChangeMonitor: RefreshMonitor {
         Task { await directoryMonitor?.start() }
     }
 
-    func stop() {
+    public func stop() {
         directoryMonitor = nil
     }
 }

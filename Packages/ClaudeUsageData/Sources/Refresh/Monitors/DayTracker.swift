@@ -4,26 +4,27 @@
 //
 
 import Foundation
+import ClaudeUsageCore
 
 /// Encapsulates day tracking logic for detecting midnight crossings.
 @MainActor
-struct DayTracker {
+public struct DayTracker {
     private(set) var lastKnownDay: String
 
-    init(clock: any ClockProtocol) {
+    public init(clock: any ClockProtocol) {
         self.lastKnownDay = Self.formatDay(clock.now)
     }
 
     /// Determines refresh reason for calendar day change notification.
     /// Always returns .dayChange since the system told us the day changed.
-    mutating func refreshReasonForDayChange(clock: any ClockProtocol) -> RefreshReason {
+    public mutating func refreshReasonForDayChange(clock: any ClockProtocol) -> RefreshReason {
         lastKnownDay = Self.formatDay(clock.now)
         return .dayChange
     }
 
     /// Determines refresh reason for system clock change.
     /// Returns .dayChange only if the day actually changed.
-    mutating func refreshReasonForClockChange(clock: any ClockProtocol) -> RefreshReason? {
+    public mutating func refreshReasonForClockChange(clock: any ClockProtocol) -> RefreshReason? {
         let currentDay = Self.formatDay(clock.now)
         guard currentDay != lastKnownDay else { return nil }
         lastKnownDay = currentDay
@@ -32,7 +33,7 @@ struct DayTracker {
 
     /// Determines refresh reason for wake from sleep.
     /// Returns .dayChange if day changed, otherwise .wakeFromSleep.
-    mutating func refreshReasonForWake(clock: any ClockProtocol) -> RefreshReason {
+    public mutating func refreshReasonForWake(clock: any ClockProtocol) -> RefreshReason {
         let currentDay = Self.formatDay(clock.now)
         if currentDay != lastKnownDay {
             lastKnownDay = currentDay

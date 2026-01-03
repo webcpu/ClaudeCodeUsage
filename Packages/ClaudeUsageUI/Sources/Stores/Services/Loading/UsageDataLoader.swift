@@ -39,7 +39,7 @@ struct TodayPhaseOutput: Sendable {
 
 actor UsageDataLoader {
     private let repository: any UsageDataSource
-    private let sessionMonitorService: SessionMonitorService
+    private let sessionDataSource: any SessionDataSource
     private let loadTrace: any LoadTracing
 
     /// The composed load pipeline: today >>> history >>> combine
@@ -49,11 +49,11 @@ actor UsageDataLoader {
 
     init(
         repository: any UsageDataSource,
-        sessionMonitorService: SessionMonitorService,
+        sessionDataSource: any SessionDataSource,
         loadTrace: any LoadTracing = LoadTrace.shared
     ) {
         self.repository = repository
-        self.sessionMonitorService = sessionMonitorService
+        self.sessionDataSource = sessionDataSource
         self.loadTrace = loadTrace
     }
 
@@ -127,7 +127,7 @@ private extension UsageDataLoader {
     }
 
     func fetchSessionWithTracing() async -> (SessionBlock?, BurnRate?) {
-        let (session, timing) = await timed { await sessionMonitorService.getActiveSession() }
+        let (session, timing) = await timed { await sessionDataSource.getActiveSession() }
         await recordSessionTrace(session: session, timing: timing)
         return (session, session?.burnRate)
     }

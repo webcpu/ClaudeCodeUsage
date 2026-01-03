@@ -4,19 +4,20 @@
 //
 
 import Foundation
+import ClaudeUsageCore
 
 @MainActor
-final class FallbackTimer: RefreshMonitor {
+public final class FallbackTimer: RefreshMonitor {
     private var task: Task<Void, Never>?
     private let interval: TimeInterval
     private let onRefresh: (RefreshReason) -> Void
 
-    init(interval: TimeInterval, onRefresh: @escaping (RefreshReason) -> Void) {
+    public init(interval: TimeInterval, onRefresh: @escaping (RefreshReason) -> Void) {
         self.interval = interval
         self.onRefresh = onRefresh
     }
 
-    func start() {
+    public func start() {
         stop()
         task = Task { @MainActor in
             while !Task.isCancelled {
@@ -31,7 +32,7 @@ final class FallbackTimer: RefreshMonitor {
         }
     }
 
-    func stop() {
+    public func stop() {
         task?.cancel()
         task = nil
     }

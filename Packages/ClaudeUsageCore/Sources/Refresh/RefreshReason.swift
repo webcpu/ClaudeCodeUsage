@@ -9,8 +9,12 @@ import Foundation
 
 /// Describes the behavior characteristics of a refresh reason.
 /// Adding new properties here automatically extends all RefreshReason cases.
-struct RefreshReasonDescriptor: Sendable {
-    let shouldInvalidateCache: Bool
+public struct RefreshReasonDescriptor: Sendable {
+    public let shouldInvalidateCache: Bool
+
+    public init(shouldInvalidateCache: Bool) {
+        self.shouldInvalidateCache = shouldInvalidateCache
+    }
 }
 
 // MARK: - Registry
@@ -18,7 +22,7 @@ struct RefreshReasonDescriptor: Sendable {
 extension RefreshReasonDescriptor {
     /// Registry mapping each refresh reason to its descriptor.
     /// To add a new RefreshReason: add the case and register its descriptor here.
-    static let descriptors: [RefreshReason: RefreshReasonDescriptor] = [
+    public static let descriptors: [RefreshReason: RefreshReasonDescriptor] = [
         .manual: RefreshReasonDescriptor(shouldInvalidateCache: true),
         .fileChange: RefreshReasonDescriptor(shouldInvalidateCache: true),
         .dayChange: RefreshReasonDescriptor(shouldInvalidateCache: true),
@@ -32,7 +36,7 @@ extension RefreshReasonDescriptor {
 // MARK: - RefreshReason
 
 /// Describes why a refresh was triggered, used for cache invalidation decisions.
-enum RefreshReason: Sendable, Hashable {
+public enum RefreshReason: Sendable, Hashable {
     case manual
     case fileChange
     case dayChange
@@ -46,5 +50,5 @@ enum RefreshReason: Sendable, Hashable {
     }
 
     /// Whether this refresh reason should invalidate cached data.
-    var shouldInvalidateCache: Bool { descriptor.shouldInvalidateCache }
+    public var shouldInvalidateCache: Bool { descriptor.shouldInvalidateCache }
 }
