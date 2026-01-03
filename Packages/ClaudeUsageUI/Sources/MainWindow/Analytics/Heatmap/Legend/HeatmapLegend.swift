@@ -5,6 +5,62 @@
 
 import SwiftUI
 
+// MARK: - Legend Style Descriptor
+
+/// Descriptor that encapsulates view building logic for each legend style.
+/// Adding a new legend style requires only adding an entry to the registry.
+@MainActor
+struct LegendStyleDescriptor {
+    let buildView: (LegendContext) -> AnyView
+
+    /// Context containing all data needed to build a legend view
+    struct LegendContext {
+        let legendTitle: AnyView
+        let horizontalLegendContent: AnyView
+        let verticalColorScale: AnyView
+        let conditionalCostReference: AnyView
+        let colorSquares: AnyView
+        let compactCostLabel: AnyView
+        let legendAccessibilityLabel: String
+        let compactAccessibilityLabel: String
+    }
+
+    /// Registry mapping each legend style to its descriptor
+    static let registry: [HeatmapLegend.LegendStyle: LegendStyleDescriptor] = [
+        .horizontal: LegendStyleDescriptor { context in
+            AnyView(
+                VStack(alignment: .leading, spacing: 4) {
+                    context.legendTitle
+                    context.horizontalLegendContent
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(context.legendAccessibilityLabel)
+            )
+        },
+        .vertical: LegendStyleDescriptor { context in
+            AnyView(
+                VStack(alignment: .center, spacing: 8) {
+                    context.legendTitle
+                    context.verticalColorScale
+                    context.conditionalCostReference
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(context.legendAccessibilityLabel)
+            )
+        },
+        .compact: LegendStyleDescriptor { context in
+            AnyView(
+                HStack(spacing: 4) {
+                    context.colorSquares
+                    context.compactCostLabel
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(context.compactAccessibilityLabel)
+            )
+        }
+    ]
+}
+
 // MARK: - Heatmap Legend
 
 /// Reusable legend component for heatmap color scale
@@ -88,37 +144,20 @@ public struct HeatmapLegend: View {
     // MARK: - Body
 
     public var body: some View {
-        switch style {
-        case .horizontal:
-            horizontalLegend
-        case .vertical:
-            verticalLegend
-        case .compact:
-            compactLegend
-        }
-    }
+        let context = LegendStyleDescriptor.LegendContext(
+            legendTitle: AnyView(legendTitle),
+            horizontalLegendContent: AnyView(horizontalLegendContent),
+            verticalColorScale: AnyView(verticalColorScale),
+            conditionalCostReference: AnyView(conditionalCostReference),
+            colorSquares: AnyView(colorSquares),
+            compactCostLabel: AnyView(compactCostLabel),
+            legendAccessibilityLabel: legendAccessibilityLabel,
+            compactAccessibilityLabel: compactAccessibilityLabel
+        )
 
-    // MARK: - Legend Variants (Mid Level)
-
-    @ViewBuilder
-    private var horizontalLegend: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            legendTitle
-            horizontalLegendContent
+        if let descriptor = LegendStyleDescriptor.registry[style] {
+            descriptor.buildView(context)
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(legendAccessibilityLabel)
-    }
-
-    @ViewBuilder
-    private var verticalLegend: some View {
-        VStack(alignment: .center, spacing: 8) {
-            legendTitle
-            verticalColorScale
-            conditionalCostReference
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(legendAccessibilityLabel)
     }
 
     // MARK: - Legend Content (Mid Level)
@@ -151,16 +190,6 @@ public struct HeatmapLegend: View {
                 accessibility: accessibility
             )
         }
-    }
-
-    @ViewBuilder
-    private var compactLegend: some View {
-        HStack(spacing: 4) {
-            colorSquares
-            compactCostLabel
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(compactAccessibilityLabel)
     }
 
     // MARK: - Components (Low Level)
