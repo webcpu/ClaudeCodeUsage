@@ -76,7 +76,13 @@ public final class UsageStore {
     // MARK: - Initialization
 
     public convenience init() {
-        self.init(repository: nil, sessionMonitorService: nil, configurationService: nil, clock: SystemClock(), loadTrace: LoadTrace.shared)
+        self.init(
+            repository: UsageStoreDefaults.repository,
+            sessionMonitorService: UsageStoreDefaults.sessionMonitorService,
+            configurationService: UsageStoreDefaults.configurationService,
+            clock: UsageStoreDefaults.clock,
+            loadTrace: UsageStoreDefaults.loadTrace
+        )
     }
 
     init(
@@ -196,7 +202,62 @@ public final class UsageStore {
     }
 }
 
+// MARK: - Factory
+
+/// Provides default dependencies for UsageStore construction.
+/// Separates construction policy from the UsageStore class itself.
+enum UsageStoreDefaults {
+    static var clock: any ClockProtocol { SystemClock() }
+    static var loadTrace: any LoadTracing { LoadTrace.shared }
+    static var repository: (any UsageDataSource)? { nil }
+    static var sessionMonitorService: SessionMonitorService? { nil }
+    static var configurationService: ConfigurationService? { nil }
+}
+
 // MARK: - Supporting Types
+
+/// Describes the derived properties for a ViewState case.
+/// Each case provides its own values, eliminating pattern matching.
+struct ViewStateDescriptor {
+    let isLoading: Bool
+    let hasLoaded: Bool
+    let stats: UsageStats?
+    let error: Error?
+
+    static let loading = ViewStateDescriptor(
+        isLoading: true,
+        hasLoaded: false,
+        stats: nil,
+        error: nil
+    )
+
+    static func loadedToday(_ stats: UsageStats) -> ViewStateDescriptor {
+        ViewStateDescriptor(
+            isLoading: false,
+            hasLoaded: true,
+            stats: nil,
+            error: nil
+        )
+    }
+
+    static func loaded(_ stats: UsageStats) -> ViewStateDescriptor {
+        ViewStateDescriptor(
+            isLoading: false,
+            hasLoaded: true,
+            stats: stats,
+            error: nil
+        )
+    }
+
+    static func error(_ error: Error) -> ViewStateDescriptor {
+        ViewStateDescriptor(
+            isLoading: false,
+            hasLoaded: false,
+            stats: nil,
+            error: error
+        )
+    }
+}
 
 enum ViewState {
     case loading
@@ -204,22 +265,23 @@ enum ViewState {
     case loaded(UsageStats)
     case error(Error)
 
-    var isLoading: Bool {
-        if case .loading = self { return true }
-        return false
-    }
-
-    var hasLoaded: Bool {
+    /// Each case maps to its descriptor - no pattern matching in computed properties
+    var descriptor: ViewStateDescriptor {
         switch self {
-        case .loadedToday, .loaded: return true
-        default: return false
+        case .loading:
+            return .loading
+        case .loadedToday(let stats):
+            return .loadedToday(stats)
+        case .loaded(let stats):
+            return .loaded(stats)
+        case .error(let error):
+            return .error(error)
         }
     }
 
-    var stats: UsageStats? {
-        if case .loaded(let stats) = self { return stats }
-        return nil
-    }
+    var isLoading: Bool { descriptor.isLoading }
+    var hasLoaded: Bool { descriptor.hasLoaded }
+    var stats: UsageStats? { descriptor.stats }
 }
 
 // MARK: - Pure Functions
