@@ -1,11 +1,9 @@
 //
-//  UsageDataSource.swift
-//  Protocols defining data provider capabilities
+//  UsageProviding.swift
+//  Protocol for usage data access
 //
 
 import Foundation
-
-// MARK: - UsageProviding
 
 /// Provides access to usage data.
 public protocol UsageProviding: Sendable {
@@ -20,18 +18,4 @@ public protocol UsageProviding: Sendable {
 
     /// Invalidate any cached data to force fresh reads.
     func clearCache() async
-}
-
-// MARK: - SessionProviding
-
-/// Provides access to live session data.
-public protocol SessionProviding: Sendable {
-    /// Get the currently active session block, if any.
-    func getActiveSession() async -> SessionBlock?
-
-    /// Get the current burn rate.
-    func getBurnRate() async -> BurnRate?
-
-    /// Get the auto-detected token limit.
-    func getAutoTokenLimit() async -> Int?
 }
