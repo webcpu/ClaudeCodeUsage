@@ -144,11 +144,11 @@ private struct DestinationDescriptor {
             icon: "chart.line.uptrend.xyaxis",
             viewBuilder: { AnyView(OverviewView()) }
         ),
-        .models: DestinationDescriptor(
-            title: "Models",
-            icon: "cpu",
-            viewBuilder: { AnyView(ModelsView()) }
-        ),
+//        .models: DestinationDescriptor(
+//            title: "Models",
+//            icon: "cpu",
+//            viewBuilder: { AnyView(ModelsView()) }
+//        ),
         .dailyUsage: DestinationDescriptor(
             title: "Daily Usage",
             icon: "calendar",
@@ -159,11 +159,11 @@ private struct DestinationDescriptor {
             icon: "chart.bar.xaxis",
             viewBuilder: { AnyView(AnalyticsView()) }
         ),
-        .liveMetrics: DestinationDescriptor(
-            title: "Live Metrics",
-            icon: "arrow.triangle.2.circlepath",
-            viewBuilder: { AnyView(GlanceView(viewMode: .liveMetrics)) }
-        )
+//        .liveMetrics: DestinationDescriptor(
+//            title: "Live Metrics",
+//            icon: "arrow.triangle.2.circlepath",
+//            viewBuilder: { AnyView(GlanceView(viewMode: .liveMetrics)) }
+//        )
     ]
 }
 
@@ -171,10 +171,8 @@ private struct DestinationDescriptor {
 
 public enum Destination: Hashable, CaseIterable, Sendable {
     case overview
-    case models
     case dailyUsage
     case analytics
-    case liveMetrics
 
     @MainActor
     private var descriptor: DestinationDescriptor {

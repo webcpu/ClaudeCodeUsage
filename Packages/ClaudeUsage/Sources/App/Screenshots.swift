@@ -22,10 +22,8 @@ public struct Screenshots: ScreenshotProvider {
         [
             screenshot("Glance", width: 360, height: 500) { GlanceView() },
             screenshot("Insights-Overview", width: 1100, height: 700) { InsightsView(initialDestination: .overview) },
-            screenshot("Insights-Models", width: 1100, height: 700) { InsightsView(initialDestination: .models) },
             screenshot("Insights-DailyUsage", width: 1100, height: 700) { InsightsView(initialDestination: .dailyUsage) },
-            screenshot("Insights-Analytics", width: 1100, height: 700) { InsightsView(initialDestination: .analytics) },
-            screenshot("Insights-LiveMetrics", width: 1100, height: 700) { InsightsView(initialDestination: .liveMetrics) },
+            screenshot("Insights-Analytics", width: 1100, height: 700) { InsightsView(initialDestination: .analytics) }
         ]
     }
 
