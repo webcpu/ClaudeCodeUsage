@@ -197,9 +197,7 @@ public final class HeatmapStore {
 
     /// Record dataset generation time
     func recordDatasetGenerationTime(since startTime: CFAbsoluteTime) {
-        let duration = CFAbsoluteTimeGetCurrent() - startTime
-        performanceMetrics.datasetGenerationTime = duration
-        logger.debug("Generated heatmap dataset in \(String(format: "%.3f", duration))s")
+        performanceMetrics.datasetGenerationTime = CFAbsoluteTimeGetCurrent() - startTime
     }
 
     /// Handle dataset generation error

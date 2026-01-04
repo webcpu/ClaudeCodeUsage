@@ -108,9 +108,7 @@ final class MockAppSettingsService: AppSettingsServiceProtocol {
         return .success(())
     }
 
-    func showAboutPanel() {
-        logger.debug("About panel shown")
-    }
+    func showAboutPanel() {}
 }
 #endif
 

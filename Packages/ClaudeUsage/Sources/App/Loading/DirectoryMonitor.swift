@@ -60,7 +60,6 @@ public actor DirectoryMonitor {
                     do {
                         try await Task.sleep(for: .seconds(self.debounceInterval))
                         guard !Task.isCancelled else { return }
-                        logger.debug("Triggering onChange callback")
                         self.onChange()
                     } catch {
                         // Task cancelled
@@ -100,15 +99,8 @@ public actor DirectoryMonitor {
                 let ctx = Unmanaged<CallbackContext>.fromOpaque(info).takeUnretainedValue()
 
                 if let paths = Unmanaged<CFArray>.fromOpaque(eventPaths).takeUnretainedValue() as? [String], numEvents > 0 {
-                    logger.debug("FSEvents: \(numEvents) event(s) received")
-                    for (i, path) in paths.enumerated() {
-                        let flags = eventFlags[i]
-                        logger.debug("  [\(i)] \(path, privacy: .public) flags=\(flags)")
-                    }
-
-                    let jsonlPaths = paths.filter { $0.hasSuffix(".jsonl") }
-                    if !jsonlPaths.isEmpty {
-                        logger.debug("JSONL change detected: \(jsonlPaths.count) file(s)")
+                    let hasJSONLChanges = paths.contains { $0.hasSuffix(".jsonl") }
+                    if hasJSONLChanges {
                         ctx.handleEvent()
                     }
                 }
@@ -126,10 +118,7 @@ public actor DirectoryMonitor {
         }
 
         FSEventStreamSetDispatchQueue(stream, queue)
-        let started = FSEventStreamStart(stream)
-        if started {
-            logger.debug("Started watching \(self.path, privacy: .public) (recursive)")
-        } else {
+        if !FSEventStreamStart(stream) {
             logger.error("FSEventStreamStart failed for \(self.path, privacy: .public)")
         }
     }
@@ -139,7 +128,6 @@ public actor DirectoryMonitor {
         debounceTask = nil
 
         if let stream {
-            logger.debug("Stopping FSEventStream")
             FSEventStreamStop(stream)
             FSEventStreamInvalidate(stream)
             FSEventStreamRelease(stream)

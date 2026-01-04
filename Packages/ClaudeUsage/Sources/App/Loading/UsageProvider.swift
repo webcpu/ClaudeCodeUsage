@@ -30,9 +30,6 @@ public actor UsageProvider: UsageProviding {
     public func getTodayEntries() async throws -> [UsageEntry] {
         let allFiles = try FileDiscovery.discoverFiles(in: basePath)
         let todayFiles = FileDiscovery.filter(allFiles, by: FileFilters.modifiedToday())
-
-        logger.debug("Files: \(todayFiles.count) today / \(allFiles.count) total")
-
         let entries = await loadEntries(from: todayFiles)
         return UsageAggregator.filterToday(entries)
     }

@@ -99,10 +99,7 @@ public final class GlanceStore {
     }
 
     func loadData(invalidateCache: Bool = true) async {
-        guard !isCurrentlyLoading else {
-            logger.debug("Load blocked: already loading")
-            return
-        }
+        guard !isCurrentlyLoading else { return }
 
         isCurrentlyLoading = true
         isLoading = true
@@ -110,8 +107,6 @@ public final class GlanceStore {
             isCurrentlyLoading = false
             isLoading = false
         }
-
-        logger.debug("Loading glance data (invalidateCache=\(invalidateCache))")
 
         do {
             if invalidateCache {
@@ -125,7 +120,6 @@ public final class GlanceStore {
             activeSession = await sessionTask
             burnRate = activeSession?.burnRate
 
-            logger.debug("Loaded \(self.todayEntries.count) entries, session=\(self.activeSession != nil)")
         } catch {
             logger.error("Failed to load: \(error.localizedDescription)")
         }
