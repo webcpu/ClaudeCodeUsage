@@ -7,15 +7,15 @@ import Foundation
 
 // MARK: - Capture Result
 
-struct CaptureResult: Codable {
-    let name: String
-    let path: String
-    let width: Int
-    let height: Int
-    let status: String
-    let error: String?
+public struct CaptureResult: Codable, Sendable {
+    public let name: String
+    public let path: String
+    public let width: Int
+    public let height: Int
+    public let status: String
+    public let error: String?
 
-    static func success(name: String, path: String, size: CGSize) -> CaptureResult {
+    public static func success(name: String, path: String, size: CGSize) -> CaptureResult {
         CaptureResult(
             name: name,
             path: path,
@@ -26,7 +26,7 @@ struct CaptureResult: Codable {
         )
     }
 
-    static func failure(name: String, path: String, size: CGSize, error: Error) -> CaptureResult {
+    public static func failure(name: String, path: String, size: CGSize, error: Error) -> CaptureResult {
         CaptureResult(
             name: name,
             path: path,
@@ -37,19 +37,25 @@ struct CaptureResult: Codable {
         )
     }
 
-    var logMessage: String {
+    public var logMessage: String {
         "\(status == "success" ? "Saved" : "FAILED"): \(path)"
     }
 }
 
 // MARK: - Manifest Output
 
-struct ManifestOutput: Codable {
-    let timestamp: String
-    let outputDirectory: String
-    let screenshots: [CaptureResult]
+public struct ManifestOutput: Codable, Sendable {
+    public let timestamp: String
+    public let outputDirectory: String
+    public let screenshots: [CaptureResult]
 
-    static func from(results: [CaptureResult], directory: URL) -> ManifestOutput {
+    public init(timestamp: String, outputDirectory: String, screenshots: [CaptureResult]) {
+        self.timestamp = timestamp
+        self.outputDirectory = outputDirectory
+        self.screenshots = screenshots
+    }
+
+    public static func from(results: [CaptureResult], directory: URL) -> ManifestOutput {
         ManifestOutput(
             timestamp: ISO8601DateFormatter().string(from: Date()),
             outputDirectory: directory.path,

@@ -5,12 +5,12 @@
 
 import Foundation
 
-enum CaptureError: Error, CustomStringConvertible {
+public enum CaptureError: Error, CustomStringConvertible, Sendable {
     case renderFailed(String)
     case pngConversionFailed(String)
     case screenshotNotFound(String, available: [String])
 
-    var description: String {
+    public var description: String {
         switch self {
         case .renderFailed(let name):
             "Render failed: \(name)"
