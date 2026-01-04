@@ -33,10 +33,10 @@ The codebase uses **two independent stores** for clean separation:
 │  PricingCalculator          │   │  RefreshReason              │
 ├─────────────────────────────┤   ├─────────────────────────────┤
 │ Views/                      │   │ Infrastructure/             │
-│  InsightsView               │   │  Clock/, Settings/          │
+│  InsightsView               │   │  Clock/, Settings/, Refresh/│
 │  Overview/                  │   ├─────────────────────────────┤
 │  Models/                    │   │ Data/                       │
-│  Daily/                     │   │  SessionMonitor, Refresh/   │
+│  Daily/                     │   │  SessionMonitor             │
 │  Heatmap/                   │   ├─────────────────────────────┤
 │  Cards/                     │   │ Views/                      │
 │                             │   │  GlanceScene, GlanceView    │
@@ -89,16 +89,16 @@ Packages/ClaudeUsage/Sources/
     │   ├── RefreshMonitor.swift
     │   ├── RefreshReason.swift
     │   └── UsageDataSource.swift
-    ├── Infrastructure/
+    ├── Infrastructure/           # External system integrations
     │   ├── Clock/                # ClockProtocol, SystemClock
     │   ├── Settings/             # AppSettingsService, OpenAtLoginToggle
+    │   ├── Refresh/              # RefreshCoordinator, Monitors/
     │   └── AppConfiguration.swift
     ├── Stores/
     │   ├── GlanceStore.swift     # Owns live session
     │   └── Loading/              # UsageDataLoader, LoadTrace
-    ├── Data/
-    │   ├── SessionMonitor.swift
-    │   └── Refresh/              # RefreshCoordinator, Monitors/
+    ├── Data/                     # Data access layer
+    │   └── SessionMonitor.swift  # Repository for session data
     └── Views/
         ├── GlanceScene.swift     # Menu bar scene entry point
         ├── GlanceView.swift      # Main menu bar content view
@@ -147,6 +147,32 @@ The module names reflect user intent:
 All components are named consistently with their module:
 - **InsightsStore** + **InsightsView** for deep analysis
 - **GlanceStore** + **GlanceView** + **GlanceScene** + **GlanceTheme** for quick glances
+
+## Clean Architecture Layers
+
+Each vertical slice (Insights, Glance) follows Clean Architecture layering:
+
+```
+┌─────────────────────────────────────────────────────┐
+│ Views/              Presentation Layer              │
+├─────────────────────────────────────────────────────┤
+│ Stores/             Application Layer (Use Cases)   │
+├─────────────────────────────────────────────────────┤
+│ Domain/             Domain Layer (Entities)         │
+├─────────────────────────────────────────────────────┤
+│ Data/               Data Access (Repositories)      │
+│ Infrastructure/     External Systems (OS, Timers)   │
+└─────────────────────────────────────────────────────┘
+```
+
+**Layer responsibilities:**
+- **Domain/** - Pure business types and protocols (no external dependencies)
+- **Data/** - Data access implementations (file system reads)
+- **Infrastructure/** - External system adapters (timers, OS notifications, settings)
+- **Stores/** - Application state and use cases
+- **Views/** - SwiftUI presentation
+
+Dependencies point inward: Views → Stores → Domain ← Data/Infrastructure
 
 ## Design Principles
 
