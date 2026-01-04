@@ -111,7 +111,7 @@ public final class GlanceStore {
             isLoading = false
         }
 
-        logger.info("Loading glance data (invalidateCache=\(invalidateCache))")
+        logger.debug("Loading glance data (invalidateCache=\(invalidateCache))")
 
         do {
             if invalidateCache {
@@ -125,7 +125,7 @@ public final class GlanceStore {
             activeSession = await sessionTask
             burnRate = activeSession?.burnRate
 
-            logger.info("Loaded \(self.todayEntries.count) entries, session=\(self.activeSession != nil)")
+            logger.debug("Loaded \(self.todayEntries.count) entries, session=\(self.activeSession != nil)")
         } catch {
             logger.error("Failed to load: \(error.localizedDescription)")
         }

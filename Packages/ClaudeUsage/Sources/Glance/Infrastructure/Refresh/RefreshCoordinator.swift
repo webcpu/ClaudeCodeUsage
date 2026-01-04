@@ -51,7 +51,7 @@ public final class RefreshCoordinator {
     // MARK: - Refresh Dispatch
 
     public func triggerRefresh(reason: RefreshReason) {
-        logger.info("Refresh triggered: \(String(describing: reason), privacy: .public)")
+        logger.debug("Refresh triggered: \(String(describing: reason), privacy: .public)")
         Task { await onRefresh?(reason) }
     }
 }

@@ -68,12 +68,12 @@ public final class InsightsStore {
         isCurrentlyLoading = true
         defer { isCurrentlyLoading = false }
 
-        logger.info("Loading insights data")
+        logger.debug("Loading insights data")
 
         do {
             let stats = try await usageProvider.getUsageStats()
             state = .loaded(stats)
-            logger.info("Loaded \(stats.byDate.count) days of data")
+            logger.debug("Loaded \(stats.byDate.count) days of data")
         } catch {
             state = .error(error)
             logger.error("Failed to load: \(error.localizedDescription)")
@@ -84,7 +84,7 @@ public final class InsightsStore {
 
     private func startMonitoring() async {
         await directoryMonitor?.start()
-        logger.info("Started directory monitoring")
+        logger.debug("Started directory monitoring")
     }
 }
 

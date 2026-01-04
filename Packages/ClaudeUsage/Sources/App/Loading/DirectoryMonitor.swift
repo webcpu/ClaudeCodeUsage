@@ -60,7 +60,7 @@ public actor DirectoryMonitor {
                     do {
                         try await Task.sleep(for: .seconds(self.debounceInterval))
                         guard !Task.isCancelled else { return }
-                        logger.info("Triggering onChange callback")
+                        logger.debug("Triggering onChange callback")
                         self.onChange()
                     } catch {
                         // Task cancelled
@@ -108,7 +108,7 @@ public actor DirectoryMonitor {
 
                     let jsonlPaths = paths.filter { $0.hasSuffix(".jsonl") }
                     if !jsonlPaths.isEmpty {
-                        logger.info("JSONL change detected: \(jsonlPaths.count) file(s)")
+                        logger.debug("JSONL change detected: \(jsonlPaths.count) file(s)")
                         ctx.handleEvent()
                     }
                 }
@@ -128,7 +128,7 @@ public actor DirectoryMonitor {
         FSEventStreamSetDispatchQueue(stream, queue)
         let started = FSEventStreamStart(stream)
         if started {
-            logger.info("Started watching \(self.path, privacy: .public) (recursive)")
+            logger.debug("Started watching \(self.path, privacy: .public) (recursive)")
         } else {
             logger.error("FSEventStreamStart failed for \(self.path, privacy: .public)")
         }
