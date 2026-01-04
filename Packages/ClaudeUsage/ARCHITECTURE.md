@@ -36,7 +36,7 @@ The codebase uses **two independent stores** for clean separation:
 │  InsightsView               │   │  Clock/, Settings/, Refresh/│
 │  Overview/                  │   ├─────────────────────────────┤
 │  Models/                    │   │ Data/                       │
-│  Daily/                     │   │  SessionRepository             │
+│  Daily/                     │   │  SessionProvider            │
 │  Heatmap/                   │   ├─────────────────────────────┤
 │  Cards/                     │   │ Views/                      │
 │                             │   │  GlanceScene, GlanceView    │
@@ -83,12 +83,13 @@ Packages/ClaudeUsage/Sources/
 │
 └── Glance/                       # Quick check vertical slice
     ├── AppLifecycleManager.swift # Lifecycle handling for GlanceStore
-    ├── Domain/                   # Session domain
+    ├── Domain/                   # Session domain (pure logic)
     │   ├── SessionBlock.swift
+    │   ├── SessionDetector.swift # Pure session detection logic
     │   ├── BurnRate.swift
     │   ├── RefreshMonitor.swift
     │   ├── RefreshReason.swift
-    │   └── UsageDataSource.swift
+    │   └── UsageDataSource.swift # SessionProviding protocol
     ├── Infrastructure/           # External system integrations
     │   ├── Clock/                # ClockProtocol, SystemClock
     │   ├── Settings/             # AppSettingsService, OpenAtLoginToggle
@@ -98,7 +99,7 @@ Packages/ClaudeUsage/Sources/
     │   ├── GlanceStore.swift     # Owns live session
     │   └── Loading/              # UsageDataLoader, LoadTrace
     ├── Data/                     # Data access layer
-    │   └── SessionRepository.swift  # Repository for session data
+    │   └── SessionProvider.swift # Provides session data (uses SessionDetector)
     └── Views/
         ├── GlanceScene.swift     # Menu bar scene entry point
         ├── GlanceView.swift      # Main menu bar content view
@@ -126,7 +127,7 @@ Packages/ClaudeUsage/Sources/
 ├─────────────────────┤         ├─────────────────────┤
 │ Loads via           │         │ Loads via           │
 │ UsageRepository     │         │ UsageRepository +   │
-│                     │         │ SessionRepository      │
+│                     │         │ SessionProvider     │
 ├─────────────────────┤         ├─────────────────────┤
 │ Transforms to       │         │ Transforms to       │
 │ UsageStats          │         │ SessionBlock        │
@@ -189,10 +190,11 @@ Neither store depends on the other. They share the data loading layer
 
 Each vertical slice owns its domain:
 - **Insights/Domain**: Analytics types (UsageStats, UsageAggregator)
-- **Glance/Domain**: Session types (SessionBlock, BurnRate)
+- **Glance/Domain**: Session types (SessionBlock, SessionDetector, BurnRate)
 - **App/Domain**: Shared types (UsageEntry, TokenCounts)
 
 Reading a Domain folder tells you what that slice does.
+Domain contains pure business logic with no I/O dependencies.
 
 ### Clear Dependency Direction
 
@@ -206,7 +208,9 @@ Both vertical slices depend on App/, but never on each other.
 
 ## Key Design Patterns
 
-- **Repository Pattern**: UsageRepository abstracts data access
+- **Provider Pattern**: SessionProvider abstracts session data access
+- **Pure Domain Logic**: SessionDetector contains pure detection algorithms (no I/O)
+- **Repository Pattern**: UsageRepository abstracts usage data access
 - **Actor Concurrency**: Thread-safe state with actors
 - **@Observable**: Modern SwiftUI state management
 - **Factory Pattern**: RefreshCoordinatorFactory assembles monitors

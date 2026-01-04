@@ -24,16 +24,16 @@ public protocol UsageDataSource: Sendable {
     func clearCache() async
 }
 
-// MARK: - SessionDataSource
+// MARK: - SessionProviding
 
-/// Provides access to live session data
-public protocol SessionDataSource: Sendable {
-    /// Get the currently active session block, if any
+/// Provides access to live session data.
+public protocol SessionProviding: Sendable {
+    /// Get the currently active session block, if any.
     func getActiveSession() async -> SessionBlock?
 
-    /// Get the current burn rate
+    /// Get the current burn rate.
     func getBurnRate() async -> BurnRate?
 
-    /// Get the auto-detected token limit
+    /// Get the auto-detected token limit.
     func getAutoTokenLimit() async -> Int?
 }

@@ -1,5 +1,5 @@
 //
-//  SessionRepositoryTests.swift
+//  SessionProviderTests.swift
 //  ClaudeUsageDataTests
 //
 
@@ -7,14 +7,14 @@ import Testing
 import Foundation
 @testable import ClaudeUsage
 
-@Suite("SessionRepository")
-struct SessionRepositoryTests {
+@Suite("SessionProvider")
+struct SessionProviderTests {
     private let basePath = NSHomeDirectory() + "/.claude"
 
     @Test("active session has valid structure")
     func activeSessionHasValidStructure() async {
-        let repository = SessionRepository(basePath: basePath)
-        guard let session = await repository.getActiveSession() else {
+        let provider = SessionProvider(basePath: basePath)
+        guard let session = await provider.getActiveSession() else {
             return
         }
 
@@ -28,11 +28,11 @@ struct SessionRepositoryTests {
 
     @Test("clearCache allows fresh data fetch")
     func clearCacheAllowsFreshFetch() async {
-        let repository = SessionRepository(basePath: basePath)
-        _ = await repository.getActiveSession()
-        await repository.clearCache()
+        let provider = SessionProvider(basePath: basePath)
+        _ = await provider.getActiveSession()
+        await provider.clearCache()
 
-        let session = await repository.getActiveSession()
+        let session = await provider.getActiveSession()
 
         if let session = session {
             #expect(hasValidIdentifier(session))
@@ -42,9 +42,9 @@ struct SessionRepositoryTests {
 
     @Test("token limit returns value when session exists")
     func tokenLimitReturnsValueWhenSessionExists() async {
-        let repository = SessionRepository(basePath: basePath)
-        let session = await repository.getActiveSession()
-        let limit = await repository.getAutoTokenLimit()
+        let provider = SessionProvider(basePath: basePath)
+        let session = await provider.getActiveSession()
+        let limit = await provider.getAutoTokenLimit()
 
         if session != nil {
             #expect(limit != nil, "Should have token limit when session exists")
