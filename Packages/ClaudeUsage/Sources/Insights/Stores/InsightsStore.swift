@@ -25,7 +25,7 @@ public final class InsightsStore {
 
     // MARK: - Dependencies
 
-    private let repository: UsageRepository
+    private let usageProvider: UsageProvider
     private var directoryMonitor: DirectoryMonitor?
 
     // MARK: - Internal State
@@ -36,7 +36,7 @@ public final class InsightsStore {
     // MARK: - Initialization
 
     public init(basePath: String = AppConfiguration.default.basePath) {
-        self.repository = UsageRepository(basePath: basePath)
+        self.usageProvider = UsageProvider(basePath: basePath)
         self.directoryMonitor = nil
 
         self.directoryMonitor = DirectoryMonitor(path: basePath) { [weak self] in
@@ -45,8 +45,8 @@ public final class InsightsStore {
         }
     }
 
-    init(repository: UsageRepository, directoryMonitor: DirectoryMonitor) {
-        self.repository = repository
+    init(usageProvider: UsageProvider, directoryMonitor: DirectoryMonitor) {
+        self.usageProvider = usageProvider
         self.directoryMonitor = directoryMonitor
     }
 
@@ -71,7 +71,7 @@ public final class InsightsStore {
         logger.info("Loading insights data")
 
         do {
-            let stats = try await repository.getUsageStats()
+            let stats = try await usageProvider.getUsageStats()
             state = .loaded(stats)
             logger.info("Loaded \(stats.byDate.count) days of data")
         } catch {

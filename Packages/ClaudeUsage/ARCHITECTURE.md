@@ -61,7 +61,7 @@ Packages/ClaudeUsage/Sources/
 │   └── Loading/                  # Shared data loading
 │       ├── FileDiscovery.swift
 │       ├── JSONLParser.swift
-│       ├── UsageRepository.swift
+│       ├── UsageProvider.swift
 │       └── DirectoryMonitor.swift
 │
 ├── Insights/                     # Deep analysis vertical slice
@@ -126,7 +126,7 @@ Packages/ClaudeUsage/Sources/
 │ DirectoryMonitor    │         │ RefreshCoordinator  │
 ├─────────────────────┤         ├─────────────────────┤
 │ Loads via           │         │ Loads via           │
-│ UsageRepository     │         │ UsageRepository +   │
+│ UsageProvider       │         │ UsageProvider +     │
 │                     │         │ SessionProvider     │
 ├─────────────────────┤         ├─────────────────────┤
 │ Transforms to       │         │ Transforms to       │
@@ -208,9 +208,8 @@ Both vertical slices depend on App/, but never on each other.
 
 ## Key Design Patterns
 
-- **Provider Pattern**: SessionProvider abstracts session data access
+- **Provider Pattern**: UsageProvider/SessionProvider abstract read-only data access
 - **Pure Domain Logic**: SessionDetector contains pure detection algorithms (no I/O)
-- **Repository Pattern**: UsageRepository abstracts usage data access
 - **Actor Concurrency**: Thread-safe state with actors
 - **@Observable**: Modern SwiftUI state management
 - **Factory Pattern**: RefreshCoordinatorFactory assembles monitors

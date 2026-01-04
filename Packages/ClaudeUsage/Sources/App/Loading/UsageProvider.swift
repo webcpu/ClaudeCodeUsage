@@ -1,11 +1,16 @@
+//
+//  UsageProvider.swift
+//  Provides usage data from .jsonl files
+//
+
 import Foundation
 import OSLog
 
-private let logger = Logger(subsystem: "com.claudecodeusage", category: "Repository")
+private let logger = Logger(subsystem: "com.claudecodeusage", category: "UsageProvider")
 
-// MARK: - UsageRepository
+// MARK: - UsageProvider
 
-public actor UsageRepository: UsageDataSource {
+public actor UsageProvider: UsageProviding {
 
     // MARK: - Properties
 
@@ -20,7 +25,7 @@ public actor UsageRepository: UsageDataSource {
         self.basePath = basePath
     }
 
-    // MARK: - UsageDataSource Protocol
+    // MARK: - UsageProviding
 
     public func getTodayEntries() async throws -> [UsageEntry] {
         let allFiles = try FileDiscovery.discoverFiles(in: basePath)

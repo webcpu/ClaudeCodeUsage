@@ -41,7 +41,7 @@ public final class GlanceStore {
 
     // MARK: - Dependencies
 
-    private let repository: UsageRepository
+    private let usageProvider: UsageProvider
     private let sessionProvider: SessionProvider
     private let clock: any ClockProtocol
     private let refreshCoordinator: RefreshCoordinator
@@ -58,7 +58,7 @@ public final class GlanceStore {
         sessionDurationHours: Double = 5.0,
         clock: any ClockProtocol = SystemClock()
     ) {
-        self.repository = UsageRepository(basePath: basePath)
+        self.usageProvider = UsageProvider(basePath: basePath)
         self.sessionProvider = SessionProvider(
             basePath: basePath,
             sessionDurationHours: sessionDurationHours
@@ -75,12 +75,12 @@ public final class GlanceStore {
     }
 
     init(
-        repository: UsageRepository,
+        usageProvider: UsageProvider,
         sessionProvider: SessionProvider,
         clock: any ClockProtocol,
         refreshCoordinator: RefreshCoordinator
     ) {
-        self.repository = repository
+        self.usageProvider = usageProvider
         self.sessionProvider = sessionProvider
         self.clock = clock
         self.refreshCoordinator = refreshCoordinator
@@ -115,10 +115,10 @@ public final class GlanceStore {
 
         do {
             if invalidateCache {
-                await repository.clearCache()
+                await usageProvider.clearCache()
             }
 
-            async let entriesTask = repository.getTodayEntries()
+            async let entriesTask = usageProvider.getTodayEntries()
             async let sessionTask = sessionProvider.getActiveSession()
 
             todayEntries = try await entriesTask

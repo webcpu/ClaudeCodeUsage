@@ -1,26 +1,24 @@
 //
 //  UsageDataSource.swift
-//  ClaudeUsageCore
-//
-//  Protocols defining usage data access capabilities
+//  Protocols defining data provider capabilities
 //
 
 import Foundation
 
-// MARK: - UsageDataSource
+// MARK: - UsageProviding
 
-/// Provides access to usage data
-public protocol UsageDataSource: Sendable {
-    /// Get all usage entries for today
+/// Provides access to usage data.
+public protocol UsageProviding: Sendable {
+    /// Get all usage entries for today.
     func getTodayEntries() async throws -> [UsageEntry]
 
-    /// Get aggregated usage statistics
+    /// Get aggregated usage statistics.
     func getUsageStats() async throws -> UsageStats
 
-    /// Get all raw usage entries (for detailed analysis)
+    /// Get all raw usage entries (for detailed analysis).
     func getAllEntries() async throws -> [UsageEntry]
 
-    /// Invalidate any cached data to force fresh reads
+    /// Invalidate any cached data to force fresh reads.
     func clearCache() async
 }
 

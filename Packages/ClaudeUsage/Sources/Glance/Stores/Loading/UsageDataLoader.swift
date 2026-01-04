@@ -1,6 +1,6 @@
 //
 //  UsageDataLoader.swift
-//  Orchestrates data loading from repository and session services
+//  Orchestrates data loading from providers
 //
 
 import Foundation
@@ -37,7 +37,7 @@ struct TodayPhaseOutput: Sendable {
 // MARK: - UsageDataLoader
 
 actor UsageDataLoader {
-    private let repository: any UsageDataSource
+    private let usageProvider: any UsageProviding
     private let sessionProvider: any SessionProviding
     private let loadTrace: any LoadTracing
 
@@ -47,18 +47,18 @@ actor UsageDataLoader {
     }
 
     init(
-        repository: any UsageDataSource,
-        sessionDataSource: any SessionProviding,
+        usageProvider: any UsageProviding,
+        sessionProvider: any SessionProviding,
         loadTrace: any LoadTracing = LoadTrace.shared
     ) {
-        self.repository = repository
-        self.sessionProvider = sessionDataSource
+        self.usageProvider = usageProvider
+        self.sessionProvider = sessionProvider
         self.loadTrace = loadTrace
     }
 
     func loadToday(invalidateCache: Bool = false) async throws -> TodayLoadResult {
         if invalidateCache {
-            await repository.clearCache()
+            await usageProvider.clearCache()
         }
         return try await tracePhase(.today) {
             try await fetchTodayData()
@@ -67,7 +67,7 @@ actor UsageDataLoader {
 
     func loadHistory() async throws -> FullLoadResult {
         try await tracePhase(.history) {
-            FullLoadResult(fullStats: try await repository.getUsageStats())
+            FullLoadResult(fullStats: try await usageProvider.getUsageStats())
         }
     }
 
@@ -116,7 +116,7 @@ private extension UsageDataLoader {
 
 private extension UsageDataLoader {
     func fetchTodayData() async throws -> TodayLoadResult {
-        async let entriesTask = repository.getTodayEntries()
+        async let entriesTask = usageProvider.getTodayEntries()
         async let sessionTask = fetchSessionWithTracing()
 
         let entries = try await entriesTask
