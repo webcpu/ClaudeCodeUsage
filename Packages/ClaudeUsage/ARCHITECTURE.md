@@ -11,8 +11,8 @@ The codebase uses **two independent stores** for clean separation:
 │                            App                                   │
 │  ┌───────────────────────────────────────────────────────────┐  │
 │  │  AppEnvironment (DI)                                      │  │
-│  │  App/Domain (UsageEntry, TokenCounts)                     │  │
-│  │  App/Loading (Repository, Parser, Monitor)                │  │
+│  │  App/Domain (UsageEntry, TokenCounts, UsageProviding)     │  │
+│  │  App/Loading (UsageProvider, Parser, Monitor)             │  │
 │  └───────────────────────────────────────────────────────────┘  │
 └──────────────────────────────┬──────────────────────────────────┘
                                │
@@ -24,24 +24,24 @@ The codebase uses **two independent stores** for clean separation:
 │    (Deep Analysis Window)   │   │    (Quick Check Menu Bar)   │
 ├─────────────────────────────┤   ├─────────────────────────────┤
 │ Stores/                     │   │ Stores/                     │
-│  InsightsStore              │   │  GlanceStore                │
+│  InsightsStore              │   │  GlanceStore, Loading/      │
 ├─────────────────────────────┤   ├─────────────────────────────┤
 │ Domain/                     │   │ Domain/                     │
-│  UsageStats                 │   │  SessionBlock               │
-│  UsageAggregator            │   │  BurnRate                   │
-│  UsageAnalytics             │   │  RefreshMonitor             │
-│  PricingCalculator          │   │  RefreshReason              │
+│  UsageStats                 │   │  SessionBlock, BurnRate     │
+│  UsageAggregator            │   │  SessionDetector            │
+│  UsageAnalytics             │   │  SessionProviding           │
+│  PricingCalculator          │   │  RefreshMonitor/Reason      │
 ├─────────────────────────────┤   ├─────────────────────────────┤
 │ Views/                      │   │ Infrastructure/             │
 │  InsightsView               │   │  Clock/, Settings/, Refresh/│
-│  Overview/                  │   ├─────────────────────────────┤
-│  Models/                    │   │ Data/                       │
-│  Daily/                     │   │  SessionProvider            │
-│  Heatmap/                   │   ├─────────────────────────────┤
-│  Cards/                     │   │ Views/                      │
+│  Overview/, Models/         │   ├─────────────────────────────┤
+│  Daily/, Heatmap/           │   │ Data/                       │
+│  Cards/                     │   │  SessionProvider            │
+│                             │   ├─────────────────────────────┤
+│                             │   │ Views/                      │
 │                             │   │  GlanceScene, GlanceView    │
 │                             │   │  Sections/, Components/     │
-│                             │   │  Theme/ (GlanceTheme)       │
+│                             │   │  Theme/, Helpers/           │
 └─────────────────────────────┘   └─────────────────────────────┘
 ```
 
@@ -54,14 +54,15 @@ Packages/ClaudeUsage/Sources/
 │   ├── AppEnvironment+Preview.swift
 │   ├── Screenshots.swift
 │   ├── Previews.swift
-│   ├── Domain/                   # Shared data types
+│   ├── Domain/                   # Shared data types & protocols
 │   │   ├── UsageEntry.swift
 │   │   ├── TokenCounts.swift
-│   │   └── Composition.swift
+│   │   ├── Composition.swift
+│   │   └── UsageProviding.swift  # Protocol for usage data access
 │   └── Loading/                  # Shared data loading
 │       ├── FileDiscovery.swift
 │       ├── JSONLParser.swift
-│       ├── UsageProvider.swift
+│       ├── UsageProvider.swift   # Implements UsageProviding
 │       └── DirectoryMonitor.swift
 │
 ├── Insights/                     # Deep analysis vertical slice
@@ -75,23 +76,26 @@ Packages/ClaudeUsage/Sources/
 │   └── Views/
 │       ├── InsightsView.swift    # Main navigation view
 │       ├── AnalyticsView.swift
+│       ├── ContentStateRouter.swift
+│       ├── EmptyStateView.swift
 │       ├── Overview/             # OverviewView, MetricCard
 │       ├── Models/               # ModelsView
 │       ├── Daily/                # DailyUsageView, Charts/
 │       ├── Heatmap/              # YearlyCostHeatmap, Grid/, Legend/, etc.
-│       └── Cards/                # Analytics cards
+│       ├── Cards/                # Analytics cards
+│       └── Components/           # CaptureCompatibleScrollView
 │
 └── Glance/                       # Quick check vertical slice
     ├── AppLifecycleManager.swift # Lifecycle handling for GlanceStore
     ├── Domain/                   # Session domain (pure logic)
     │   ├── SessionBlock.swift
     │   ├── SessionDetector.swift # Pure session detection logic
+    │   ├── SessionProviding.swift # Protocol for session data access
     │   ├── BurnRate.swift
     │   ├── RefreshMonitor.swift
-    │   ├── RefreshReason.swift
-    │   └── UsageDataSource.swift # SessionProviding protocol
+    │   └── RefreshReason.swift
     ├── Infrastructure/           # External system integrations
-    │   ├── Clock/                # ClockProtocol, SystemClock
+    │   ├── Clock/                # ClockProtocol, SystemClock, TestClock
     │   ├── Settings/             # AppSettingsService, OpenAtLoginToggle
     │   ├── Refresh/              # RefreshCoordinator, Monitors/
     │   └── AppConfiguration.swift
@@ -99,7 +103,7 @@ Packages/ClaudeUsage/Sources/
     │   ├── GlanceStore.swift     # Owns live session
     │   └── Loading/              # UsageDataLoader, LoadTrace
     ├── Data/                     # Data access layer
-    │   └── SessionProvider.swift # Provides session data (uses SessionDetector)
+    │   └── SessionProvider.swift # Implements SessionProviding
     └── Views/
         ├── GlanceScene.swift     # Menu bar scene entry point
         ├── GlanceView.swift      # Main menu bar content view
@@ -161,7 +165,7 @@ Each vertical slice (Insights, Glance) follows Clean Architecture layering:
 ├─────────────────────────────────────────────────────┤
 │ Domain/             Domain Layer (Entities)         │
 ├─────────────────────────────────────────────────────┤
-│ Data/               Data Access (Repositories)      │
+│ Data/               Data Access (Providers)         │
 │ Infrastructure/     External Systems (OS, Timers)   │
 └─────────────────────────────────────────────────────┘
 ```
@@ -191,7 +195,7 @@ Neither store depends on the other. They share the data loading layer
 Each vertical slice owns its domain:
 - **Insights/Domain**: Analytics types (UsageStats, UsageAggregator)
 - **Glance/Domain**: Session types (SessionBlock, SessionDetector, BurnRate)
-- **App/Domain**: Shared types (UsageEntry, TokenCounts)
+- **App/Domain**: Shared types (UsageEntry, TokenCounts, UsageProviding)
 
 Reading a Domain folder tells you what that slice does.
 Domain contains pure business logic with no I/O dependencies.
