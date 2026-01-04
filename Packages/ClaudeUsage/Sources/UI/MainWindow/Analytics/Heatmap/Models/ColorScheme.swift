@@ -149,10 +149,6 @@ public final class HeatmapColorManager: Sendable {
         })
     }
 
-    // MARK: - Types
-
-    public typealias ColorVariation = ClaudeUsageUI.ColorVariation
-
     // MARK: - Public Interface (High Level)
 
     /// Get color for a cost value (O(1) lookup from pre-computed grid)

@@ -10,7 +10,7 @@
                              │
 ┌────────────────────────────▼────────────────────────────────┐
 │                   Presentation Layer                        │
-│                     (ClaudeUsageUI)                         │
+│                   (ClaudeUsageUI target)                    │
 │  ┌──────────────┐  ┌──────────────┐  ┌─────────────────┐   │
 │  │    Views     │  │    Stores    │  │    Services     │   │
 │  │  MenuBar/    │  │  UsageStore  │  │  LoadTrace      │   │
@@ -21,7 +21,7 @@
                              │
 ┌────────────────────────────▼────────────────────────────────┐
 │                       Data Layer                            │
-│                    (ClaudeUsageData)                        │
+│                  (ClaudeUsageData target)                   │
 │  ┌─────────────────┐  ┌──────────────┐  ┌───────────────┐  │
 │  │   Repository    │  │   Refresh    │  │  Monitoring   │  │
 │  │ UsageRepository │  │ Coordinator  │  │ SessionMonitor│  │
@@ -31,7 +31,7 @@
                              │
 ┌────────────────────────────▼────────────────────────────────┐
 │                      Domain Layer                           │
-│                    (ClaudeUsageCore)                        │
+│                  (ClaudeUsageCore target)                   │
 │  ┌───────────┐ ┌─────────┐ ┌─────────┐ ┌───────────────┐   │
 │  │  Models   │ │Analytics│ │ Clock   │ │Configuration  │   │
 │  │UsageEntry │ │Pricing  │ │Protocol │ │AppConfiguration│  │
@@ -50,36 +50,41 @@
 
 ```
 Packages/
-├── ClaudeUsageCore/           # Domain Layer (no dependencies)
-│   └── Sources/
-│       ├── Models/            # UsageEntry, TokenCounts, SessionBlock, BurnRate
-│       ├── Analytics/         # PricingCalculator, UsageAggregator
-│       ├── Protocols/         # UsageDataSource, SessionDataSource
-│       ├── Clock/             # ClockProtocol, SystemClock
-│       ├── Configuration/     # AppConfiguration, ConfigurationService
-│       ├── Refresh/           # RefreshMonitor, RefreshReason
-│       └── Tracing/           # LoadTracing, LoadPhase
+├── ClaudeUsage/                # Single package with layered targets
+│   ├── Package.swift
+│   ├── Sources/
+│   │   ├── Core/               # Layer 0 - Domain (no dependencies)
+│   │   │   ├── Models/         # UsageEntry, TokenCounts, SessionBlock, BurnRate
+│   │   │   ├── Analytics/      # PricingCalculator, UsageAggregator
+│   │   │   ├── Protocols/      # UsageDataSource, SessionDataSource
+│   │   │   ├── Clock/          # ClockProtocol, SystemClock
+│   │   │   ├── Configuration/  # AppConfiguration, ConfigurationService
+│   │   │   ├── Refresh/        # RefreshMonitor, RefreshReason
+│   │   │   └── Tracing/        # LoadTracing, LoadPhase
+│   │   │
+│   │   ├── Data/               # Layer 1 - Data (depends: Core)
+│   │   │   ├── Repository/     # UsageRepository, FileDiscovery
+│   │   │   ├── Parsing/        # JSONLParser
+│   │   │   ├── Monitoring/     # SessionMonitor, DirectoryMonitor
+│   │   │   └── Refresh/        # RefreshCoordinator, RefreshConfig
+│   │   │       └── Monitors/   # FileChange, DayChange, Wake, Timer
+│   │   │
+│   │   └── UI/                 # Layer 2 - Presentation (depends: Core, Data)
+│   │       ├── Stores/         # UsageStore
+│   │       │   └── Services/
+│   │       │       ├── Clock/  # TestClock (test support)
+│   │       │       └── Loading/# LoadTrace, UsageDataLoader
+│   │       ├── MenuBar/        # Menu bar views
+│   │       ├── MainWindow/     # Main window views
+│   │       ├── Shared/         # Shared components
+│   │       └── Settings/       # User preferences
+│   │
+│   └── Tests/
+│       ├── CoreTests/
+│       ├── DataTests/
+│       └── UITests/
 │
-├── ClaudeUsageData/           # Data Layer (depends: Core)
-│   └── Sources/
-│       ├── Repository/        # UsageRepository, FileDiscovery
-│       ├── Parsing/           # JSONLParser
-│       ├── Monitoring/        # SessionMonitor, DirectoryMonitor
-│       └── Refresh/           # RefreshCoordinator, RefreshConfig
-│           └── Monitors/      # FileChange, DayChange, Wake, Timer
-│
-├── ClaudeUsageUI/             # Presentation Layer (depends: Core, Data)
-│   └── Sources/
-│       ├── Stores/            # UsageStore
-│       │   └── Services/
-│       │       ├── Clock/     # TestClock (test support)
-│       │       └── Loading/   # LoadTrace, UsageDataLoader
-│       ├── MenuBar/           # Menu bar views
-│       ├── MainWindow/        # Main window views
-│       ├── Shared/            # Shared components
-│       └── Settings/          # User preferences
-│
-└── ScreenshotKit/             # Utility (standalone)
+└── ScreenshotKit/              # Utility (standalone)
 ```
 
 ## Data Flow
@@ -123,8 +128,8 @@ Packages/
 
 ## Dependency Rules
 
-| Layer | Can Depend On |
-|-------|---------------|
+| Target | Can Depend On |
+|--------|---------------|
 | **Core** | Nothing (pure Swift) |
 | **Data** | Core |
 | **UI** | Core, Data |
@@ -138,3 +143,10 @@ Packages/
 - **Factory Pattern**: `RefreshCoordinatorFactory` assembles monitor configurations
 - **Protocol-Oriented**: `UsageDataSource`, `SessionDataSource`, `RefreshMonitor`, `ClockProtocol`, `LoadTracing`
 - **Descriptor Pattern (OCP)**: `RefreshReason`, `Destination`, `MenuButtonStyle` for extensibility
+
+## Benefits of Single Package
+
+- **File structure mirrors layer architecture**: Sources/Core, Sources/Data, Sources/UI
+- **Single Package.swift enforces dependencies**: Compiler prevents illegal cross-layer imports
+- **Simpler navigation**: Clear layer boundaries at directory level
+- **Unified versioning**: All layers evolve together

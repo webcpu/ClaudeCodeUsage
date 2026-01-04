@@ -222,9 +222,7 @@
 			mainGroup = ECF410222F03E6AD00DFC0C8;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				ECF4108B2F03EC6700DFC0C8 /* XCLocalSwiftPackageReference "Packages/ClaudeUsageCore" */,
-				ECF4108E2F03EC7800DFC0C8 /* XCLocalSwiftPackageReference "Packages/ClaudeUsageData" */,
-				ECF412B52F03F5BB00DFC0C8 /* XCLocalSwiftPackageReference "Packages/ClaudeUsageUI" */,
+				ECF4108B2F03EC6700DFC0C8 /* XCLocalSwiftPackageReference "Packages/ClaudeUsage" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = ECF4102C2F03E6AD00DFC0C8 /* Products */;
@@ -610,47 +608,46 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		ECF4108B2F03EC6700DFC0C8 /* XCLocalSwiftPackageReference "Packages/ClaudeUsageCore" */ = {
+		ECF4108B2F03EC6700DFC0C8 /* XCLocalSwiftPackageReference "Packages/ClaudeUsage" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = Packages/ClaudeUsageCore;
-		};
-		ECF4108E2F03EC7800DFC0C8 /* XCLocalSwiftPackageReference "Packages/ClaudeUsageData" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = Packages/ClaudeUsageData;
-		};
-		ECF412B52F03F5BB00DFC0C8 /* XCLocalSwiftPackageReference "Packages/ClaudeUsageUI" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = Packages/ClaudeUsageUI;
+			relativePath = Packages/ClaudeUsage;
 		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
 		ECF410562F03E6FD00DFC0C8 /* ClaudeUsageCore */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = ECF4108B2F03EC6700DFC0C8 /* XCLocalSwiftPackageReference "Packages/ClaudeUsage" */;
 			productName = ClaudeUsageCore;
 		};
 		ECF410582F03E6FD00DFC0C8 /* ClaudeUsageData */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = ECF4108B2F03EC6700DFC0C8 /* XCLocalSwiftPackageReference "Packages/ClaudeUsage" */;
 			productName = ClaudeUsageData;
 		};
 		ECF4105B2F03EA3E00DFC0C8 /* ClaudeUsageCore */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = ECF4108B2F03EC6700DFC0C8 /* XCLocalSwiftPackageReference "Packages/ClaudeUsage" */;
 			productName = ClaudeUsageCore;
 		};
 		ECF4105E2F03EA5900DFC0C8 /* ClaudeUsageData */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = ECF4108B2F03EC6700DFC0C8 /* XCLocalSwiftPackageReference "Packages/ClaudeUsage" */;
 			productName = ClaudeUsageData;
 		};
 		ECF4108C2F03EC6700DFC0C8 /* ClaudeUsageCore */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = ECF4108B2F03EC6700DFC0C8 /* XCLocalSwiftPackageReference "Packages/ClaudeUsage" */;
 			productName = ClaudeUsageCore;
 		};
 		ECF4108F2F03EC7800DFC0C8 /* ClaudeUsageData */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = ECF4108B2F03EC6700DFC0C8 /* XCLocalSwiftPackageReference "Packages/ClaudeUsage" */;
 			productName = ClaudeUsageData;
 		};
 		ECF412B62F03F5BB00DFC0C8 /* ClaudeUsageUI */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = ECF4108B2F03EC6700DFC0C8 /* XCLocalSwiftPackageReference "Packages/ClaudeUsage" */;
 			productName = ClaudeUsageUI;
 		};
 /* End XCSwiftPackageProductDependency section */
