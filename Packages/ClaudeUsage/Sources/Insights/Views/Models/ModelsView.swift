@@ -203,5 +203,3 @@ private enum ModelColorRegistry {
         mappings.first { modelName.contains($0.pattern) }?.color ?? .gray
     }
 }
-
-// ModelNameFormatter is now provided by ClaudeUsageCore

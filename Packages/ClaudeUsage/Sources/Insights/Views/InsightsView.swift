@@ -144,11 +144,6 @@ private struct DestinationDescriptor {
             icon: "chart.line.uptrend.xyaxis",
             viewBuilder: { AnyView(OverviewView()) }
         ),
-//        .models: DestinationDescriptor(
-//            title: "Models",
-//            icon: "cpu",
-//            viewBuilder: { AnyView(ModelsView()) }
-//        ),
         .dailyUsage: DestinationDescriptor(
             title: "Daily Usage",
             icon: "calendar",
@@ -158,12 +153,7 @@ private struct DestinationDescriptor {
             title: "Analytics",
             icon: "chart.bar.xaxis",
             viewBuilder: { AnyView(AnalyticsView()) }
-        ),
-//        .liveMetrics: DestinationDescriptor(
-//            title: "Live Metrics",
-//            icon: "arrow.triangle.2.circlepath",
-//            viewBuilder: { AnyView(GlanceView(viewMode: .liveMetrics)) }
-//        )
+        )
     ]
 }
 
