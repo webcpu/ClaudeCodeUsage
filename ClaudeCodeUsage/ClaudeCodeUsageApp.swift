@@ -21,7 +21,8 @@ struct ClaudeCodeUsageApp: App {
     private var mainWindow: some Scene {
         Window(AppMetadata.name, id: "main") {
             MainView()
-                .environment(env.store)
+                .environment(env.analyticsStore)
+                .environment(env.sessionStore)
                 .environment(env.settings)
         }
         .defaultLaunchBehavior(.suppressed)

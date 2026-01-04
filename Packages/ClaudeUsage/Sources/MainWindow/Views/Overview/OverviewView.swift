@@ -6,7 +6,7 @@
 import SwiftUI
 
 struct OverviewView: View {
-    @Environment(UsageStore.self) private var store
+    @Environment(AnalyticsStore.self) private var store
 
     var body: some View {
         CaptureCompatibleScrollView {
@@ -24,7 +24,7 @@ private enum ContentState {
     case loaded(UsageStats)
     case error
 
-    static func from(store: UsageStore) -> ContentState {
+    static func from(store: AnalyticsStore) -> ContentState {
         if store.isLoading { return .loading }
         guard let stats = store.stats else { return .error }
         return .loaded(stats)

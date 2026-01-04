@@ -28,14 +28,14 @@ public struct MenuBarScene: Scene {
 
     private var menuContent: some View {
         MenuBarContentView()
-            .environment(env.store)
+            .environment(env.sessionStore)
             .environment(env.settings)
     }
 
     private var menuLabel: some View {
-        MenuBarLabel(store: env.store)
-            .id(env.store.formattedTodaysCost)
-            .environment(env.store)
+        MenuBarLabel(store: env.sessionStore)
+            .id(env.sessionStore.formattedTodaysCost)
+            .environment(env.sessionStore)
             .environment(env.settings)
             .task { await initializeOnce() }
             .contextMenu { contextMenu }
@@ -43,22 +43,22 @@ public struct MenuBarScene: Scene {
 
     private var contextMenu: some View {
         MenuBarContextMenu()
-            .environment(env.store)
+            .environment(env.sessionStore)
             .environment(env.settings)
     }
 
     private func initializeOnce() async {
         guard !hasInitialized else { return }
         hasInitialized = true
-        lifecycleManager.configure(with: env.store)
-        await env.store.initializeIfNeeded()
+        lifecycleManager.configure(with: env.sessionStore)
+        await env.sessionStore.initializeIfNeeded()
     }
 }
 
 // MARK: - Menu Bar Label
 
 struct MenuBarLabel: View {
-    @Bindable var store: UsageStore
+    @Bindable var store: SessionStore
 
     var body: some View {
         HStack(spacing: 4) {
@@ -85,7 +85,7 @@ struct MenuBarLabel: View {
 // MARK: - Menu Bar Context Menu
 
 struct MenuBarContextMenu: View {
-    @Environment(UsageStore.self) private var store
+    @Environment(SessionStore.self) private var store
 
     var body: some View {
         Group {
@@ -153,22 +153,17 @@ enum MenuBarAppearanceRegistry {
     )
 
     /// Selects the appropriate appearance configuration based on store state.
-    static func select(from store: UsageStore) -> MenuBarAppearanceConfig {
+    static func select(from store: SessionStore) -> MenuBarAppearanceConfig {
         if store.hasActiveSession { return active }
-        if store.isOverBudget { return warning }
         return normal
     }
 }
 
-// MARK: - UsageStore Appearance Helpers
+// MARK: - SessionStore Appearance Helpers
 
-extension UsageStore {
+extension SessionStore {
     var hasActiveSession: Bool {
         activeSession?.isActive == true
-    }
-
-    var isOverBudget: Bool {
-        todaysCost > dailyCostThreshold
     }
 }
 
@@ -176,7 +171,7 @@ extension UsageStore {
 
 #if DEBUG
 private struct MenuBarLabelPreview: View {
-    @Environment(UsageStore.self) private var store
+    @Environment(SessionStore.self) private var store
 
     var body: some View {
         MenuBarLabel(store: store)

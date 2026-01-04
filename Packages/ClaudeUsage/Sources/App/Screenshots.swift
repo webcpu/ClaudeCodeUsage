@@ -31,11 +31,12 @@ public struct Screenshots: ScreenshotProvider {
 
     public static func makeEnvironment() async throws -> Environment {
         let env = AppEnvironment.live()
-        await env.store.loadData()
+        await env.sessionStore.loadData()
+        await env.analyticsStore.loadData()
 
         // Wait for data to load (max 5 seconds)
         for _ in 0..<50 {
-            if env.store.state.hasLoaded { return env }
+            if !env.sessionStore.isLoading && !env.analyticsStore.isLoading { return env }
             try await Task.sleep(for: .milliseconds(100))
         }
 
@@ -55,7 +56,8 @@ private func screenshot<V: View>(
     .init(name: name, width: width, height: height) { env in
         AnyView(
             view()
-                .environment(env.store)
+                .environment(env.sessionStore)
+                .environment(env.analyticsStore)
                 .environment(env.settings)
                 .environment(\.isCaptureMode, true)
         )

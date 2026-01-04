@@ -1,15 +1,18 @@
 # Software Architecture
 
-## Vertical Slice Architecture
+## Two-Store Architecture
 
-The codebase uses **vertical slices** where MainWindow is a pure presentation layer and MenuBar owns the data pipeline.
+The codebase uses **two independent stores** for clean separation:
+- **AnalyticsStore** (MainWindow) - Historical usage analytics
+- **SessionStore** (MenuBar) - Live session monitoring
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                            App                                   │
 │  ┌───────────────────────────────────────────────────────────┐  │
 │  │  AppEnvironment (DI)                                      │  │
-│  │  Screenshots                                              │  │
+│  │  App/Domain (UsageEntry, TokenCounts)                     │  │
+│  │  App/Loading (Repository, Parser, Monitor)                │  │
 │  └───────────────────────────────────────────────────────────┘  │
 └──────────────────────────────┬──────────────────────────────────┘
                                │
@@ -20,30 +23,25 @@ The codebase uses **vertical slices** where MainWindow is a pure presentation la
 │        MainWindow           │   │          MenuBar            │
 │    (Analytics Dashboard)    │   │    (Live Session Monitor)   │
 ├─────────────────────────────┤   ├─────────────────────────────┤
-│ Views only                  │   │ Stores (shared via Env)     │
-│  MainView                   │   │  UsageStore                 │
-│  Overview/                  │   │  Loading/                   │
+│ Stores/                     │   │ Stores/                     │
+│  AnalyticsStore             │   │  SessionStore               │
+├─────────────────────────────┤   ├─────────────────────────────┤
+│ Domain/                     │   │ Domain/                     │
+│  UsageStats                 │   │  SessionBlock               │
+│  UsageAggregator            │   │  BurnRate                   │
+│  UsageAnalytics             │   │  RefreshMonitor             │
+│  PricingCalculator          │   │  RefreshReason              │
+├─────────────────────────────┤   ├─────────────────────────────┤
+│ Views/                      │   │ Infrastructure/             │
+│  Overview/                  │   │  Clock/, Settings/          │
 │  Models/                    │   ├─────────────────────────────┤
-│  Daily/                     │   │ Infrastructure              │
-│  Heatmap/                   │   │  Clock/, Settings/          │
-│  Cards/                     │   │  AppConfiguration           │
-│  Components/                │   ├─────────────────────────────┤
-│                             │   │ Domain                      │
-│                             │   │  UsageEntry, TokenCounts    │
-│                             │   │  SessionBlock, BurnRate     │
-│                             │   │  UsageAggregator, etc.      │
+│  Daily/                     │   │ Data/                       │
+│  Heatmap/                   │   │  SessionMonitor             │
+│  Cards/                     │   │  Refresh/                   │
 │                             │   ├─────────────────────────────┤
-│                             │   │ Data                        │
-│                             │   │  UsageRepository            │
-│                             │   │  FileDiscovery, JSONLParser │
-│                             │   │  SessionMonitor             │
-│                             │   │  DirectoryMonitor           │
-│                             │   │  Refresh/*                  │
-│                             │   ├─────────────────────────────┤
-│                             │   │ Views                       │
-│                             │   │  MenuBarScene               │
-│                             │   │  MenuBarContentView         │
-│                             │   │  Sections/, Components/     │
+│                             │   │ Views/                      │
+│                             │   │  Sections/                  │
+│                             │   │  Components/                │
 └─────────────────────────────┘   └─────────────────────────────┘
 ```
 
@@ -51,65 +49,61 @@ The codebase uses **vertical slices** where MainWindow is a pure presentation la
 
 ```
 Packages/ClaudeUsage/Sources/
-├── App/                          # Minimal composition root
-│   ├── AppEnvironment.swift      # DI container
+├── App/                          # Shared composition root
+│   ├── AppEnvironment.swift      # DI container (both stores)
 │   ├── AppEnvironment+Preview.swift
-│   ├── Screenshots.swift         # Screenshot capture support
+│   ├── Screenshots.swift
 │   ├── Previews.swift
-│   └── AppLifecycleManager.swift
+│   ├── Domain/                   # Shared data types
+│   │   ├── UsageEntry.swift
+│   │   ├── TokenCounts.swift
+│   │   └── Composition.swift
+│   └── Loading/                  # Shared data loading
+│       ├── FileDiscovery.swift
+│       ├── JSONLParser.swift
+│       ├── UsageRepository.swift
+│       └── DirectoryMonitor.swift
 │
-├── MainWindow/                   # Pure presentation layer
+├── MainWindow/                   # Analytics vertical slice
+│   ├── Domain/                   # Analytics domain
+│   │   ├── UsageStats.swift
+│   │   ├── UsageAggregator.swift
+│   │   ├── UsageAnalytics.swift
+│   │   └── PricingCalculator.swift
+│   ├── Stores/
+│   │   └── AnalyticsStore.swift  # Owns historical stats
 │   └── Views/
 │       ├── MainView.swift
 │       ├── AnalyticsView.swift
-│       ├── ContentStateRouter.swift
-│       ├── EmptyStateView.swift
-│       ├── Components/           # CaptureCompatibleScrollView
-│       ├── Overview/             # OverviewView, MetricCard
-│       ├── Models/               # ModelsView
-│       ├── Daily/                # DailyUsageView, Charts/
-│       ├── Cards/                # Analytics cards
-│       └── Heatmap/              # YearlyCostHeatmap + subfolders
+│       ├── Overview/
+│       ├── Models/
+│       ├── Daily/
+│       ├── Heatmap/
+│       └── Cards/
 │
-└── MenuBar/                      # Full vertical slice (owns data pipeline)
-    ├── Infrastructure/           # Cross-cutting concerns
-    │   ├── Clock/                # ClockProtocol, SystemClock
-    │   ├── Settings/             # AppSettingsService, OpenAtLoginToggle
-    │   └── AppConfiguration.swift
-    ├── Stores/                   # Central state (shared via Environment)
-    │   ├── UsageStore.swift
-    │   └── Loading/              # UsageDataLoader, LoadTrace, TestClock
-    ├── Domain/                   # All domain models
-    │   ├── UsageEntry.swift
-    │   ├── TokenCounts.swift
-    │   ├── Composition.swift
+└── MenuBar/                      # Monitoring vertical slice
+    ├── AppLifecycleManager.swift # Lifecycle handling for SessionStore
+    ├── Domain/                   # Session domain
     │   ├── SessionBlock.swift
     │   ├── BurnRate.swift
-    │   ├── UsageStats.swift
-    │   ├── UsageAggregator.swift
-    │   ├── UsageAnalytics.swift
-    │   ├── PricingCalculator.swift
     │   ├── RefreshMonitor.swift
     │   ├── RefreshReason.swift
     │   └── UsageDataSource.swift
-    ├── Data/                     # All data access
-    │   ├── UsageRepository.swift
-    │   ├── FileDiscovery.swift
-    │   ├── JSONLParser.swift
+    ├── Infrastructure/
+    │   ├── Clock/
+    │   ├── Settings/
+    │   └── AppConfiguration.swift
+    ├── Stores/
+    │   ├── SessionStore.swift    # Owns live session
+    │   └── Loading/
+    ├── Data/
     │   ├── SessionMonitor.swift
-    │   ├── DirectoryMonitor.swift
     │   └── Refresh/
-    │       ├── RefreshCoordinator.swift
-    │       ├── RefreshCoordinatorFactory.swift
-    │       ├── RefreshConfig.swift
-    │       └── Monitors/
     └── Views/
         ├── MenuBarScene.swift
         ├── MenuBarContentView.swift
         ├── Sections/
         ├── Components/
-        ├── SessionMetrics/
-        ├── Helpers/
         └── Theme/
 ```
 
@@ -118,90 +112,64 @@ Packages/ClaudeUsage/Sources/
 ```
 ~/.claude/projects/*.jsonl
          │
-         ▼
-┌─────────────────────────────┐
-│  DirectoryMonitor           │  FSEvents (MenuBar/Data)
-└─────────────┬───────────────┘
-              │
-┌─────────────▼───────────────┐
-│ RefreshCoordinator          │  Coordinates refresh triggers
-│  ├─ FileChangeMonitor       │  (MenuBar/Data/Refresh)
-│  ├─ DayChangeMonitor        │
-│  ├─ WakeMonitor             │
-│  └─ FallbackTimer           │
-└─────────────┬───────────────┘
-              │ closure callback
-┌─────────────▼───────────────┐
-│    UsageStore               │  @Observable (MenuBar/Stores)
-└─────────────┬───────────────┘
-              │
-┌─────────────▼───────────────┐
-│  UsageDataLoader            │  Orchestrates loading
-└─────────────┬───────────────┘
-              │
-    ┌─────────┴─────────┐
-    │                   │
-    ▼                   ▼
-┌────────────────┐  ┌────────────────┐
-│UsageRepository │  │ SessionMonitor │
-│(MenuBar/Data)  │  │(MenuBar/Data)  │
-└────────────────┘  └────────────────┘
-              │
-              ▼
-┌─────────────────────────────┐
-│   MenuBar/Domain Models     │
-│   UsageEntry, TokenCounts   │
-└─────────────────────────────┘
-              │
-       ┌──────┴──────┐
-       ▼             ▼
-  MainWindow      MenuBar
-    Views          Views
+         ├─────────────────────────────────┐
+         │                                 │
+         ▼                                 ▼
+┌─────────────────────┐         ┌─────────────────────┐
+│   AnalyticsStore    │         │    SessionStore     │
+│   (MainWindow)      │         │    (MenuBar)        │
+├─────────────────────┤         ├─────────────────────┤
+│ Subscribes to       │         │ Subscribes to       │
+│ DirectoryMonitor    │         │ RefreshCoordinator  │
+├─────────────────────┤         ├─────────────────────┤
+│ Loads via           │         │ Loads via           │
+│ UsageRepository     │         │ UsageRepository +   │
+│                     │         │ SessionMonitor      │
+├─────────────────────┤         ├─────────────────────┤
+│ Transforms to       │         │ Transforms to       │
+│ UsageStats          │         │ SessionBlock        │
+│ (historical)        │         │ (live)              │
+└─────────┬───────────┘         └─────────┬───────────┘
+          │                               │
+          ▼                               ▼
+    MainWindow                        MenuBar
+      Views                            Views
 ```
 
 ## Design Principles
 
-### MainWindow = Pure Presentation
+### Independent Stores
 
-MainWindow contains only Views - no Domain or Data layers:
-- Reads from UsageStore (injected via Environment)
-- Contains view-specific logic in Heatmap/Stores (HeatmapStore)
-- No direct data access - all data comes through UsageStore
+Each store is fully independent:
+- **AnalyticsStore**: Loads historical stats, subscribed to DirectoryMonitor
+- **SessionStore**: Loads live session, subscribed to RefreshCoordinator
 
-### MenuBar = Full Vertical Slice
+Neither store depends on the other. They share the data loading layer
+(App/Loading) but load and transform data independently.
 
-MenuBar owns the complete data pipeline:
-- **Infrastructure**: Clock, Settings, AppConfiguration
-- **Stores**: UsageStore (shared via Environment)
-- **Domain**: All domain models (UsageEntry, TokenCounts, etc.)
-- **Data**: Repository, parsers, monitors, refresh coordination
-- **Views**: Menu bar UI
+### Domain Ownership
 
-### App/ = Minimal Composition Root
+Each vertical slice owns its domain:
+- **MainWindow/Domain**: Analytics types (UsageStats, UsageAggregator)
+- **MenuBar/Domain**: Session types (SessionBlock, BurnRate)
+- **App/Domain**: Shared types (UsageEntry, TokenCounts)
 
-App/ contains only what's truly shared:
-- **AppEnvironment**: DI container that wires dependencies
-- **Screenshots**: Bridges both slices for screenshot capture
-- **Previews**: SwiftUI preview support
+Reading a Domain folder tells you what that slice does.
 
 ### Clear Dependency Direction
 
 ```
-MainWindow ──► Environment ◄── MenuBar
-                   │
-                   ▼
-              UsageStore
-           (owned by MenuBar)
+MainWindow ──┐
+             ├──► App (shared domain + loading)
+MenuBar ─────┘
 ```
 
-MainWindow and MenuBar never depend on each other directly.
-They share state through SwiftUI Environment.
+Both vertical slices depend on App/, but never on each other.
 
 ## Key Design Patterns
 
-- **Repository Pattern**: UsageRepository, SessionMonitor abstract data access
+- **Repository Pattern**: UsageRepository abstracts data access
 - **Actor Concurrency**: Thread-safe state with actors
-- **@Observable**: Modern SwiftUI state management in UsageStore
+- **@Observable**: Modern SwiftUI state management
 - **Factory Pattern**: RefreshCoordinatorFactory assembles monitors
-- **Descriptor Pattern (OCP)**: RefreshReason, MenuButtonStyle for extensibility
-- **Environment Injection**: UsageStore shared via SwiftUI @Environment
+- **Environment Injection**: Both stores shared via SwiftUI @Environment

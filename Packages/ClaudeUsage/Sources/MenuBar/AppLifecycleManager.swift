@@ -11,13 +11,13 @@ import Combine
 @MainActor
 public final class AppLifecycleManager {
     private var cancellables = Set<AnyCancellable>()
-    private weak var store: UsageStore?
+    private weak var store: SessionStore?
 
     public init() {
         setupNotificationHandlers()
     }
 
-    public func configure(with store: UsageStore) {
+    public func configure(with store: SessionStore) {
         self.store = store
     }
     

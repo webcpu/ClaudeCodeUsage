@@ -2,7 +2,7 @@ import SwiftUI
 import Charts
 
 struct CostMetricsSection: View {
-    @Environment(UsageStore.self) private var store
+    @Environment(SessionStore.self) private var store
 
     @State private var cachedTodaysCostColor: Color = MenuBarTheme.Colors.Status.normal
     @State private var lastCostProgress: Double = 0
@@ -10,31 +10,12 @@ struct CostMetricsSection: View {
     var body: some View {
         VStack(spacing: MenuBarTheme.Layout.sectionSpacing) {
             todaysCostView
-            summaryStatsViewIfAvailable
-        }
-        .onChange(of: store.todaysCostProgress) { oldValue, newValue in
-            updateCostColorIfChanged(oldValue: oldValue, newValue: newValue)
         }
         .onAppear(perform: initializeCachedValues)
     }
 
-    private var summaryStatsViewIfAvailable: some View {
-        Group {
-            if let stats = store.stats {
-                summaryStatsView(stats)
-            }
-        }
-    }
-
-    private func updateCostColorIfChanged(oldValue: Double, newValue: Double) {
-        guard abs(oldValue - newValue) > 0.01 else { return }
-        cachedTodaysCostColor = ColorService.colorForCostProgress(newValue)
-        lastCostProgress = newValue
-    }
-
     private func initializeCachedValues() {
-        cachedTodaysCostColor = ColorService.colorForCostProgress(store.todaysCostProgress)
-        lastCostProgress = store.todaysCostProgress
+        cachedTodaysCostColor = MenuBarTheme.Colors.Status.normal
     }
 }
 
@@ -61,24 +42,12 @@ private extension CostMetricsSection {
     }
 
     var costValueWithWarning: some View {
-        HStack(spacing: 4) {
-            Text(store.formattedTodaysCost)
-                .font(MenuBarTheme.Typography.metricValue)
-                .foregroundColor(cachedTodaysCostColor)
-                .monospacedDigit()
-                .lineLimit(1)
-                .fixedSize(horizontal: true, vertical: false)
-            budgetExceededWarningIfNeeded
-        }
-    }
-
-    @ViewBuilder
-    var budgetExceededWarningIfNeeded: some View {
-        if store.todaysCostProgress > 1.0 {
-            Image(systemName: "flame.fill")
-                .font(MenuBarTheme.Typography.warningIcon)
-                .foregroundColor(MenuBarTheme.Colors.Status.critical)
-        }
+        Text(store.formattedTodaysCost)
+            .font(MenuBarTheme.Typography.metricValue)
+            .foregroundColor(cachedTodaysCostColor)
+            .monospacedDigit()
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
     }
 
     @ViewBuilder
@@ -89,40 +58,6 @@ private extension CostMetricsSection {
     }
 }
 
-// MARK: - Summary Stats View
-
-private extension CostMetricsSection {
-    func summaryStatsView(_ stats: UsageStats) -> some View {
-        HStack {
-            totalCostStat(stats)
-            Spacer()
-            dailyAverageStat
-        }
-        .padding(.bottom, MenuBarTheme.Layout.verticalPadding)
-    }
-
-    func totalCostStat(_ stats: UsageStats) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text("Total")
-                .font(MenuBarTheme.Typography.summaryLabel)
-                .foregroundColor(MenuBarTheme.Colors.UI.secondaryText)
-            Text(stats.totalCost.asCurrency)
-                .font(MenuBarTheme.Typography.summaryValue)
-                .monospacedDigit()
-        }
-    }
-
-    var dailyAverageStat: some View {
-        VStack(alignment: .trailing, spacing: 2) {
-            Text("7d Avg")
-                .font(MenuBarTheme.Typography.summaryLabel)
-                .foregroundColor(MenuBarTheme.Colors.UI.secondaryText)
-            Text(FormatterService.formatDailyAverage(store.averageDailyCost))
-                .font(MenuBarTheme.Typography.summaryValue)
-                .monospacedDigit()
-        }
-    }
-}
 
 // MARK: - Y-Axis Labels Component
 

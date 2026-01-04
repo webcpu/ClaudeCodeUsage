@@ -7,7 +7,7 @@ import SwiftUI
 
 // MARK: - Main Menu Bar Content View
 struct MenuBarContentView: View {
-    @Environment(UsageStore.self) private var store
+    @Environment(SessionStore.self) private var store
     @Environment(AppSettingsService.self) private var settings
     @FocusState private var focusedField: FocusField?
     let viewMode: MenuBarViewMode
@@ -20,7 +20,7 @@ struct MenuBarContentView: View {
     init(viewMode: MenuBarViewMode = .menuBar) {
         self.viewMode = viewMode
     }
-    
+
     var body: some View {
         VStack(spacing: 0) {
             liveSessionSection

@@ -6,7 +6,7 @@
 import SwiftUI
 
 struct ModelsView: View {
-    @Environment(UsageStore.self) private var store
+    @Environment(AnalyticsStore.self) private var store
 
     var body: some View {
         CaptureCompatibleScrollView {
@@ -22,7 +22,7 @@ struct ModelsView: View {
         .frame(minWidth: 600, idealWidth: 840)
     }
 
-    private func contentState(from store: UsageStore) -> RoutableState<ModelsData> {
+    private func contentState(from store: AnalyticsStore) -> RoutableState<ModelsData> {
         if store.isLoading { return .loading }
         guard let stats = store.stats else { return .error }
         let sortedModels = stats.byModel.sorted { $0.totalCost > $1.totalCost }

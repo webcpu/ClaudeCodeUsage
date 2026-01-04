@@ -6,7 +6,7 @@
 import SwiftUI
 
 struct SessionMetricsSection: View {
-    @Environment(UsageStore.self) private var store
+    @Environment(SessionStore.self) private var store
 
     var body: some View {
         VStack(spacing: MenuBarTheme.Layout.sectionSpacing) {

@@ -6,21 +6,19 @@
 import SwiftUI
 
 struct UsageMetricsSection: View {
-    @Environment(UsageStore.self) private var store
+    @Environment(SessionStore.self) private var store
 
     var body: some View {
         VStack(spacing: MenuBarTheme.Layout.sectionSpacing) {
-            if store.stats != nil {
-                // Token usage - show raw count only (no fake percentage)
-                // Claude's actual rate limit is not exposed in usage data
-                if let session = store.activeSession {
-                    TokenDisplay(tokens: session.tokens.total)
-                }
+            // Token usage - show raw count only (no fake percentage)
+            // Claude's actual rate limit is not exposed in usage data
+            if let session = store.activeSession {
+                TokenDisplay(tokens: session.tokens.total)
+            }
 
-                // Burn rate
-                if let burnRate = store.burnRate {
-                    burnRateView(burnRate)
-                }
+            // Burn rate
+            if let burnRate = store.burnRate {
+                burnRateView(burnRate)
             }
         }
     }

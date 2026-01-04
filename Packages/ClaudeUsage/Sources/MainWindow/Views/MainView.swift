@@ -13,7 +13,7 @@ public extension Notification.Name {
 
 // MARK: - Main View
 public struct MainView: View {
-    @Environment(UsageStore.self) private var store
+    @Environment(AnalyticsStore.self) private var analyticsStore
     @State private var selectedDestination: Destination?
 
     public init(initialDestination: Destination = .overview) {
@@ -23,9 +23,9 @@ public struct MainView: View {
     public var body: some View {
         NavigationContent(
             selectedDestination: $selectedDestination,
-            store: store
+            analyticsStore: analyticsStore
         )
-        .task { await store.initializeIfNeeded() }
+        .task { await analyticsStore.initializeIfNeeded() }
     }
 }
 
@@ -33,7 +33,7 @@ public struct MainView: View {
 private struct NavigationContent: View {
     @Binding var selectedDestination: Destination?
     @Environment(\.isCaptureMode) private var isCaptureMode
-    let store: UsageStore
+    let analyticsStore: AnalyticsStore
 
     var body: some View {
         if isCaptureMode {
@@ -47,11 +47,11 @@ private struct NavigationContent: View {
         NavigationSplitView {
             Sidebar(selectedDestination: $selectedDestination)
         } detail: {
-            DetailView(destination: selectedDestination ?? .overview, store: store)
+            DetailView(destination: selectedDestination ?? .overview, analyticsStore: analyticsStore)
         }
         .onReceive(NotificationCenter.default.publisher(for: .refreshData)) { _ in
             Task {
-                await store.loadData()
+                await analyticsStore.loadData()
             }
         }
     }
@@ -60,7 +60,7 @@ private struct NavigationContent: View {
         HStack(spacing: 0) {
             StaticSidebar(selectedDestination: selectedDestination ?? .overview)
             Divider()
-            DetailView(destination: selectedDestination ?? .overview, store: store)
+            DetailView(destination: selectedDestination ?? .overview, analyticsStore: analyticsStore)
         }
     }
 }
@@ -119,11 +119,11 @@ private struct Sidebar: View {
 // MARK: - Detail View
 private struct DetailView: View {
     let destination: Destination
-    let store: UsageStore
+    let analyticsStore: AnalyticsStore
 
     var body: some View {
         destination.makeView()
-            .environment(store)
+            .environment(analyticsStore)
             .frame(minWidth: 700)
     }
 }
