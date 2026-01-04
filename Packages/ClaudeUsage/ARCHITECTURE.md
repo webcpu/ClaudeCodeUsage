@@ -33,15 +33,15 @@ The codebase uses **two independent stores** for clean separation:
 │  PricingCalculator          │   │  RefreshReason              │
 ├─────────────────────────────┤   ├─────────────────────────────┤
 │ Views/                      │   │ Infrastructure/             │
-│  Overview/                  │   │  Clock/, Settings/          │
-│  Models/                    │   ├─────────────────────────────┤
-│  Daily/                     │   │ Data/                       │
-│  Heatmap/                   │   │  SessionMonitor             │
-│  Cards/                     │   │  Refresh/                   │
-│                             │   ├─────────────────────────────┤
-│                             │   │ Views/                      │
-│                             │   │  Sections/                  │
-│                             │   │  Components/                │
+│  InsightsView               │   │  Clock/, Settings/          │
+│  Overview/                  │   ├─────────────────────────────┤
+│  Models/                    │   │ Data/                       │
+│  Daily/                     │   │  SessionMonitor, Refresh/   │
+│  Heatmap/                   │   ├─────────────────────────────┤
+│  Cards/                     │   │ Views/                      │
+│                             │   │  GlanceScene, GlanceView    │
+│                             │   │  Sections/, Components/     │
+│                             │   │  Theme/ (GlanceTheme)       │
 └─────────────────────────────┘   └─────────────────────────────┘
 ```
 
@@ -73,13 +73,13 @@ Packages/ClaudeUsage/Sources/
 │   ├── Stores/
 │   │   └── InsightsStore.swift   # Owns historical stats
 │   └── Views/
-│       ├── InsightsView.swift
+│       ├── InsightsView.swift    # Main navigation view
 │       ├── AnalyticsView.swift
-│       ├── Overview/
-│       ├── Models/
-│       ├── Daily/
-│       ├── Heatmap/
-│       └── Cards/
+│       ├── Overview/             # OverviewView, MetricCard
+│       ├── Models/               # ModelsView
+│       ├── Daily/                # DailyUsageView, Charts/
+│       ├── Heatmap/              # YearlyCostHeatmap, Grid/, Legend/, etc.
+│       └── Cards/                # Analytics cards
 │
 └── Glance/                       # Quick check vertical slice
     ├── AppLifecycleManager.swift # Lifecycle handling for GlanceStore
@@ -90,21 +90,23 @@ Packages/ClaudeUsage/Sources/
     │   ├── RefreshReason.swift
     │   └── UsageDataSource.swift
     ├── Infrastructure/
-    │   ├── Clock/
-    │   ├── Settings/
+    │   ├── Clock/                # ClockProtocol, SystemClock
+    │   ├── Settings/             # AppSettingsService, OpenAtLoginToggle
     │   └── AppConfiguration.swift
     ├── Stores/
     │   ├── GlanceStore.swift     # Owns live session
-    │   └── Loading/
+    │   └── Loading/              # UsageDataLoader, LoadTrace
     ├── Data/
     │   ├── SessionMonitor.swift
-    │   └── Refresh/
+    │   └── Refresh/              # RefreshCoordinator, Monitors/
     └── Views/
-        ├── GlanceScene.swift
-        ├── GlanceView.swift
-        ├── Sections/
-        ├── Components/
-        └── Theme/
+        ├── GlanceScene.swift     # Menu bar scene entry point
+        ├── GlanceView.swift      # Main menu bar content view
+        ├── Sections/             # CostMetricsSection, UsageMetricsSection
+        ├── SessionMetrics/       # SessionMetricsSection
+        ├── Components/           # ActionButtons, GraphView, MetricRow, etc.
+        ├── Helpers/              # ColorService, FormatterService
+        └── Theme/                # GlanceTheme, GlanceStyles
 ```
 
 ## Data Flow
@@ -142,9 +144,9 @@ The module names reflect user intent:
 - **Insights** = "I want to analyze my usage" (deep analysis, open the window)
 - **Glance** = "I want to check my session" (quick look, menu bar)
 
-The stores match their modules:
-- **InsightsStore** provides data for deep analysis
-- **GlanceStore** provides data for quick glances
+All components are named consistently with their module:
+- **InsightsStore** + **InsightsView** for deep analysis
+- **GlanceStore** + **GlanceView** + **GlanceScene** + **GlanceTheme** for quick glances
 
 ## Design Principles
 
