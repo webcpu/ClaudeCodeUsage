@@ -16,7 +16,7 @@ struct SessionMetricsSection: View {
         }
     }
 
-    private func sessionTimeMetricRow(for session: SessionBlock) -> MetricRow {
+    private func sessionTimeMetricRow(for session: UsageSession) -> MetricRow {
         MetricRow(
             title: "Time",
             value: FormatterService.formatTimeInterval(

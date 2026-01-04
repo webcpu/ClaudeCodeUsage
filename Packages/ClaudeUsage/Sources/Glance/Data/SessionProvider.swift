@@ -21,7 +21,7 @@ public actor SessionProvider: SessionProviding {
     private var lastFileTimestamps: [String: Date] = [:]
     private var allEntries: [UsageEntry] = []
     private var cachedTokenLimit: Int = 0
-    private var cachedSession: (session: SessionBlock?, timestamp: Date)?
+    private var cachedSession: (session: UsageSession?, timestamp: Date)?
 
     // MARK: - Initialization
 
@@ -32,7 +32,7 @@ public actor SessionProvider: SessionProviding {
 
     // MARK: - SessionProviding
 
-    public func getActiveSession() async -> SessionBlock? {
+    public func getActiveSession() async -> UsageSession? {
         if let cached = cachedSession, isCacheValid(cached.timestamp) {
             return cached.session
         }
@@ -62,7 +62,7 @@ public actor SessionProvider: SessionProviding {
 
     // MARK: - Session Loading
 
-    private func loadActiveSession() -> SessionBlock? {
+    private func loadActiveSession() -> UsageSession? {
         loadModifiedFiles()
         let now = Date()
         let blocks = detector.detectSessions(from: allEntries, now: now)

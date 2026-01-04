@@ -21,21 +21,21 @@ public struct SessionDetector: Sendable {
     // MARK: - Public API
 
     /// Detects all session blocks from sorted usage entries.
-    public func detectSessions(from entries: [UsageEntry], now: Date) -> [SessionBlock] {
+    public func detectSessions(from entries: [UsageEntry], now: Date) -> [UsageSession] {
         guard !entries.isEmpty else { return [] }
         let groups = splitAtSessionGaps(entries)
         return mapGroupsToBlocks(groups, now: now)
     }
 
     /// Finds the most recent active session from detected blocks.
-    public func findActiveSession(in blocks: [SessionBlock]) -> SessionBlock? {
+    public func findActiveSession(in blocks: [UsageSession]) -> UsageSession? {
         blocks
             .filter(\.isActive)
             .max { ($0.actualEndTime ?? $0.startTime) < ($1.actualEndTime ?? $1.startTime) }
     }
 
     /// Returns max tokens from completed (inactive) sessions.
-    public func maxTokensFromCompletedSessions(_ blocks: [SessionBlock]) -> Int {
+    public func maxTokensFromCompletedSessions(_ blocks: [UsageSession]) -> Int {
         blocks
             .filter { !$0.isActive }
             .map(\.tokens.total)
@@ -73,7 +73,7 @@ private extension SessionDetector {
 // MARK: - Block Mapping
 
 private extension SessionDetector {
-    func mapGroupsToBlocks(_ groups: [[UsageEntry]], now: Date) -> [SessionBlock] {
+    func mapGroupsToBlocks(_ groups: [[UsageEntry]], now: Date) -> [UsageSession] {
         guard !groups.isEmpty else { return [] }
         let historicalBlocks = groups.dropLast().compactMap { createHistoricalBlock($0, now: now) }
         let finalBlock = groups.last.flatMap { createFinalBlock($0, now: now) }
@@ -81,13 +81,13 @@ private extension SessionDetector {
     }
 
     /// Historical blocks are always inactive - completed sessions.
-    func createHistoricalBlock(_ entries: [UsageEntry], now: Date) -> SessionBlock? {
+    func createHistoricalBlock(_ entries: [UsageEntry], now: Date) -> UsageSession? {
         guard let sessionStart = entries.first?.timestamp else { return nil }
         return createBlock(entries: entries, displayStartTime: sessionStart, isActive: false, now: now)
     }
 
     /// Final block may be active if recent activity detected.
-    func createFinalBlock(_ entries: [UsageEntry], now: Date) -> SessionBlock? {
+    func createFinalBlock(_ entries: [UsageEntry], now: Date) -> UsageSession? {
         guard let sessionStart = entries.first?.timestamp else { return nil }
         let isActive = hasRecentActivity(entries: entries, now: now)
         let displayTime = isActive
@@ -110,11 +110,10 @@ private extension SessionDetector {
         displayStartTime: Date,
         isActive: Bool,
         now: Date
-    ) -> SessionBlock? {
+    ) -> UsageSession? {
         guard !entries.isEmpty else { return nil }
 
-        return SessionBlock(
-            id: UUID().uuidString,
+        return UsageSession(
             startTime: displayStartTime,
             endTime: displayStartTime.addingTimeInterval(sessionDurationSeconds),
             actualEndTime: entries.last?.timestamp,

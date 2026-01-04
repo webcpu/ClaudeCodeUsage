@@ -1,16 +1,13 @@
 //
-//  SessionBlock.swift
-//  ClaudeUsageCore
-//
-//  Represents a continuous usage session with projections
+//  UsageSession.swift
+//  Represents a time-bounded usage period with token tracking
 //
 
 import Foundation
 
-// MARK: - SessionBlock
+// MARK: - UsageSession
 
-public struct SessionBlock: Sendable, Hashable, Identifiable {
-    public let id: String
+public struct UsageSession: Sendable, Hashable {
     public let startTime: Date
     public let endTime: Date
     public let actualEndTime: Date?
@@ -23,7 +20,6 @@ public struct SessionBlock: Sendable, Hashable, Identifiable {
     public let tokenLimit: Int?
 
     public init(
-        id: String,
         startTime: Date,
         endTime: Date,
         actualEndTime: Date? = nil,
@@ -35,7 +31,6 @@ public struct SessionBlock: Sendable, Hashable, Identifiable {
         burnRate: BurnRate,
         tokenLimit: Int? = nil
     ) {
-        self.id = id
         self.startTime = startTime
         self.endTime = endTime
         self.actualEndTime = actualEndTime
@@ -51,11 +46,10 @@ public struct SessionBlock: Sendable, Hashable, Identifiable {
 
 // MARK: - Transformations
 
-public extension SessionBlock {
+public extension UsageSession {
     /// Returns a copy with updated tokenLimit
-    func with(tokenLimit: Int?) -> SessionBlock {
-        SessionBlock(
-            id: id,
+    func with(tokenLimit: Int?) -> UsageSession {
+        UsageSession(
             startTime: startTime,
             endTime: endTime,
             actualEndTime: actualEndTime,
@@ -72,7 +66,7 @@ public extension SessionBlock {
 
 // MARK: - Derived Properties
 
-public extension SessionBlock {
+public extension UsageSession {
     var duration: TimeInterval {
         (actualEndTime ?? endTime).timeIntervalSince(startTime)
     }

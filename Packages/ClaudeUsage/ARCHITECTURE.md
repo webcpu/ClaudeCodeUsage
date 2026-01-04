@@ -27,7 +27,7 @@ The codebase uses **two independent stores** for clean separation:
 │  InsightsStore              │   │  GlanceStore, Loading/      │
 ├─────────────────────────────┤   ├─────────────────────────────┤
 │ Domain/                     │   │ Domain/                     │
-│  UsageStats                 │   │  SessionBlock, BurnRate     │
+│  UsageStats                 │   │  UsageSession, BurnRate     │
 │  UsageAggregator            │   │  SessionDetector            │
 │  UsageAnalytics             │   │  SessionProviding           │
 │  PricingCalculator          │   │  RefreshMonitor/Reason      │
@@ -88,7 +88,7 @@ Packages/ClaudeUsage/Sources/
 └── Glance/                       # Quick check vertical slice
     ├── AppLifecycleManager.swift # Lifecycle handling for GlanceStore
     ├── Domain/                   # Session domain (pure logic)
-    │   ├── SessionBlock.swift
+    │   ├── UsageSession.swift
     │   ├── SessionDetector.swift # Pure session detection logic
     │   ├── SessionProviding.swift # Protocol for session data access
     │   ├── BurnRate.swift
@@ -134,7 +134,7 @@ Packages/ClaudeUsage/Sources/
 │                     │         │ SessionProvider     │
 ├─────────────────────┤         ├─────────────────────┤
 │ Transforms to       │         │ Transforms to       │
-│ UsageStats          │         │ SessionBlock        │
+│ UsageStats          │         │ UsageSession        │
 │ (historical)        │         │ (live)              │
 └─────────┬───────────┘         └─────────┬───────────┘
           │                               │
@@ -194,7 +194,7 @@ Neither store depends on the other. They share the data loading layer
 
 Each vertical slice owns its domain:
 - **Insights/Domain**: Analytics types (UsageStats, UsageAggregator)
-- **Glance/Domain**: Session types (SessionBlock, SessionDetector, BurnRate)
+- **Glance/Domain**: Session types (UsageSession, SessionDetector, BurnRate)
 - **App/Domain**: Shared types (UsageEntry, TokenCounts, UsageProviding)
 
 Reading a Domain folder tells you what that slice does.

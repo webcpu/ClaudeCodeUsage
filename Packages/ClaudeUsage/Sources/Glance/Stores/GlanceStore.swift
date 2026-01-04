@@ -17,7 +17,7 @@ public final class GlanceStore {
     // MARK: - State
 
     private(set) var isLoading = true
-    private(set) var activeSession: SessionBlock?
+    private(set) var activeSession: UsageSession?
     private(set) var burnRate: BurnRate?
     private(set) var todayEntries: [UsageEntry] = []
 
@@ -148,7 +148,7 @@ public final class GlanceStore {
 
 // MARK: - Pure Functions
 
-private func sessionProgress(_ session: SessionBlock, now: Date) -> Double {
+private func sessionProgress(_ session: UsageSession, now: Date) -> Double {
     let elapsed = now.timeIntervalSince(session.startTime)
     let total = session.endTime.timeIntervalSince(session.startTime)
     guard total > 0 else { return 0 }

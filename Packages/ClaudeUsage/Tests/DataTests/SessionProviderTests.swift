@@ -18,7 +18,6 @@ struct SessionProviderTests {
             return
         }
 
-        #expect(hasValidIdentifier(session))
         #expect(session.isActive)
         #expect(hasValidTimeRange(session))
         #expect(hasEntries(session))
@@ -35,7 +34,6 @@ struct SessionProviderTests {
         let session = await provider.getActiveSession()
 
         if let session = session {
-            #expect(hasValidIdentifier(session))
             #expect(hasEntries(session))
         }
     }
@@ -53,23 +51,19 @@ struct SessionProviderTests {
 
     // MARK: - Pure Validation Functions
 
-    private func hasValidIdentifier(_ session: SessionBlock) -> Bool {
-        !session.id.isEmpty
-    }
-
-    private func hasEntries(_ session: SessionBlock) -> Bool {
+    private func hasEntries(_ session: UsageSession) -> Bool {
         session.entries.count > 0
     }
 
-    private func hasValidTimeRange(_ session: SessionBlock) -> Bool {
+    private func hasValidTimeRange(_ session: UsageSession) -> Bool {
         session.startTime < Date() && session.endTime > session.startTime
     }
 
-    private func hasTokenUsage(_ session: SessionBlock) -> Bool {
+    private func hasTokenUsage(_ session: UsageSession) -> Bool {
         session.tokens.total > 0
     }
 
-    private func hasModels(_ session: SessionBlock) -> Bool {
+    private func hasModels(_ session: UsageSession) -> Bool {
         !session.models.isEmpty
     }
 }

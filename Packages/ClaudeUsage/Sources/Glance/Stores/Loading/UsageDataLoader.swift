@@ -125,7 +125,7 @@ private extension UsageDataLoader {
         return buildTodayResult(entries: entries, session: session, burnRate: burnRate)
     }
 
-    func fetchSessionWithTracing() async -> (SessionBlock?, BurnRate?) {
+    func fetchSessionWithTracing() async -> (UsageSession?, BurnRate?) {
         let (session, timing) = await timed { await sessionProvider.getActiveSession() }
         await recordSessionTrace(session: session, timing: timing)
         return (session, session?.burnRate)
@@ -137,7 +137,7 @@ private extension UsageDataLoader {
 private extension UsageDataLoader {
     func buildTodayResult(
         entries: [UsageEntry],
-        session: SessionBlock?,
+        session: UsageSession?,
         burnRate: BurnRate?
     ) -> TodayLoadResult {
         TodayLoadResult(
@@ -164,7 +164,7 @@ private extension UsageDataLoader {
         return result
     }
 
-    func recordSessionTrace(session: SessionBlock?, timing: TimeInterval) async {
+    func recordSessionTrace(session: UsageSession?, timing: TimeInterval) async {
         await loadTrace.recordSession(
             found: session != nil,
             cached: timing < TracingThreshold.cachedResponseTime,
@@ -186,7 +186,7 @@ private extension UsageDataLoader {
 struct TodayLoadResult {
     let todayEntries: [UsageEntry]
     let todayStats: UsageStats
-    let session: SessionBlock?
+    let session: UsageSession?
     let burnRate: BurnRate?
     let autoTokenLimit: Int?
 }
@@ -201,7 +201,7 @@ struct UsageLoadResult {
     let todayEntries: [UsageEntry]
     let todayStats: UsageStats
     let fullStats: UsageStats
-    let session: SessionBlock?
+    let session: UsageSession?
     let burnRate: BurnRate?
     let autoTokenLimit: Int?
 }
