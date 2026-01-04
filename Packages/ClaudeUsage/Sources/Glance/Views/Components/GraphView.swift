@@ -26,7 +26,7 @@ struct GraphView: View {
                 chartContentView(in: geometry)
             }
         }
-        .frame(height: MenuBarTheme.Layout.graphHeight)
+        .frame(height: GlanceTheme.Layout.graphHeight)
     }
 }
 
@@ -34,14 +34,14 @@ struct GraphView: View {
 
 private extension GraphView {
     var backgroundView: some View {
-        RoundedRectangle(cornerRadius: MenuBarTheme.Layout.graphCornerRadius)
-            .fill(MenuBarTheme.Colors.UI.background)
+        RoundedRectangle(cornerRadius: GlanceTheme.Layout.graphCornerRadius)
+            .fill(GlanceTheme.Colors.UI.background)
             .overlay(backgroundBorder)
     }
 
     var backgroundBorder: some View {
-        RoundedRectangle(cornerRadius: MenuBarTheme.Layout.graphCornerRadius)
-            .stroke(MenuBarTheme.Colors.UI.trackBorder, lineWidth: MenuBarTheme.Graph.strokeWidth)
+        RoundedRectangle(cornerRadius: GlanceTheme.Layout.graphCornerRadius)
+            .stroke(GlanceTheme.Colors.UI.trackBorder, lineWidth: GlanceTheme.Graph.strokeWidth)
     }
 }
 
@@ -148,17 +148,17 @@ private extension GraphView {
                 path.addHorizontalLine(at: y, width: geometry.size.width)
             }
         }
-        .stroke(MenuBarTheme.Colors.UI.gridLines, lineWidth: MenuBarTheme.Graph.strokeWidth)
+        .stroke(GlanceTheme.Colors.UI.gridLines, lineWidth: GlanceTheme.Graph.strokeWidth)
     }
 
     func gridLineYPositions(in size: CGSize) -> [CGFloat] {
-        (1..<MenuBarTheme.Layout.gridLineCount).map { index in
+        (1..<GlanceTheme.Layout.gridLineCount).map { index in
             calculateGridLineY(at: index, height: size.height)
         }
     }
 
     func calculateGridLineY(at index: Int, height: CGFloat) -> CGFloat {
-        height * (CGFloat(index) / CGFloat(MenuBarTheme.Layout.gridLineCount))
+        height * (CGFloat(index) / CGFloat(GlanceTheme.Layout.gridLineCount))
     }
 }
 
@@ -169,7 +169,7 @@ private extension GraphView {
         Path { path in
             path.addLineGraph(through: calculateCoordinates(for: normalizedData, in: geometry.size))
         }
-        .stroke(color, lineWidth: MenuBarTheme.Graph.lineWidth)
+        .stroke(color, lineWidth: GlanceTheme.Graph.lineWidth)
     }
 }
 
@@ -197,8 +197,8 @@ private extension GraphView {
 
     var areaGradientColors: [Color] {
         [
-            color.opacity(MenuBarTheme.Graph.areaGradientTopOpacity),
-            color.opacity(MenuBarTheme.Graph.areaGradientBottomOpacity)
+            color.opacity(GlanceTheme.Graph.areaGradientTopOpacity),
+            color.opacity(GlanceTheme.Graph.areaGradientBottomOpacity)
         ]
     }
 }
@@ -216,7 +216,7 @@ private extension GraphView {
     func dataDot(at point: CGPoint) -> some View {
         Circle()
             .fill(color)
-            .frame(width: MenuBarTheme.Layout.dataDotSize, height: MenuBarTheme.Layout.dataDotSize)
+            .frame(width: GlanceTheme.Layout.dataDotSize, height: GlanceTheme.Layout.dataDotSize)
             .position(point)
     }
 }

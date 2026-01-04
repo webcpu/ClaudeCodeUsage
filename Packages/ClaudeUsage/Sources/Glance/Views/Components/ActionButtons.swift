@@ -9,14 +9,14 @@ import SwiftUI
 
 struct ActionButtons: View {
     @Environment(\.openWindow) private var openWindow
-    let viewMode: MenuBarViewMode
+    let viewMode: GlanceViewMode
 
     var body: some View {
         HStack(spacing: 12) {
             dashboardButton
             menuBarOnlyButtons
         }
-        .padding(.bottom, MenuBarTheme.Layout.actionButtonsBottomPadding)
+        .padding(.bottom, GlanceTheme.Layout.actionButtonsBottomPadding)
     }
 
     // MARK: - Button Components
@@ -27,7 +27,7 @@ struct ActionButtons: View {
             Button("Main") {
                 openMainWindow()
             }
-            .buttonStyle(MenuButtonStyle(style: .primary))
+            .buttonStyle(GlanceButtonStyle(style: .primary))
             .keyboardShortcut("1", modifiers: .command)
             .help("Open the main window (⌘1)")
         }
@@ -46,7 +46,7 @@ struct ActionButtons: View {
         SettingsMenu()
             .menuStyle(BorderlessButtonMenuStyle())
             .fixedSize()
-            .buttonStyle(MenuButtonStyle(style: .secondary))
+            .buttonStyle(GlanceButtonStyle(style: .secondary))
             .help("Settings")
     }
 
@@ -54,7 +54,7 @@ struct ActionButtons: View {
         Button("Quit") {
             NSApplication.shared.terminate(nil)
         }
-        .buttonStyle(MenuButtonStyle(style: .secondary))
+        .buttonStyle(GlanceButtonStyle(style: .secondary))
         .keyboardShortcut("q", modifiers: .command)
         .help("Quit the application (⌘Q)")
     }
@@ -127,7 +127,7 @@ private func centerWindow(_ window: NSWindow, on screen: NSScreen?) {
 
 // MARK: - Supporting Types
 
-enum MenuBarViewMode {
+enum GlanceViewMode {
     case menuBar
     case liveMetrics
 }

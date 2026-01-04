@@ -13,15 +13,15 @@ struct SectionHeader: View {
     let badge: String?
     
     var body: some View {
-        HStack(spacing: MenuBarTheme.Layout.itemSpacing) {
+        HStack(spacing: GlanceTheme.Layout.itemSpacing) {
             Image(systemName: icon)
-                .font(MenuBarTheme.Typography.sectionIcon)
+                .font(GlanceTheme.Typography.sectionIcon)
                 .foregroundColor(color)
             
             Text(title.uppercased())
-                .font(MenuBarTheme.Typography.sectionTitle)
-                .foregroundColor(MenuBarTheme.Colors.UI.secondaryText)
-                .kerning(MenuBarTheme.Typography.sectionTitleKerning)
+                .font(GlanceTheme.Typography.sectionTitle)
+                .foregroundColor(GlanceTheme.Colors.UI.secondaryText)
+                .kerning(GlanceTheme.Typography.sectionTitleKerning)
             
             if let badge = badge {
                 badgeView(badge)
@@ -29,19 +29,19 @@ struct SectionHeader: View {
             
             Spacer()
         }
-        .padding(.horizontal, MenuBarTheme.Layout.contentHorizontalPadding)
-        .padding(.vertical, MenuBarTheme.Layout.verticalPadding)
-        .background(MenuBarTheme.Colors.UI.sectionBackground)
+        .padding(.horizontal, GlanceTheme.Layout.contentHorizontalPadding)
+        .padding(.vertical, GlanceTheme.Layout.verticalPadding)
+        .background(GlanceTheme.Colors.UI.sectionBackground)
     }
     
     // MARK: - Badge View
     private func badgeView(_ text: String) -> some View {
         Text(text)
-            .font(MenuBarTheme.Typography.badgeText)
+            .font(GlanceTheme.Typography.badgeText)
             .foregroundColor(.white)
-            .padding(.horizontal, MenuBarTheme.Badge.horizontalPadding)
-            .padding(.vertical, MenuBarTheme.Badge.verticalPadding)
+            .padding(.horizontal, GlanceTheme.Badge.horizontalPadding)
+            .padding(.vertical, GlanceTheme.Badge.verticalPadding)
             .background(color)
-            .cornerRadius(MenuBarTheme.Badge.cornerRadius)
+            .cornerRadius(GlanceTheme.Badge.cornerRadius)
     }
 }

@@ -1,6 +1,6 @@
 //
-//  MainView.swift
-//  Main window with sidebar navigation
+//  InsightsView.swift
+//  Insights window with sidebar navigation
 //
 
 import SwiftUI
@@ -11,8 +11,8 @@ public extension Notification.Name {
     static let refreshData = Notification.Name("refreshData")
 }
 
-// MARK: - Main View
-public struct MainView: View {
+// MARK: - Insights View
+public struct InsightsView: View {
     @Environment(InsightsStore.self) private var insightsStore
     @State private var selectedDestination: Destination?
 
@@ -162,7 +162,7 @@ private struct DestinationDescriptor {
         .liveMetrics: DestinationDescriptor(
             title: "Live Metrics",
             icon: "arrow.triangle.2.circlepath",
-            viewBuilder: { AnyView(MenuBarContentView(viewMode: .liveMetrics)) }
+            viewBuilder: { AnyView(GlanceView(viewMode: .liveMetrics)) }
         )
     ]
 }

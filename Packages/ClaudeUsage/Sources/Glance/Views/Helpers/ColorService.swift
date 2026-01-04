@@ -30,12 +30,12 @@ enum ThresholdRegistry {
 
     static let percentage: [ColorThreshold] = [
         ColorThreshold(
-            upperBound: MenuBarTheme.Thresholds.Percentage.low,
-            color: MenuBarTheme.Colors.Status.active
+            upperBound: GlanceTheme.Thresholds.Percentage.low,
+            color: GlanceTheme.Colors.Status.active
         ),
         ColorThreshold(
-            upperBound: MenuBarTheme.Thresholds.Percentage.high,
-            color: MenuBarTheme.Colors.Status.warning
+            upperBound: GlanceTheme.Thresholds.Percentage.high,
+            color: GlanceTheme.Colors.Status.warning
         ),
     ]
 
@@ -43,18 +43,18 @@ enum ThresholdRegistry {
 
     static let costProgress: [ColorThreshold] = [
         ColorThreshold(
-            upperBound: MenuBarTheme.Thresholds.Cost.normal,
-            color: MenuBarTheme.Colors.Status.active
+            upperBound: GlanceTheme.Thresholds.Cost.normal,
+            color: GlanceTheme.Colors.Status.active
         ),
         ColorThreshold(
-            upperBound: MenuBarTheme.Thresholds.Cost.critical,
-            color: MenuBarTheme.Colors.Status.warning
+            upperBound: GlanceTheme.Thresholds.Cost.critical,
+            color: GlanceTheme.Colors.Status.warning
         ),
     ]
 
     // MARK: - Fallback Color
 
-    static let fallbackColor = MenuBarTheme.Colors.Status.critical
+    static let fallbackColor = GlanceTheme.Colors.Status.critical
 }
 
 // MARK: - Segment Registry
@@ -68,16 +68,16 @@ enum SegmentRegistry {
 
     static let sessionTime: [ProgressSegment] = [
         ProgressSegment(
-            range: 0...MenuBarTheme.Thresholds.Sessions.timeSegments.low,
-            color: MenuBarTheme.Colors.ProgressSegments.green
+            range: 0...GlanceTheme.Thresholds.Sessions.timeSegments.low,
+            color: GlanceTheme.Colors.ProgressSegments.green
         ),
         ProgressSegment(
-            range: MenuBarTheme.Thresholds.Sessions.timeSegments.low...MenuBarTheme.Thresholds.Sessions.timeSegments.medium,
-            color: MenuBarTheme.Colors.ProgressSegments.orange
+            range: GlanceTheme.Thresholds.Sessions.timeSegments.low...GlanceTheme.Thresholds.Sessions.timeSegments.medium,
+            color: GlanceTheme.Colors.ProgressSegments.orange
         ),
         ProgressSegment(
-            range: MenuBarTheme.Thresholds.Sessions.timeSegments.medium...MenuBarTheme.Thresholds.Sessions.timeSegments.max,
-            color: MenuBarTheme.Colors.ProgressSegments.red
+            range: GlanceTheme.Thresholds.Sessions.timeSegments.medium...GlanceTheme.Thresholds.Sessions.timeSegments.max,
+            color: GlanceTheme.Colors.ProgressSegments.red
         ),
     ]
 
@@ -85,16 +85,16 @@ enum SegmentRegistry {
 
     static let sessionToken: [ProgressSegment] = [
         ProgressSegment(
-            range: 0...MenuBarTheme.Thresholds.Sessions.tokenSegments.low,
-            color: MenuBarTheme.Colors.ProgressSegments.blue
+            range: 0...GlanceTheme.Thresholds.Sessions.tokenSegments.low,
+            color: GlanceTheme.Colors.ProgressSegments.blue
         ),
         ProgressSegment(
-            range: MenuBarTheme.Thresholds.Sessions.tokenSegments.low...MenuBarTheme.Thresholds.Sessions.tokenSegments.medium,
-            color: MenuBarTheme.Colors.ProgressSegments.purple
+            range: GlanceTheme.Thresholds.Sessions.tokenSegments.low...GlanceTheme.Thresholds.Sessions.tokenSegments.medium,
+            color: GlanceTheme.Colors.ProgressSegments.purple
         ),
         ProgressSegment(
-            range: MenuBarTheme.Thresholds.Sessions.tokenSegments.medium...MenuBarTheme.Thresholds.Sessions.tokenSegments.max,
-            color: MenuBarTheme.Colors.ProgressSegments.red
+            range: GlanceTheme.Thresholds.Sessions.tokenSegments.medium...GlanceTheme.Thresholds.Sessions.tokenSegments.max,
+            color: GlanceTheme.Colors.ProgressSegments.red
         ),
     ]
 

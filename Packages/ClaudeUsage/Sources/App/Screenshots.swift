@@ -20,12 +20,12 @@ public struct Screenshots: ScreenshotProvider {
 
     public static var screenshots: [Screenshot<Environment>] {
         [
-            screenshot("MenuBar", width: 360, height: 500) { MenuBarContentView() },
-            screenshot("MainWindow-Overview", width: 1100, height: 700) { MainView(initialDestination: .overview) },
-            screenshot("MainWindow-Models", width: 1100, height: 700) { MainView(initialDestination: .models) },
-            screenshot("MainWindow-DailyUsage", width: 1100, height: 700) { MainView(initialDestination: .dailyUsage) },
-            screenshot("MainWindow-Analytics", width: 1100, height: 700) { MainView(initialDestination: .analytics) },
-            screenshot("MainWindow-LiveMetrics", width: 1100, height: 700) { MainView(initialDestination: .liveMetrics) },
+            screenshot("Glance", width: 360, height: 500) { GlanceView() },
+            screenshot("Insights-Overview", width: 1100, height: 700) { InsightsView(initialDestination: .overview) },
+            screenshot("Insights-Models", width: 1100, height: 700) { InsightsView(initialDestination: .models) },
+            screenshot("Insights-DailyUsage", width: 1100, height: 700) { InsightsView(initialDestination: .dailyUsage) },
+            screenshot("Insights-Analytics", width: 1100, height: 700) { InsightsView(initialDestination: .analytics) },
+            screenshot("Insights-LiveMetrics", width: 1100, height: 700) { InsightsView(initialDestination: .liveMetrics) },
         ]
     }
 

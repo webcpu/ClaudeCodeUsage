@@ -20,7 +20,7 @@ struct ClaudeCodeUsageApp: App {
 
     private var mainWindow: some Scene {
         Window(AppMetadata.name, id: "main") {
-            MainView()
+            InsightsView()
                 .environment(env.insightsStore)
                 .environment(env.glanceStore)
                 .environment(env.settings)
@@ -33,7 +33,7 @@ struct ClaudeCodeUsageApp: App {
     }
 
     private var menuBarScene: some Scene {
-        MenuBarScene(env: env, lifecycleManager: lifecycleManager)
+        GlanceScene(env: env, lifecycleManager: lifecycleManager)
     }
 }
 

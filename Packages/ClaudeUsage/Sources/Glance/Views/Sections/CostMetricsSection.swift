@@ -4,18 +4,18 @@ import Charts
 struct CostMetricsSection: View {
     @Environment(GlanceStore.self) private var store
 
-    @State private var cachedTodaysCostColor: Color = MenuBarTheme.Colors.Status.normal
+    @State private var cachedTodaysCostColor: Color = GlanceTheme.Colors.Status.normal
     @State private var lastCostProgress: Double = 0
 
     var body: some View {
-        VStack(spacing: MenuBarTheme.Layout.sectionSpacing) {
+        VStack(spacing: GlanceTheme.Layout.sectionSpacing) {
             todaysCostView
         }
         .onAppear(perform: initializeCachedValues)
     }
 
     private func initializeCachedValues() {
-        cachedTodaysCostColor = MenuBarTheme.Colors.Status.normal
+        cachedTodaysCostColor = GlanceTheme.Colors.Status.normal
     }
 }
 
@@ -28,14 +28,14 @@ private extension CostMetricsSection {
             Spacer()
             hourlyCostChartIfAvailable
         }
-        .padding(.vertical, MenuBarTheme.Layout.verticalPadding)
+        .padding(.vertical, GlanceTheme.Layout.verticalPadding)
     }
 
     var todaysCostLabel: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text("Today")
-                .font(MenuBarTheme.Typography.metricTitle)
-                .foregroundColor(MenuBarTheme.Colors.UI.secondaryText)
+                .font(GlanceTheme.Typography.metricTitle)
+                .foregroundColor(GlanceTheme.Colors.UI.secondaryText)
             costValueWithWarning
         }
         .layoutPriority(1)
@@ -43,7 +43,7 @@ private extension CostMetricsSection {
 
     var costValueWithWarning: some View {
         Text(store.formattedTodaysCost)
-            .font(MenuBarTheme.Typography.metricValue)
+            .font(GlanceTheme.Typography.metricValue)
             .foregroundColor(cachedTodaysCostColor)
             .monospacedDigit()
             .lineLimit(1)

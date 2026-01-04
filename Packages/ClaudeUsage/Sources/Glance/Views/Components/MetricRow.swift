@@ -16,11 +16,11 @@ struct MetricRow: View {
     let showWarning: Bool
     
     var body: some View {
-        VStack(alignment: .leading, spacing: MenuBarTheme.Layout.itemSpacing) {
+        VStack(alignment: .leading, spacing: GlanceTheme.Layout.itemSpacing) {
             headerRow
             progressBarSection
         }
-        .padding(.vertical, MenuBarTheme.Layout.verticalPadding)
+        .padding(.vertical, GlanceTheme.Layout.verticalPadding)
     }
 
     // MARK: - Header Row
@@ -41,8 +41,8 @@ struct MetricRow: View {
         if let data = trendData, data.count > 1 {
             GraphView(dataPoints: data, color: percentageColor)
                 .frame(
-                    width: MenuBarTheme.Layout.graphWidth,
-                    height: MenuBarTheme.Layout.graphHeight
+                    width: GlanceTheme.Layout.graphWidth,
+                    height: GlanceTheme.Layout.graphHeight
                 )
                 .padding(.trailing, 6)
         }
@@ -87,8 +87,8 @@ struct MetricRow: View {
 
     private var titleLabel: some View {
         Text(title)
-            .font(MenuBarTheme.Typography.metricTitle)
-            .foregroundColor(MenuBarTheme.Colors.UI.secondaryText)
+            .font(GlanceTheme.Typography.metricTitle)
+            .foregroundColor(GlanceTheme.Colors.UI.secondaryText)
     }
 
     private var percentageRow: some View {
@@ -100,7 +100,7 @@ struct MetricRow: View {
 
     private var percentageLabel: some View {
         Text(FormatterService.formatPercentage(percentage))
-            .font(MenuBarTheme.Typography.metricValue)
+            .font(GlanceTheme.Typography.metricValue)
             .foregroundColor(percentageColor)
             .monospacedDigit()
     }
@@ -109,8 +109,8 @@ struct MetricRow: View {
     private var warningIcon: some View {
         if shouldShowWarningIcon {
             Image(systemName: "flame.fill")
-                .font(MenuBarTheme.Typography.warningIcon)
-                .foregroundColor(MenuBarTheme.Colors.Status.critical)
+                .font(GlanceTheme.Typography.warningIcon)
+                .foregroundColor(GlanceTheme.Colors.Status.critical)
         }
     }
 
@@ -126,8 +126,8 @@ struct MetricRow: View {
 
     private var primaryValueLabel: some View {
         Text(value)
-            .font(MenuBarTheme.Typography.metricValue.weight(.medium))
-            .foregroundColor(MenuBarTheme.Colors.UI.primaryText)
+            .font(GlanceTheme.Typography.metricValue.weight(.medium))
+            .foregroundColor(GlanceTheme.Colors.UI.primaryText)
             .monospacedDigit()
             .lineLimit(1)
             .minimumScaleFactor(0.8)
@@ -137,8 +137,8 @@ struct MetricRow: View {
     private var subvalueLabel: some View {
         if let subvalue {
             Text(subvalue)
-                .font(MenuBarTheme.Typography.metricSubvalue)
-                .foregroundColor(MenuBarTheme.Colors.UI.secondaryText)
+                .font(GlanceTheme.Typography.metricSubvalue)
+                .foregroundColor(GlanceTheme.Colors.UI.secondaryText)
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)

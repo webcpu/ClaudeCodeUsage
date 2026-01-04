@@ -9,7 +9,7 @@ struct SessionMetricsSection: View {
     @Environment(GlanceStore.self) private var store
 
     var body: some View {
-        VStack(spacing: MenuBarTheme.Layout.sectionSpacing) {
+        VStack(spacing: GlanceTheme.Layout.sectionSpacing) {
             if let session = store.activeSession {
                 sessionTimeMetricRow(for: session)
             }

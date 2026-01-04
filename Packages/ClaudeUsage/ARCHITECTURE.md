@@ -73,7 +73,7 @@ Packages/ClaudeUsage/Sources/
 │   ├── Stores/
 │   │   └── InsightsStore.swift   # Owns historical stats
 │   └── Views/
-│       ├── MainView.swift
+│       ├── InsightsView.swift
 │       ├── AnalyticsView.swift
 │       ├── Overview/
 │       ├── Models/
@@ -100,8 +100,8 @@ Packages/ClaudeUsage/Sources/
     │   ├── SessionMonitor.swift
     │   └── Refresh/
     └── Views/
-        ├── MenuBarScene.swift
-        ├── MenuBarContentView.swift
+        ├── GlanceScene.swift
+        ├── GlanceView.swift
         ├── Sections/
         ├── Components/
         └── Theme/

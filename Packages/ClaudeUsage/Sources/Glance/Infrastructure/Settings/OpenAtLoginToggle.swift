@@ -39,7 +39,7 @@ private extension OpenAtLoginToggle {
 
     var labelText: some View {
         Text("Open at Login")
-            .font(MenuBarTheme.Typography.actionButton)
+            .font(GlanceTheme.Typography.actionButton)
             .foregroundColor(labelColor)
     }
 

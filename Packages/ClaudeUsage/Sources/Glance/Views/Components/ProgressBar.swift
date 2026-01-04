@@ -19,20 +19,20 @@ struct ProgressBar: View {
                 overflowIndicator
             }
         }
-        .frame(height: MenuBarTheme.Layout.progressBarHeight)
+        .frame(height: GlanceTheme.Layout.progressBarHeight)
     }
 
     // MARK: - View Components
 
     private var backgroundTrack: some View {
-        RoundedRectangle(cornerRadius: MenuBarTheme.Layout.progressBarCornerRadius)
-            .fill(MenuBarTheme.Colors.UI.trackBackground)
+        RoundedRectangle(cornerRadius: GlanceTheme.Layout.progressBarCornerRadius)
+            .fill(GlanceTheme.Colors.UI.trackBackground)
             .overlay(trackBorder)
     }
 
     private var trackBorder: some View {
-        RoundedRectangle(cornerRadius: MenuBarTheme.Layout.progressBarCornerRadius)
-            .stroke(MenuBarTheme.Colors.UI.trackBorder, lineWidth: MenuBarTheme.Graph.strokeWidth)
+        RoundedRectangle(cornerRadius: GlanceTheme.Layout.progressBarCornerRadius)
+            .stroke(GlanceTheme.Colors.UI.trackBorder, lineWidth: GlanceTheme.Graph.strokeWidth)
     }
 
     private func progressFill(width: CGFloat) -> some View {
@@ -41,7 +41,7 @@ struct ProgressBar: View {
                 segmentView(for: segments[index], containerWidth: width)
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: MenuBarTheme.Layout.progressBarCornerRadius))
+        .clipShape(RoundedRectangle(cornerRadius: GlanceTheme.Layout.progressBarCornerRadius))
     }
 
     @ViewBuilder
@@ -60,8 +60,8 @@ struct ProgressBar: View {
             HStack {
                 Spacer()
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .font(MenuBarTheme.Typography.overflowIcon)
-                    .foregroundColor(MenuBarTheme.Colors.Status.critical)
+                    .font(GlanceTheme.Typography.overflowIcon)
+                    .foregroundColor(GlanceTheme.Colors.Status.critical)
                     .offset(x: 2)
             }
         }
@@ -82,8 +82,8 @@ struct ProgressBar: View {
     private func segmentGradient(for segment: ProgressSegment) -> LinearGradient {
         LinearGradient(
             colors: [
-                segment.color.opacity(MenuBarTheme.Graph.progressGradientStartOpacity),
-                segment.color.opacity(MenuBarTheme.Graph.progressGradientEndOpacity)
+                segment.color.opacity(GlanceTheme.Graph.progressGradientStartOpacity),
+                segment.color.opacity(GlanceTheme.Graph.progressGradientEndOpacity)
             ],
             startPoint: .leading,
             endPoint: .trailing

@@ -1,13 +1,13 @@
 //
-//  MenuBarScene.swift
-//  Menu bar scene and supporting views
+//  GlanceScene.swift
+//  Glance scene and supporting views
 //
 
 import SwiftUI
 
-// MARK: - Menu Bar Scene
+// MARK: - Glance Scene
 
-public struct MenuBarScene: Scene {
+public struct GlanceScene: Scene {
     let env: AppEnvironment
     let lifecycleManager: AppLifecycleManager
     @State private var hasInitialized = false
@@ -27,13 +27,13 @@ public struct MenuBarScene: Scene {
     }
 
     private var menuContent: some View {
-        MenuBarContentView()
+        GlanceView()
             .environment(env.glanceStore)
             .environment(env.settings)
     }
 
     private var menuLabel: some View {
-        MenuBarLabel(store: env.glanceStore)
+        GlanceLabel(store: env.glanceStore)
             .id(env.glanceStore.formattedTodaysCost)
             .environment(env.glanceStore)
             .environment(env.settings)
@@ -42,7 +42,7 @@ public struct MenuBarScene: Scene {
     }
 
     private var contextMenu: some View {
-        MenuBarContextMenu()
+        GlanceContextMenu()
             .environment(env.glanceStore)
             .environment(env.settings)
     }
@@ -55,9 +55,9 @@ public struct MenuBarScene: Scene {
     }
 }
 
-// MARK: - Menu Bar Label
+// MARK: - Glance Label
 
-struct MenuBarLabel: View {
+struct GlanceLabel: View {
     @Bindable var store: GlanceStore
 
     var body: some View {
@@ -77,14 +77,14 @@ struct MenuBarLabel: View {
             .font(.system(.body, design: .monospaced))
     }
 
-    private var appearance: MenuBarAppearanceConfig {
-        MenuBarAppearanceRegistry.select(from: store)
+    private var appearance: GlanceAppearanceConfig {
+        GlanceAppearanceRegistry.select(from: store)
     }
 }
 
-// MARK: - Menu Bar Context Menu
+// MARK: - Glance Context Menu
 
-struct MenuBarContextMenu: View {
+struct GlanceContextMenu: View {
     @Environment(GlanceStore.self) private var store
 
     var body: some View {
@@ -124,36 +124,36 @@ struct MenuBarContextMenu: View {
     }
 }
 
-// MARK: - Menu Bar Appearance
+// MARK: - Glance Appearance
 
-/// Configuration for a menu bar appearance state.
+/// Configuration for a glance appearance state.
 /// Registry pattern: each appearance is a configuration bundle, not a switch case.
-struct MenuBarAppearanceConfig {
+struct GlanceAppearanceConfig {
     let icon: String
     let color: Color
 }
 
-/// Registry of menu bar appearance configurations.
+/// Registry of glance appearance configurations.
 /// Open for extension (add new appearances), closed for modification (no switch changes needed).
 @MainActor
-enum MenuBarAppearanceRegistry {
-    static let active = MenuBarAppearanceConfig(
+enum GlanceAppearanceRegistry {
+    static let active = GlanceAppearanceConfig(
         icon: "dollarsign.circle.fill",
         color: .green
     )
 
-    static let warning = MenuBarAppearanceConfig(
+    static let warning = GlanceAppearanceConfig(
         icon: "exclamationmark.triangle.fill",
         color: .orange
     )
 
-    static let normal = MenuBarAppearanceConfig(
+    static let normal = GlanceAppearanceConfig(
         icon: "dollarsign.circle",
         color: .primary
     )
 
     /// Selects the appropriate appearance configuration based on store state.
-    static func select(from store: GlanceStore) -> MenuBarAppearanceConfig {
+    static func select(from store: GlanceStore) -> GlanceAppearanceConfig {
         if store.hasActiveSession { return active }
         return normal
     }
@@ -170,11 +170,11 @@ extension GlanceStore {
 // MARK: - Preview
 
 #if DEBUG
-private struct MenuBarLabelPreview: View {
+private struct GlanceLabelPreview: View {
     @Environment(GlanceStore.self) private var store
 
     var body: some View {
-        MenuBarLabel(store: store)
+        GlanceLabel(store: store)
             .padding()
             .background(Color(nsColor: .windowBackgroundColor))
             .cornerRadius(8)
@@ -182,8 +182,8 @@ private struct MenuBarLabelPreview: View {
     }
 }
 
-#Preview("Menu Bar Label", traits: .appEnvironment) {
-    MenuBarLabelPreview()
+#Preview("Glance Label", traits: .appEnvironment) {
+    GlanceLabelPreview()
 }
 #endif
 

@@ -1,12 +1,12 @@
 //
-//  MenuBarTheme.swift
-//  Centralized theme and design constants for the menu bar
+//  GlanceTheme.swift
+//  Centralized theme and design constants for glance views
 //
 
 import SwiftUI
 
 @available(macOS 13.0, *)
-struct MenuBarTheme {
+struct GlanceTheme {
     
     // MARK: - Layout Constants
     struct Layout {

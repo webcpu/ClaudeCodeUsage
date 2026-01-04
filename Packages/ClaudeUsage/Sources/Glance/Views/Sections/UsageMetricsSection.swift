@@ -9,7 +9,7 @@ struct UsageMetricsSection: View {
     @Environment(GlanceStore.self) private var store
 
     var body: some View {
-        VStack(spacing: MenuBarTheme.Layout.sectionSpacing) {
+        VStack(spacing: GlanceTheme.Layout.sectionSpacing) {
             // Token usage - show raw count only (no fake percentage)
             // Claude's actual rate limit is not exposed in usage data
             if let session = store.activeSession {
@@ -30,17 +30,17 @@ struct UsageMetricsSection: View {
                 FormatterService.formatTokenRate(burnRate.tokensPerMinute),
                 systemImage: "flame.fill"
             )
-            .font(MenuBarTheme.Typography.burnRateLabel)
-            .foregroundColor(MenuBarTheme.Colors.Status.warning)
+            .font(GlanceTheme.Typography.burnRateLabel)
+            .foregroundColor(GlanceTheme.Colors.Status.warning)
             
             Spacer()
             
             Text(FormatterService.formatCostRate(burnRate.costPerHour))
-                .font(MenuBarTheme.Typography.burnRateValue)
-                .foregroundColor(MenuBarTheme.Colors.Status.warning)
+                .font(GlanceTheme.Typography.burnRateValue)
+                .foregroundColor(GlanceTheme.Colors.Status.warning)
                 .monospacedDigit()
         }
-        .padding(.bottom, MenuBarTheme.Layout.verticalPadding)
+        .padding(.bottom, GlanceTheme.Layout.verticalPadding)
     }
 }
 
@@ -53,17 +53,17 @@ private struct TokenDisplay: View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Tokens")
-                    .font(MenuBarTheme.Typography.metricTitle)
-                    .foregroundColor(MenuBarTheme.Colors.UI.secondaryText)
+                    .font(GlanceTheme.Typography.metricTitle)
+                    .foregroundColor(GlanceTheme.Colors.UI.secondaryText)
             }
 
             Spacer()
 
             Text(FormatterService.formatTokenCount(tokens))
-                .font(MenuBarTheme.Typography.metricValue.weight(.medium))
-                .foregroundColor(MenuBarTheme.Colors.UI.primaryText)
+                .font(GlanceTheme.Typography.metricValue.weight(.medium))
+                .foregroundColor(GlanceTheme.Colors.UI.primaryText)
                 .monospacedDigit()
         }
-        .padding(.vertical, MenuBarTheme.Layout.verticalPadding)
+        .padding(.vertical, GlanceTheme.Layout.verticalPadding)
     }
 }

@@ -1,23 +1,23 @@
 //
-//  MenuBar.swift
-//  Refactored professional menu bar UI with clean architecture
+//  GlanceView.swift
+//  Glance view with clean architecture
 //
 
 import SwiftUI
 
-// MARK: - Main Menu Bar Content View
-struct MenuBarContentView: View {
+// MARK: - Glance View
+struct GlanceView: View {
     @Environment(GlanceStore.self) private var store
     @Environment(AppSettingsService.self) private var settings
     @FocusState private var focusedField: FocusField?
-    let viewMode: MenuBarViewMode
+    let viewMode: GlanceViewMode
 
     enum FocusField: Hashable {
         case settings
         case quit
     }
 
-    init(viewMode: MenuBarViewMode = .menuBar) {
+    init(viewMode: GlanceViewMode = .menuBar) {
         self.viewMode = viewMode
     }
 
@@ -28,8 +28,8 @@ struct MenuBarContentView: View {
             costSection
             actionsSection
         }
-        .frame(width: MenuBarTheme.Layout.menuBarWidth)
-        .background(MenuBarTheme.Colors.UI.background)
+        .frame(width: GlanceTheme.Layout.menuBarWidth)
+        .background(GlanceTheme.Colors.UI.background)
         .focusable()
         .onKeyPress { handleKeyPress($0) }
         .task { await store.initializeIfNeeded() }
@@ -44,7 +44,7 @@ struct MenuBarContentView: View {
             SectionHeader(
                 title: "Live Session",
                 icon: "dot.radiowaves.left.and.right",
-                color: MenuBarTheme.Colors.Sections.liveSession,
+                color: GlanceTheme.Colors.Sections.liveSession,
                 badge: "ACTIVE"
             )
             SessionMetricsSection()
@@ -61,7 +61,7 @@ struct MenuBarContentView: View {
             SectionHeader(
                 title: "Usage",
                 icon: "chart.bar.fill",
-                color: MenuBarTheme.Colors.Sections.usage,
+                color: GlanceTheme.Colors.Sections.usage,
                 badge: nil
             )
             UsageMetricsSection()
@@ -77,7 +77,7 @@ struct MenuBarContentView: View {
             SectionHeader(
                 title: "Cost",
                 icon: "dollarsign.circle.fill",
-                color: MenuBarTheme.Colors.Sections.cost,
+                color: GlanceTheme.Colors.Sections.cost,
                 badge: nil
             )
             CostMetricsSection()
@@ -131,7 +131,7 @@ struct MenuBarContentView: View {
     // MARK: - UI Elements
     private var sectionDivider: some View {
         Divider()
-            .padding(.vertical, MenuBarTheme.Layout.dividerVerticalPadding)
+            .padding(.vertical, GlanceTheme.Layout.dividerVerticalPadding)
     }
 }
 
