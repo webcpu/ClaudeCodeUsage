@@ -4,8 +4,7 @@
 //
 
 import SwiftUI
-import ClaudeUsageCore
-import ClaudeUsageUI
+import ClaudeUsage
 
 // MARK: - App Entry Point
 

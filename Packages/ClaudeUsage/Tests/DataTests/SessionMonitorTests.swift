@@ -5,8 +5,7 @@
 
 import Testing
 import Foundation
-@testable import ClaudeUsageData
-@testable import ClaudeUsageCore
+@testable import ClaudeUsage
 
 @Suite("SessionMonitor")
 struct SessionMonitorTests {

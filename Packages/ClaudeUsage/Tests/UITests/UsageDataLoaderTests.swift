@@ -5,9 +5,7 @@
 
 import Testing
 import Foundation
-@testable import ClaudeUsageUI
-@testable import ClaudeUsageData
-@testable import ClaudeUsageCore
+@testable import ClaudeUsage
 
 // MARK: - Pure Functions
 

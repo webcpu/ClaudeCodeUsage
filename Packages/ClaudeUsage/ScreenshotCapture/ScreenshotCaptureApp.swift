@@ -1,5 +1,5 @@
 import ScreenshotKit
-@testable import ClaudeUsageUI
+@testable import ClaudeUsage
 
 @main
 struct ScreenshotCaptureApp {

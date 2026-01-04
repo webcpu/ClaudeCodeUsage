@@ -1,90 +1,107 @@
 # Software Architecture
 
-## Layer Diagram
+## Vertical Slice Architecture
+
+The codebase uses **vertical slices** where each UI container owns its complete stack (Domain → Data → Views).
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                         App Layer                           │
-│            (ClaudeCodeUsageApp - Entry Point)               │
-└────────────────────────────┬────────────────────────────────┘
-                             │
-┌────────────────────────────▼────────────────────────────────┐
-│                   Presentation Layer                        │
-│                   (ClaudeUsageUI target)                    │
-│  ┌──────────────┐  ┌──────────────┐  ┌─────────────────┐   │
-│  │    Views     │  │    Stores    │  │    Services     │   │
-│  │  MenuBar/    │  │  UsageStore  │  │  LoadTrace      │   │
-│  │  MainWindow/ │  │  HeatmapStore│  │  UsageDataLoader│   │
-│  │  Shared/     │  │              │  │  TestClock      │   │
-│  └──────────────┘  └──────────────┘  └─────────────────┘   │
-└────────────────────────────┬────────────────────────────────┘
-                             │
-┌────────────────────────────▼────────────────────────────────┐
-│                       Data Layer                            │
-│                  (ClaudeUsageData target)                   │
-│  ┌─────────────────┐  ┌──────────────┐  ┌───────────────┐  │
-│  │   Repository    │  │   Refresh    │  │  Monitoring   │  │
-│  │ UsageRepository │  │ Coordinator  │  │ SessionMonitor│  │
-│  │ FileDiscovery   │  │ Monitors/*   │  │ DirectoryMon  │  │
-│  └─────────────────┘  └──────────────┘  └───────────────┘  │
-└────────────────────────────┬────────────────────────────────┘
-                             │
-┌────────────────────────────▼────────────────────────────────┐
-│                      Domain Layer                           │
-│                  (ClaudeUsageCore target)                   │
-│  ┌───────────┐ ┌─────────┐ ┌─────────┐ ┌───────────────┐   │
-│  │  Models   │ │Analytics│ │ Clock   │ │Configuration  │   │
-│  │UsageEntry │ │Pricing  │ │Protocol │ │AppConfiguration│  │
-│  │TokenCounts│ │Aggregator││SystemClk│ │ConfigService  │   │
-│  │SessionBlk │ │         │ │         │ │               │   │
-│  └───────────┘ └─────────┘ └─────────┘ └───────────────┘   │
-│  ┌───────────┐ ┌─────────┐ ┌─────────────────────────────┐ │
-│  │ Protocols │ │ Refresh │ │         Tracing             │ │
-│  │UsageData  │ │Monitor  │ │LoadTracing, LoadPhase       │ │
-│  │SessionData│ │Reason   │ │                             │ │
-│  └───────────┘ └─────────┘ └─────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                            App                                   │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │  Domain: UsageEntry, TokenCounts, Composition             │  │
+│  │  Charts                                                   │  │
+│  └───────────────────────────────────────────────────────────┘  │
+└──────────────────────────────┬──────────────────────────────────┘
+                               │
+              ┌────────────────┴────────────────┐
+              │                                 │
+              ▼                                 ▼
+┌─────────────────────────────┐   ┌─────────────────────────────┐
+│        MainWindow           │   │          MenuBar            │
+│    (Analytics Dashboard)    │   │    (Live Session Monitor)   │
+├─────────────────────────────┤   ├─────────────────────────────┤
+│ Domain                      │   │ Domain                      │
+│  UsageStats                 │   │  SessionBlock               │
+│  UsageAggregator            │   │  BurnRate                   │
+│  UsageAnalytics             │   │  RefreshMonitor             │
+├─────────────────────────────┤   ├─────────────────────────────┤
+│ Data                        │   │ Data                        │
+│  UsageRepository            │   │  SessionMonitor             │
+│  FileDiscovery              │   │  DirectoryMonitor           │
+│  JSONLParser                │   │  Refresh/*                  │
+├─────────────────────────────┤   ├─────────────────────────────┤
+│ Views                       │   │ Views                       │
+│  MainView                   │   │  MenuBarScene               │
+│  Overview/                  │   │  MenuBarContentView         │
+│  Models/                    │   │  Sections/                  │
+│  Daily/                     │   │  Components/                │
+│  Heatmap/                   │   │  SessionMetrics/            │
+│  Cards/                     │   │  Theme/                     │
+└─────────────────────────────┘   └─────────────────────────────┘
 ```
 
 ## Package Structure
 
 ```
-Packages/
-├── ClaudeUsage/                # Single package with layered targets
-│   ├── Package.swift
-│   ├── Sources/
-│   │   ├── Core/               # Layer 0 - Domain (no dependencies)
-│   │   │   ├── Models/         # UsageEntry, TokenCounts, SessionBlock, BurnRate
-│   │   │   ├── Analytics/      # PricingCalculator, UsageAggregator
-│   │   │   ├── Protocols/      # UsageDataSource, SessionDataSource
-│   │   │   ├── Clock/          # ClockProtocol, SystemClock
-│   │   │   ├── Configuration/  # AppConfiguration, ConfigurationService
-│   │   │   ├── Refresh/        # RefreshMonitor, RefreshReason
-│   │   │   └── Tracing/        # LoadTracing, LoadPhase
-│   │   │
-│   │   ├── Data/               # Layer 1 - Data (depends: Core)
-│   │   │   ├── Repository/     # UsageRepository, FileDiscovery
-│   │   │   ├── Parsing/        # JSONLParser
-│   │   │   ├── Monitoring/     # SessionMonitor, DirectoryMonitor
-│   │   │   └── Refresh/        # RefreshCoordinator, RefreshConfig
-│   │   │       └── Monitors/   # FileChange, DayChange, Wake, Timer
-│   │   │
-│   │   └── UI/                 # Layer 2 - Presentation (depends: Core, Data)
-│   │       ├── Stores/         # UsageStore
-│   │       │   └── Services/
-│   │       │       ├── Clock/  # TestClock (test support)
-│   │       │       └── Loading/# LoadTrace, UsageDataLoader
-│   │       ├── MenuBar/        # Menu bar views
-│   │       ├── MainWindow/     # Main window views
-│   │       ├── Shared/         # Shared components
-│   │       └── Settings/       # User preferences
-│   │
-│   └── Tests/
-│       ├── CoreTests/
-│       ├── DataTests/
-│       └── UITests/
+Packages/ClaudeUsage/Sources/
+├── App/                          # Composition root + shared types
+│   ├── AppEnvironment.swift      # DI container
+│   ├── Screenshots.swift         # Screenshot capture support
+│   ├── Domain/                   # Shared domain types
+│   │   ├── UsageEntry.swift
+│   │   ├── TokenCounts.swift
+│   │   └── Composition.swift
+│   └── Charts/                   # Shared chart components
 │
-└── ScreenshotKit/              # Utility (standalone)
+├── MainWindow/                   # MainWindow vertical slice
+│   ├── Previews.swift            # Preview support
+│   ├── Domain/
+│   │   ├── PricingCalculator.swift
+│   │   ├── UsageStats.swift
+│   │   ├── UsageAggregator.swift
+│   │   └── UsageAnalytics.swift
+│   ├── Data/
+│   │   ├── UsageRepository.swift
+│   │   ├── FileDiscovery.swift
+│   │   └── JSONLParser.swift
+│   └── Views/
+│       ├── MainView.swift
+│       ├── AnalyticsView.swift
+│       ├── Components/           # MainWindow-specific components
+│       ├── Overview/
+│       ├── Models/
+│       ├── Daily/
+│       ├── Heatmap/
+│       └── Cards/
+│
+└── MenuBar/                      # MenuBar vertical slice
+    ├── AppLifecycleManager.swift # App lifecycle management
+    ├── Infrastructure/           # MenuBar-owned infrastructure
+    │   ├── Clock/                # Time abstraction
+    │   ├── Settings/             # App settings
+    │   └── AppConfiguration.swift
+    ├── Stores/                   # Central state (shared via Environment)
+    │   ├── UsageStore.swift
+    │   └── Loading/
+    ├── Domain/
+    │   ├── SessionBlock.swift
+    │   ├── BurnRate.swift
+    │   ├── RefreshMonitor.swift
+    │   ├── RefreshReason.swift
+    │   └── UsageDataSource.swift
+    ├── Data/
+    │   ├── SessionMonitor.swift
+    │   ├── DirectoryMonitor.swift
+    │   └── Refresh/
+    │       ├── RefreshCoordinator.swift
+    │       └── Monitors/
+    └── Views/
+        ├── MenuBarScene.swift
+        ├── MenuBarContentView.swift
+        ├── Sections/
+        ├── Components/
+        ├── SessionMetrics/
+        └── Theme/
 ```
 
 ## Data Flow
@@ -94,59 +111,83 @@ Packages/
          │
          ▼
 ┌─────────────────────────────┐
-│  DirectoryMonitor (Data)    │  FSEvents
+│  DirectoryMonitor           │  FSEvents (MenuBar/Data)
 └─────────────┬───────────────┘
               │
 ┌─────────────▼───────────────┐
-│ RefreshCoordinator (Data)   │  Coordinates refresh triggers
-│  ├─ FileChangeMonitor       │
+│ RefreshCoordinator          │  Coordinates refresh triggers
+│  ├─ FileChangeMonitor       │  (MenuBar/Data/Refresh)
 │  ├─ DayChangeMonitor        │
 │  ├─ WakeMonitor             │
 │  └─ FallbackTimer           │
 └─────────────┬───────────────┘
               │ closure callback
 ┌─────────────▼───────────────┐
-│    UsageStore (UI)          │  @Observable, @MainActor
+│    UsageStore               │  @Observable (App/Stores)
 └─────────────┬───────────────┘
               │
 ┌─────────────▼───────────────┐
-│  UsageDataLoader (UI)       │  Orchestrates loading
+│  UsageDataLoader            │  Orchestrates loading
 └─────────────┬───────────────┘
               │
-┌─────────────▼───────────────┐
-│ UsageRepository (Data)      │  File parsing
-│ SessionMonitor (Data)       │  Session detection + caching
-└─────────────┬───────────────┘
-              │
-┌─────────────▼───────────────┐
-│   Domain Models (Core)      │
-└─────────────────────────────┘
+    ┌─────────┴─────────┐
+    │                   │
+    ▼                   ▼
+┌────────────────┐  ┌────────────────┐
+│UsageRepository │  │ SessionMonitor │
+│(MainWindow/Data)│ │(MenuBar/Data)  │
+└────────────────┘  └────────────────┘
               │
               ▼
-         SwiftUI Views
+┌─────────────────────────────┐
+│     App/Domain Models       │
+│   UsageEntry, TokenCounts   │
+└─────────────────────────────┘
+              │
+       ┌──────┴──────┐
+       ▼             ▼
+  MainWindow      MenuBar
+    Views          Views
 ```
 
-## Dependency Rules
+## Design Principles
 
-| Target | Can Depend On |
-|--------|---------------|
-| **Core** | Nothing (pure Swift) |
-| **Data** | Core |
-| **UI** | Core, Data |
-| **App** | UI |
+### Vertical Slice Benefits
+
+1. **Ownership**: MainWindow owns analytics, MenuBar owns monitoring
+2. **Cohesion**: Domain + Data + Views live together
+3. **Independence**: Change MainWindow without touching MenuBar
+4. **Navigation**: Find everything about a feature in one place
+
+### App/ as Composition Root
+
+The `App/` folder serves as the **composition root** and shared foundation:
+- **Composition Root**: AppEnvironment wires all dependencies
+- **Shared Domain**: Types used by both slices (UsageEntry, TokenCounts)
+- **Charts**: Shared chart components (HourlyCostChart)
+
+### MenuBar/ Owns Infrastructure and State
+
+MenuBar owns its infrastructure and the central state:
+- **Stores**: UsageStore (shared via Environment, drives both slices)
+- **Clock**: Time abstraction for refresh monitors
+- **Settings**: App settings service and Open at Login toggle
+- **AppConfiguration**: App-wide configuration and paths
+
+### Clear Dependency Direction
+
+```
+MainWindow ──┐
+             ├──► App (shared)
+MenuBar ─────┘
+```
+
+Both vertical slices depend on App/, but never on each other.
 
 ## Key Design Patterns
 
-- **Repository Pattern**: `UsageRepository` abstracts file system access
-- **Actor Concurrency**: Thread-safe state with `UsageRepository`, `UsageDataLoader`, `SessionMonitor`
-- **@Observable**: Modern SwiftUI state management in `UsageStore`
-- **Factory Pattern**: `RefreshCoordinatorFactory` assembles monitor configurations
-- **Protocol-Oriented**: `UsageDataSource`, `SessionDataSource`, `RefreshMonitor`, `ClockProtocol`, `LoadTracing`
-- **Descriptor Pattern (OCP)**: `RefreshReason`, `Destination`, `MenuButtonStyle` for extensibility
-
-## Benefits of Single Package
-
-- **File structure mirrors layer architecture**: Sources/Core, Sources/Data, Sources/UI
-- **Single Package.swift enforces dependencies**: Compiler prevents illegal cross-layer imports
-- **Simpler navigation**: Clear layer boundaries at directory level
-- **Unified versioning**: All layers evolve together
+- **Repository Pattern**: UsageRepository, SessionMonitor abstract data access
+- **Actor Concurrency**: Thread-safe state with actors
+- **@Observable**: Modern SwiftUI state management in UsageStore
+- **Factory Pattern**: RefreshCoordinatorFactory assembles monitors
+- **Descriptor Pattern (OCP)**: RefreshReason, MenuButtonStyle for extensibility

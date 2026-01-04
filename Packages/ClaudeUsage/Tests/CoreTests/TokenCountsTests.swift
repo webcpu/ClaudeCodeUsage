@@ -4,7 +4,7 @@
 //
 
 import Testing
-@testable import ClaudeUsageCore
+@testable import ClaudeUsage
 
 @Suite("TokenCounts")
 struct TokenCountsTests {

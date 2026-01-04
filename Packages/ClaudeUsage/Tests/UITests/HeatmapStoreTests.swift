@@ -5,8 +5,7 @@
 
 import Testing
 import Foundation
-@testable import ClaudeUsageCore
-@testable import ClaudeUsageUI
+@testable import ClaudeUsage
 
 // MARK: - Heatmap Store Tests
 

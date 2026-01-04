@@ -5,7 +5,7 @@
 
 import Testing
 import Foundation
-@testable import ClaudeUsageCore
+@testable import ClaudeUsage
 
 @Suite("UsageAggregator")
 struct UsageAggregatorTests {

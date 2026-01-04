@@ -5,7 +5,7 @@
 
 import Testing
 import Foundation
-@testable import ClaudeUsageData
+@testable import ClaudeUsage
 
 @Suite("DirectoryMonitor")
 struct DirectoryMonitorTests {

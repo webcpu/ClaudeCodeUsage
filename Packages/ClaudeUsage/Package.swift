@@ -8,44 +8,33 @@ let package = Package(
         .macOS(.v15),
     ],
     products: [
-        .library(name: "ClaudeUsageUI", targets: ["ClaudeUsageUI"]),
-        .library(name: "ClaudeUsageCore", targets: ["ClaudeUsageCore"]),
-        .library(name: "ClaudeUsageData", targets: ["ClaudeUsageData"]),
+        // Main product - exports everything
+        .library(name: "ClaudeUsage", targets: ["ClaudeUsage"]),
+        // Aliases for backwards compatibility
+        .library(name: "ClaudeUsageUI", targets: ["ClaudeUsage"]),
+        .library(name: "ClaudeUsageCore", targets: ["ClaudeUsage"]),
+        .library(name: "ClaudeUsageData", targets: ["ClaudeUsage"]),
         .executable(name: "ScreenshotCapture", targets: ["ScreenshotCapture"]),
     ],
     dependencies: [
         .package(path: "../ScreenshotKit"),
     ],
     targets: [
-        // Layer 0: Core (no dependencies)
+        // Single target with vertical slice architecture
+        // Sources organized as: Shared, Analytics, Monitoring, App, Support
         .target(
-            name: "ClaudeUsageCore",
-            path: "Sources/Core"
-        ),
-
-        // Layer 1: Data (depends on Core)
-        .target(
-            name: "ClaudeUsageData",
-            dependencies: ["ClaudeUsageCore"],
-            path: "Sources/Data"
-        ),
-
-        // Layer 2: UI (depends on Core, Data)
-        .target(
-            name: "ClaudeUsageUI",
+            name: "ClaudeUsage",
             dependencies: [
-                "ClaudeUsageCore",
-                "ClaudeUsageData",
                 .product(name: "ScreenshotKit", package: "ScreenshotKit"),
             ],
-            path: "Sources/UI"
+            path: "Sources"
         ),
 
         // Screenshot capture executable
         .executableTarget(
             name: "ScreenshotCapture",
             dependencies: [
-                "ClaudeUsageUI",
+                "ClaudeUsage",
                 .product(name: "ScreenshotKit", package: "ScreenshotKit"),
             ],
             path: "ScreenshotCapture",
@@ -56,25 +45,9 @@ let package = Package(
 
         // Tests
         .testTarget(
-            name: "ClaudeUsageCoreTests",
-            dependencies: ["ClaudeUsageCore"],
-            path: "Tests/CoreTests"
-        ),
-
-        .testTarget(
-            name: "ClaudeUsageDataTests",
-            dependencies: ["ClaudeUsageData"],
-            path: "Tests/DataTests"
-        ),
-
-        .testTarget(
-            name: "ClaudeUsageUITests",
-            dependencies: ["ClaudeUsageUI", "ClaudeUsageData"],
-            path: "Tests/UITests",
-            swiftSettings: [
-                .unsafeFlags(["-enable-testing"]),
-                .define("ENABLE_CODE_COVERAGE", .when(configuration: .debug)),
-            ]
+            name: "ClaudeUsageTests",
+            dependencies: ["ClaudeUsage"],
+            path: "Tests"
         ),
     ]
 )
