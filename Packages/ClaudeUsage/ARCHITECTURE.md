@@ -36,7 +36,7 @@ The codebase uses **two independent stores** for clean separation:
 │  InsightsView               │   │  Clock/, Settings/, Refresh/│
 │  Overview/                  │   ├─────────────────────────────┤
 │  Models/                    │   │ Data/                       │
-│  Daily/                     │   │  SessionMonitor             │
+│  Daily/                     │   │  SessionRepository             │
 │  Heatmap/                   │   ├─────────────────────────────┤
 │  Cards/                     │   │ Views/                      │
 │                             │   │  GlanceScene, GlanceView    │
@@ -98,7 +98,7 @@ Packages/ClaudeUsage/Sources/
     │   ├── GlanceStore.swift     # Owns live session
     │   └── Loading/              # UsageDataLoader, LoadTrace
     ├── Data/                     # Data access layer
-    │   └── SessionMonitor.swift  # Repository for session data
+    │   └── SessionRepository.swift  # Repository for session data
     └── Views/
         ├── GlanceScene.swift     # Menu bar scene entry point
         ├── GlanceView.swift      # Main menu bar content view
@@ -126,7 +126,7 @@ Packages/ClaudeUsage/Sources/
 ├─────────────────────┤         ├─────────────────────┤
 │ Loads via           │         │ Loads via           │
 │ UsageRepository     │         │ UsageRepository +   │
-│                     │         │ SessionMonitor      │
+│                     │         │ SessionRepository      │
 ├─────────────────────┤         ├─────────────────────┤
 │ Transforms to       │         │ Transforms to       │
 │ UsageStats          │         │ SessionBlock        │

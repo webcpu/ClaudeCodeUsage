@@ -33,8 +33,8 @@ struct UsageDataLoaderTests {
     private func createLoader() -> UsageDataLoader {
         let basePath = NSHomeDirectory() + "/.claude"
         let repository = UsageRepository(basePath: basePath)
-        let sessionMonitor = SessionMonitor(basePath: basePath)
-        return UsageDataLoader(repository: repository, sessionDataSource: sessionMonitor)
+        let sessionRepository = SessionRepository(basePath: basePath)
+        return UsageDataLoader(repository: repository, sessionDataSource: sessionRepository)
     }
 
     // MARK: - Phase 1: Today Loading

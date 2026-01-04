@@ -1,5 +1,5 @@
 //
-//  SessionMonitorTests.swift
+//  SessionRepositoryTests.swift
 //  ClaudeUsageDataTests
 //
 
@@ -7,14 +7,14 @@ import Testing
 import Foundation
 @testable import ClaudeUsage
 
-@Suite("SessionMonitor")
-struct SessionMonitorTests {
+@Suite("SessionRepository")
+struct SessionRepositoryTests {
     private let basePath = NSHomeDirectory() + "/.claude"
 
     @Test("active session has valid structure")
     func activeSessionHasValidStructure() async {
-        let monitor = SessionMonitor(basePath: basePath)
-        guard let session = await monitor.getActiveSession() else {
+        let repository = SessionRepository(basePath: basePath)
+        guard let session = await repository.getActiveSession() else {
             return
         }
 
@@ -28,11 +28,11 @@ struct SessionMonitorTests {
 
     @Test("clearCache allows fresh data fetch")
     func clearCacheAllowsFreshFetch() async {
-        let monitor = SessionMonitor(basePath: basePath)
-        _ = await monitor.getActiveSession()
-        await monitor.clearCache()
+        let repository = SessionRepository(basePath: basePath)
+        _ = await repository.getActiveSession()
+        await repository.clearCache()
 
-        let session = await monitor.getActiveSession()
+        let session = await repository.getActiveSession()
 
         if let session = session {
             #expect(hasValidIdentifier(session))
@@ -42,9 +42,9 @@ struct SessionMonitorTests {
 
     @Test("token limit returns value when session exists")
     func tokenLimitReturnsValueWhenSessionExists() async {
-        let monitor = SessionMonitor(basePath: basePath)
-        let session = await monitor.getActiveSession()
-        let limit = await monitor.getAutoTokenLimit()
+        let repository = SessionRepository(basePath: basePath)
+        let session = await repository.getActiveSession()
+        let limit = await repository.getAutoTokenLimit()
 
         if session != nil {
             #expect(limit != nil, "Should have token limit when session exists")

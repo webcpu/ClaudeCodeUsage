@@ -1,15 +1,13 @@
 //
-//  SessionMonitor.swift
-//  ClaudeUsageData
-//
-//  Monitor for detecting active Claude sessions
+//  SessionRepository.swift
+//  Repository for active Claude session data
 //
 
 import Foundation
 
-// MARK: - SessionMonitor
+// MARK: - SessionRepository
 
-public actor SessionMonitor: SessionDataSource {
+public actor SessionRepository: SessionDataSource {
     private let basePath: String
     private let sessionDurationHours: Double
     private let parser = JSONLParser()
