@@ -28,15 +28,15 @@ public struct SessionDetector: Sendable {
     }
 
     /// Finds the most recent active session from detected blocks.
-    public func findActiveSession(in blocks: [UsageSession]) -> UsageSession? {
-        blocks
+    public func findActiveSession(in sessions: [UsageSession]) -> UsageSession? {
+        sessions
             .filter(\.isActive)
             .max { ($0.actualEndTime ?? $0.startTime) < ($1.actualEndTime ?? $1.startTime) }
     }
 
     /// Returns max tokens from completed (inactive) sessions.
-    public func maxTokensFromCompletedSessions(_ blocks: [UsageSession]) -> Int {
-        blocks
+    public func maxTokensFromCompletedSessions(_ sessions: [UsageSession]) -> Int {
+        sessions
             .filter { !$0.isActive }
             .map(\.tokens.total)
             .max() ?? 0
