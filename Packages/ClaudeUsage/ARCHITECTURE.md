@@ -3,8 +3,8 @@
 ## Two-Store Architecture
 
 The codebase uses **two independent stores** for clean separation:
-- **AnalyticsStore** (MainWindow) - Historical usage analytics
-- **SessionStore** (MenuBar) - Live session monitoring
+- **InsightsStore** (Insights) - Historical usage analytics
+- **GlanceStore** (Glance) - Live session monitoring
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -20,11 +20,11 @@ The codebase uses **two independent stores** for clean separation:
               │                                 │
               ▼                                 ▼
 ┌─────────────────────────────┐   ┌─────────────────────────────┐
-│        MainWindow           │   │          MenuBar            │
-│    (Analytics Dashboard)    │   │    (Live Session Monitor)   │
+│          Insights           │   │           Glance            │
+│    (Deep Analysis Window)   │   │    (Quick Check Menu Bar)   │
 ├─────────────────────────────┤   ├─────────────────────────────┤
 │ Stores/                     │   │ Stores/                     │
-│  AnalyticsStore             │   │  SessionStore               │
+│  InsightsStore              │   │  GlanceStore                │
 ├─────────────────────────────┤   ├─────────────────────────────┤
 │ Domain/                     │   │ Domain/                     │
 │  UsageStats                 │   │  SessionBlock               │
@@ -64,14 +64,14 @@ Packages/ClaudeUsage/Sources/
 │       ├── UsageRepository.swift
 │       └── DirectoryMonitor.swift
 │
-├── MainWindow/                   # Analytics vertical slice
+├── Insights/                     # Deep analysis vertical slice
 │   ├── Domain/                   # Analytics domain
 │   │   ├── UsageStats.swift
 │   │   ├── UsageAggregator.swift
 │   │   ├── UsageAnalytics.swift
 │   │   └── PricingCalculator.swift
 │   ├── Stores/
-│   │   └── AnalyticsStore.swift  # Owns historical stats
+│   │   └── InsightsStore.swift   # Owns historical stats
 │   └── Views/
 │       ├── MainView.swift
 │       ├── AnalyticsView.swift
@@ -81,8 +81,8 @@ Packages/ClaudeUsage/Sources/
 │       ├── Heatmap/
 │       └── Cards/
 │
-└── MenuBar/                      # Monitoring vertical slice
-    ├── AppLifecycleManager.swift # Lifecycle handling for SessionStore
+└── Glance/                       # Quick check vertical slice
+    ├── AppLifecycleManager.swift # Lifecycle handling for GlanceStore
     ├── Domain/                   # Session domain
     │   ├── SessionBlock.swift
     │   ├── BurnRate.swift
@@ -94,7 +94,7 @@ Packages/ClaudeUsage/Sources/
     │   ├── Settings/
     │   └── AppConfiguration.swift
     ├── Stores/
-    │   ├── SessionStore.swift    # Owns live session
+    │   ├── GlanceStore.swift     # Owns live session
     │   └── Loading/
     ├── Data/
     │   ├── SessionMonitor.swift
@@ -116,8 +116,8 @@ Packages/ClaudeUsage/Sources/
          │                                 │
          ▼                                 ▼
 ┌─────────────────────┐         ┌─────────────────────┐
-│   AnalyticsStore    │         │    SessionStore     │
-│   (MainWindow)      │         │    (MenuBar)        │
+│    InsightsStore    │         │     GlanceStore     │
+│     (Insights)      │         │      (Glance)       │
 ├─────────────────────┤         ├─────────────────────┤
 │ Subscribes to       │         │ Subscribes to       │
 │ DirectoryMonitor    │         │ RefreshCoordinator  │
@@ -132,17 +132,27 @@ Packages/ClaudeUsage/Sources/
 └─────────┬───────────┘         └─────────┬───────────┘
           │                               │
           ▼                               ▼
-    MainWindow                        MenuBar
-      Views                            Views
+      Insights                         Glance
+       Views                           Views
 ```
+
+## Naming Philosophy
+
+The module names reflect user intent:
+- **Insights** = "I want to analyze my usage" (deep analysis, open the window)
+- **Glance** = "I want to check my session" (quick look, menu bar)
+
+The stores match their modules:
+- **InsightsStore** provides data for deep analysis
+- **GlanceStore** provides data for quick glances
 
 ## Design Principles
 
 ### Independent Stores
 
 Each store is fully independent:
-- **AnalyticsStore**: Loads historical stats, subscribed to DirectoryMonitor
-- **SessionStore**: Loads live session, subscribed to RefreshCoordinator
+- **InsightsStore**: Loads historical stats, subscribed to DirectoryMonitor
+- **GlanceStore**: Loads live session, subscribed to RefreshCoordinator
 
 Neither store depends on the other. They share the data loading layer
 (App/Loading) but load and transform data independently.
@@ -150,8 +160,8 @@ Neither store depends on the other. They share the data loading layer
 ### Domain Ownership
 
 Each vertical slice owns its domain:
-- **MainWindow/Domain**: Analytics types (UsageStats, UsageAggregator)
-- **MenuBar/Domain**: Session types (SessionBlock, BurnRate)
+- **Insights/Domain**: Analytics types (UsageStats, UsageAggregator)
+- **Glance/Domain**: Session types (SessionBlock, BurnRate)
 - **App/Domain**: Shared types (UsageEntry, TokenCounts)
 
 Reading a Domain folder tells you what that slice does.
@@ -159,9 +169,9 @@ Reading a Domain folder tells you what that slice does.
 ### Clear Dependency Direction
 
 ```
-MainWindow ──┐
-             ├──► App (shared domain + loading)
-MenuBar ─────┘
+Insights ──┐
+           ├──► App (shared domain + loading)
+Glance ────┘
 ```
 
 Both vertical slices depend on App/, but never on each other.

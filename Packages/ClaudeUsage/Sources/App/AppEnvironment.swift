@@ -9,17 +9,17 @@ import SwiftUI
 
 @MainActor
 public struct AppEnvironment: @unchecked Sendable {
-    public let sessionStore: SessionStore
-    public let analyticsStore: AnalyticsStore
+    public let glanceStore: GlanceStore
+    public let insightsStore: InsightsStore
     public let settings: AppSettingsService
 
     public init(
-        sessionStore: SessionStore = SessionStore(),
-        analyticsStore: AnalyticsStore = AnalyticsStore(),
+        glanceStore: GlanceStore = GlanceStore(),
+        insightsStore: InsightsStore = InsightsStore(),
         settings: AppSettingsService = AppSettingsService()
     ) {
-        self.sessionStore = sessionStore
-        self.analyticsStore = analyticsStore
+        self.glanceStore = glanceStore
+        self.insightsStore = insightsStore
         self.settings = settings
     }
 

@@ -2,7 +2,7 @@ import SwiftUI
 import Charts
 
 struct CostMetricsSection: View {
-    @Environment(SessionStore.self) private var store
+    @Environment(GlanceStore.self) private var store
 
     @State private var cachedTodaysCostColor: Color = MenuBarTheme.Colors.Status.normal
     @State private var lastCostProgress: Double = 0

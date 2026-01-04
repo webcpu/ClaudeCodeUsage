@@ -1,19 +1,19 @@
 //
-//  SessionStore.swift
-//  Observable state container for live session monitoring
+//  GlanceStore.swift
+//  Observable state container for quick glance monitoring
 //
 
 import SwiftUI
 import Observation
 import OSLog
 
-private let logger = Logger(subsystem: "com.claudecodeusage", category: "SessionStore")
+private let logger = Logger(subsystem: "com.claudecodeusage", category: "GlanceStore")
 
-// MARK: - Session Store
+// MARK: - Glance Store
 
 @Observable
 @MainActor
-public final class SessionStore {
+public final class GlanceStore {
     // MARK: - State
 
     private(set) var isLoading = true
@@ -111,7 +111,7 @@ public final class SessionStore {
             isLoading = false
         }
 
-        logger.info("Loading session data (invalidateCache=\(invalidateCache))")
+        logger.info("Loading glance data (invalidateCache=\(invalidateCache))")
 
         do {
             if invalidateCache {

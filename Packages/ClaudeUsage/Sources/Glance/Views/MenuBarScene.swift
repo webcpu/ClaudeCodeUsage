@@ -28,14 +28,14 @@ public struct MenuBarScene: Scene {
 
     private var menuContent: some View {
         MenuBarContentView()
-            .environment(env.sessionStore)
+            .environment(env.glanceStore)
             .environment(env.settings)
     }
 
     private var menuLabel: some View {
-        MenuBarLabel(store: env.sessionStore)
-            .id(env.sessionStore.formattedTodaysCost)
-            .environment(env.sessionStore)
+        MenuBarLabel(store: env.glanceStore)
+            .id(env.glanceStore.formattedTodaysCost)
+            .environment(env.glanceStore)
             .environment(env.settings)
             .task { await initializeOnce() }
             .contextMenu { contextMenu }
@@ -43,22 +43,22 @@ public struct MenuBarScene: Scene {
 
     private var contextMenu: some View {
         MenuBarContextMenu()
-            .environment(env.sessionStore)
+            .environment(env.glanceStore)
             .environment(env.settings)
     }
 
     private func initializeOnce() async {
         guard !hasInitialized else { return }
         hasInitialized = true
-        lifecycleManager.configure(with: env.sessionStore)
-        await env.sessionStore.initializeIfNeeded()
+        lifecycleManager.configure(with: env.glanceStore)
+        await env.glanceStore.initializeIfNeeded()
     }
 }
 
 // MARK: - Menu Bar Label
 
 struct MenuBarLabel: View {
-    @Bindable var store: SessionStore
+    @Bindable var store: GlanceStore
 
     var body: some View {
         HStack(spacing: 4) {
@@ -85,7 +85,7 @@ struct MenuBarLabel: View {
 // MARK: - Menu Bar Context Menu
 
 struct MenuBarContextMenu: View {
-    @Environment(SessionStore.self) private var store
+    @Environment(GlanceStore.self) private var store
 
     var body: some View {
         Group {
@@ -153,15 +153,15 @@ enum MenuBarAppearanceRegistry {
     )
 
     /// Selects the appropriate appearance configuration based on store state.
-    static func select(from store: SessionStore) -> MenuBarAppearanceConfig {
+    static func select(from store: GlanceStore) -> MenuBarAppearanceConfig {
         if store.hasActiveSession { return active }
         return normal
     }
 }
 
-// MARK: - SessionStore Appearance Helpers
+// MARK: - GlanceStore Appearance Helpers
 
-extension SessionStore {
+extension GlanceStore {
     var hasActiveSession: Bool {
         activeSession?.isActive == true
     }
@@ -171,7 +171,7 @@ extension SessionStore {
 
 #if DEBUG
 private struct MenuBarLabelPreview: View {
-    @Environment(SessionStore.self) private var store
+    @Environment(GlanceStore.self) private var store
 
     var body: some View {
         MenuBarLabel(store: store)

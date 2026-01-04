@@ -6,7 +6,7 @@
 import SwiftUI
 
 struct AnalyticsView: View {
-    @Environment(AnalyticsStore.self) private var store
+    @Environment(InsightsStore.self) private var store
 
     var body: some View {
         CaptureCompatibleScrollView {
@@ -22,7 +22,7 @@ struct AnalyticsView: View {
         .frame(minWidth: 600, idealWidth: 840)
     }
 
-    private func contentState(from store: AnalyticsStore) -> RoutableState<UsageStats> {
+    private func contentState(from store: InsightsStore) -> RoutableState<UsageStats> {
         if store.isLoading { return .loading }
         guard let stats = store.stats else { return .error }
         return .loaded(stats)

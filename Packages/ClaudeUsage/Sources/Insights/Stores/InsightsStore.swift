@@ -1,22 +1,22 @@
 //
-//  AnalyticsStore.swift
-//  Observable state container for analytics data
+//  InsightsStore.swift
+//  Observable state container for usage insights
 //
 
 import SwiftUI
 import Observation
 import OSLog
 
-private let logger = Logger(subsystem: "com.claudecodeusage", category: "AnalyticsStore")
+private let logger = Logger(subsystem: "com.claudecodeusage", category: "InsightsStore")
 
-// MARK: - Analytics Store
+// MARK: - Insights Store
 
 @Observable
 @MainActor
-public final class AnalyticsStore {
+public final class InsightsStore {
     // MARK: - State
 
-    private(set) var state: AnalyticsState = .loading
+    private(set) var state: InsightsState = .loading
 
     // MARK: - Derived Properties
 
@@ -68,7 +68,7 @@ public final class AnalyticsStore {
         isCurrentlyLoading = true
         defer { isCurrentlyLoading = false }
 
-        logger.info("Loading analytics data")
+        logger.info("Loading insights data")
 
         do {
             let stats = try await repository.getUsageStats()
@@ -88,9 +88,9 @@ public final class AnalyticsStore {
     }
 }
 
-// MARK: - Analytics State
+// MARK: - Insights State
 
-enum AnalyticsState {
+enum InsightsState {
     case loading
     case loaded(UsageStats)
     case error(Error)

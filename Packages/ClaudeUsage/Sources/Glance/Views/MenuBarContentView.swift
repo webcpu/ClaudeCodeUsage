@@ -7,7 +7,7 @@ import SwiftUI
 
 // MARK: - Main Menu Bar Content View
 struct MenuBarContentView: View {
-    @Environment(SessionStore.self) private var store
+    @Environment(GlanceStore.self) private var store
     @Environment(AppSettingsService.self) private var settings
     @FocusState private var focusedField: FocusField?
     let viewMode: MenuBarViewMode

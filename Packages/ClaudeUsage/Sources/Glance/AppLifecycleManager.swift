@@ -11,16 +11,16 @@ import Combine
 @MainActor
 public final class AppLifecycleManager {
     private var cancellables = Set<AnyCancellable>()
-    private weak var store: SessionStore?
+    private weak var store: GlanceStore?
 
     public init() {
         setupNotificationHandlers()
     }
 
-    public func configure(with store: SessionStore) {
+    public func configure(with store: GlanceStore) {
         self.store = store
     }
-    
+
     private func setupNotificationHandlers() {
         observe(NSApplication.didBecomeActiveNotification) { [weak self] in self?.handleAppBecameActive() }
         observe(NSApplication.didResignActiveNotification) { [weak self] in self?.handleAppResignActive() }
@@ -34,7 +34,7 @@ public final class AppLifecycleManager {
             .sink { _ in handler() }
             .store(in: &cancellables)
     }
-    
+
     private func handleAppBecameActive() {
         store?.handleAppBecameActive()
     }

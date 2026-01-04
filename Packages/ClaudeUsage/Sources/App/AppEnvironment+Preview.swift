@@ -9,15 +9,15 @@ import SwiftUI
 public struct PreviewEnvironment: PreviewModifier {
     public static func makeSharedContext() async throws -> AppEnvironment {
         let env = AppEnvironment.live()
-        await env.sessionStore.loadData()
-        await env.analyticsStore.loadData()
+        await env.glanceStore.loadData()
+        await env.insightsStore.loadData()
         return env
     }
 
     public func body(content: Content, context: AppEnvironment) -> some View {
         content
-            .environment(context.sessionStore)
-            .environment(context.analyticsStore)
+            .environment(context.glanceStore)
+            .environment(context.insightsStore)
             .environment(context.settings)
     }
 }
