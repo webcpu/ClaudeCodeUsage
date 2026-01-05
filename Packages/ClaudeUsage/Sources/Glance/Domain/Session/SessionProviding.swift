@@ -12,7 +12,4 @@ public protocol SessionProviding: Sendable {
 
     /// Get the current burn rate.
     func getBurnRate() async -> BurnRate?
-
-    /// Get the auto-detected token limit.
-    func getAutoTokenLimit() async -> Int?
 }

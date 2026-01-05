@@ -38,17 +38,6 @@ struct SessionProviderTests {
         }
     }
 
-    @Test("token limit returns value when session exists")
-    func tokenLimitReturnsValueWhenSessionExists() async {
-        let provider = SessionProvider(basePath: basePath)
-        let session = await provider.getActiveSession()
-        let limit = await provider.getAutoTokenLimit()
-
-        if session != nil {
-            #expect(limit != nil, "Should have token limit when session exists")
-        }
-    }
-
     // MARK: - Pure Validation Functions
 
     private func hasEntries(_ session: UsageSession) -> Bool {

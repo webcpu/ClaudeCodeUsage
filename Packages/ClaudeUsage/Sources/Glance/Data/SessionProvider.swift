@@ -46,11 +46,6 @@ public actor SessionProvider: SessionProviding {
         await getActiveSession()?.burnRate
     }
 
-    public func getAutoTokenLimit() async -> Int? {
-        _ = await getActiveSession()
-        return cachedTokenLimit > 0 ? cachedTokenLimit : nil
-    }
-
     // MARK: - Cache Management
 
     public func clearCache() {
