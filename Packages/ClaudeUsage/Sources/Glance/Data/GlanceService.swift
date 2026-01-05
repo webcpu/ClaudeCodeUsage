@@ -18,6 +18,11 @@ public struct GlanceData: Sendable {
         self.todayCost = todayCost
         self.activeSession = activeSession
     }
+
+    /// Tuple-based init for point-free composition
+    init(_ tuple: (TodayCost, UsageSession?)) {
+        self.init(todayCost: tuple.0, activeSession: tuple.1)
+    }
 }
 
 // MARK: - GlanceService
@@ -53,18 +58,22 @@ public actor GlanceService {
 
     /// Loads glance data. Returns nil if a load is already in progress.
     public func loadData(invalidateCache: Bool = true) async -> Result<GlanceData, Error>? {
+        await withLoadingGuard {
+            if invalidateCache { await clearCache() }
+            return await executeFetch().map(GlanceData.init)
+        }
+    }
+
+    // MARK: - Private
+
+    private func withLoadingGuard<T>(_ operation: () async -> T) async -> T? {
         guard !isLoading else {
             logger.debug("loadData: skipped - already loading")
             return nil
         }
         isLoading = true
         defer { isLoading = false }
-
-        if invalidateCache { await clearCache() }
-
-        // Pipeline: fetch → compose
-        return await executeFetch()
-            .map { cost, session in GlanceData(todayCost: cost, activeSession: session) }
+        return await operation()
     }
 
     private func executeFetch() async -> Result<(TodayCost, UsageSession?), Error> {
