@@ -9,7 +9,7 @@ import Foundation
 
 @Suite("FileDiscovery")
 struct FileDiscoveryTests {
-    private let basePath = NSHomeDirectory() + "/.claude"
+    private let basePath = AppConfiguration.default.basePath
 
     @Test("discovers JSONL files with valid structure")
     func discoversValidFiles() throws {

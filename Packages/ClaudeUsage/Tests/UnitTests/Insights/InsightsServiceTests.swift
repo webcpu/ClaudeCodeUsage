@@ -14,7 +14,7 @@ struct InsightsServiceTests {
 
     @Test("loadStats returns success with usage stats")
     func loadStatsReturnsSuccess() async throws {
-        let service = InsightsService(basePath: testBasePath)
+        let service = InsightsService()
 
         let result = await service.loadStats()
 
@@ -27,7 +27,7 @@ struct InsightsServiceTests {
 
     @Test("loadStats returns nil when already loading")
     func loadStatsSkipsWhenAlreadyLoading() async {
-        let service = InsightsService(basePath: testBasePath)
+        let service = InsightsService()
 
         // Start multiple concurrent loads
         async let result1 = service.loadStats()
@@ -45,7 +45,7 @@ struct InsightsServiceTests {
 
     @Test("loadStats sequential calls all succeed")
     func loadStatsSequentialSucceeds() async {
-        let service = InsightsService(basePath: testBasePath)
+        let service = InsightsService()
 
         let result1 = await service.loadStats()
         let result2 = await service.loadStats()
@@ -58,7 +58,7 @@ struct InsightsServiceTests {
 
     @Test("UsageStats contains expected aggregations")
     func usageStatsStructure() async {
-        let service = InsightsService(basePath: testBasePath)
+        let service = InsightsService()
 
         guard let result = await service.loadStats(),
               case .success(let stats) = result else {
@@ -78,7 +78,7 @@ struct InsightsServiceTests {
 
     @Test("startMonitoring creates monitor")
     func startMonitoringCreatesMonitor() async {
-        let service = InsightsService(basePath: testBasePath)
+        let service = InsightsService()
 
         await service.startMonitoring {}
 
@@ -90,7 +90,7 @@ struct InsightsServiceTests {
 
     @Test("stopMonitoring cleans up monitor")
     func stopMonitoringCleansUp() async {
-        let service = InsightsService(basePath: testBasePath)
+        let service = InsightsService()
 
         await service.startMonitoring {}
         await service.stopMonitoring()
@@ -101,7 +101,7 @@ struct InsightsServiceTests {
 
     @Test("startMonitoring is idempotent")
     func startMonitoringIdempotent() async {
-        let service = InsightsService(basePath: testBasePath)
+        let service = InsightsService()
 
         // Start monitoring multiple times
         await service.startMonitoring {}
@@ -114,9 +114,4 @@ struct InsightsServiceTests {
         // No crash means it's working correctly
     }
 
-    // MARK: - Test Helpers
-
-    private var testBasePath: String {
-        NSHomeDirectory() + "/.claude"
-    }
 }

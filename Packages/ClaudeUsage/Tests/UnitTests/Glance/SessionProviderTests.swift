@@ -9,11 +9,10 @@ import Foundation
 
 @Suite("SessionProvider")
 struct SessionProviderTests {
-    private let basePath = NSHomeDirectory() + "/.claude"
 
     @Test("active session has valid structure")
     func activeSessionHasValidStructure() async {
-        let provider = SessionProvider(basePath: basePath)
+        let provider = SessionProvider()
         guard let session = await provider.getActiveSession() else {
             return
         }
@@ -27,7 +26,7 @@ struct SessionProviderTests {
 
     @Test("clearCache allows fresh data fetch")
     func clearCacheAllowsFreshFetch() async {
-        let provider = SessionProvider(basePath: basePath)
+        let provider = SessionProvider()
         _ = await provider.getActiveSession()
         await provider.clearCache()
 

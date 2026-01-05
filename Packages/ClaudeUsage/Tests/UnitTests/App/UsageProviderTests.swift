@@ -9,11 +9,10 @@ import Foundation
 
 @Suite("UsageProvider")
 struct UsageProviderTests {
-    private let basePath = NSHomeDirectory() + "/.claude"
 
     @Test("getAllEntries returns non-empty collection")
     func getAllEntriesReturnsEntries() async throws {
-        let provider = UsageProvider(basePath: basePath)
+        let provider = UsageProvider()
         let entries = try await provider.getAllEntries()
 
         #expect(entries.count > 0, "Should have entries")
@@ -21,7 +20,7 @@ struct UsageProviderTests {
 
     @Test("entries are sorted by timestamp ascending")
     func entriesAreSortedByTimestamp() async throws {
-        let provider = UsageProvider(basePath: basePath)
+        let provider = UsageProvider()
         let entries = try await provider.getTodayEntries()
 
         let isSortedAscending = zip(entries, entries.dropFirst())
@@ -32,7 +31,7 @@ struct UsageProviderTests {
 
     @Test("clearCache invalidates cached data")
     func clearCacheInvalidatesData() async throws {
-        let provider = UsageProvider(basePath: basePath)
+        let provider = UsageProvider()
 
         // Load data to populate cache
         _ = try await provider.getTodayEntries()
@@ -47,7 +46,7 @@ struct UsageProviderTests {
 
     @Test("getUsageStats aggregates correctly")
     func getUsageStatsAggregates() async throws {
-        let provider = UsageProvider(basePath: basePath)
+        let provider = UsageProvider()
         let stats = try await provider.getUsageStats()
 
         #expect(stats.totalCost >= 0)

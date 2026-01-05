@@ -10,7 +10,7 @@ import Foundation
 @Suite("JSONLParser")
 struct JSONLParserTests {
     private let parser = JSONLParser()
-    private let basePath = NSHomeDirectory() + "/.claude"
+    private let basePath = AppConfiguration.default.basePath
 
     // MARK: - Tests
 
