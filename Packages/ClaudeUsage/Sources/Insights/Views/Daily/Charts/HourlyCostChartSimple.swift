@@ -11,7 +11,11 @@ import Charts
 struct HourlyCostChartSimple: View {
     let hourlyData: [Double]
     var maxScale: Double? = nil
-    @State private var selectedHour: Int? = nil
+    @State private var selectedHour: Double? = nil
+
+    private var selectedHourIndex: Int? {
+        selectedHour.map { Int($0) }
+    }
 
     var body: some View {
         GeometryReader { geometry in
@@ -113,7 +117,7 @@ private extension HourlyCostChartSimple {
 
     func hourlyBar(hour: Int, cost: Double) -> some ChartContent {
         BarMark(
-            x: .value("Hour", hour),
+            x: .value("Hour", Double(hour) + 0.5),
             y: .value("Cost", cost)
         )
         .foregroundStyle(barColor(for: cost))
@@ -130,8 +134,8 @@ private extension HourlyCostChartSimple {
 
     @ChartContentBuilder
     func selectionMark(for hour: Int) -> some ChartContent {
-        if let selectedHour, selectedHour == hour {
-            RuleMark(x: .value("Hour", hour))
+        if let selectedHourIndex, selectedHourIndex == hour {
+            RuleMark(x: .value("Hour", Double(hour) + 0.5))
                 .foregroundStyle(.primary.opacity(0.3))
                 .lineStyle(StrokeStyle(lineWidth: 1, dash: [2, 2]))
         }
@@ -189,13 +193,13 @@ private extension HourlyCostChartSimple {
 private extension HourlyCostChartSimple {
     @ViewBuilder
     func tooltipView(chartWidth: CGFloat, totalWidth: CGFloat) -> some View {
-        if let selectedHour, isValidHour(selectedHour) {
+        if let hour = selectedHourIndex, isValidHour(hour) {
             HourlyTooltipView(
-                hour: selectedHour,
-                cost: hourlyData[selectedHour],
+                hour: hour,
+                cost: hourlyData[hour],
                 isCompact: true
             )
-            .offset(x: tooltipXOffset(for: selectedHour, chartWidth: chartWidth, totalWidth: totalWidth))
+            .offset(x: tooltipXOffset(for: hour, chartWidth: chartWidth, totalWidth: totalWidth))
             .allowsHitTesting(false)
         }
     }
@@ -212,7 +216,8 @@ private extension HourlyCostChartSimple {
 
     func calculateBarCenter(for hour: Int, chartWidth: CGFloat) -> CGFloat {
         let barWidth = chartWidth / 24
-        return (CGFloat(hour) + 0.5) * barWidth
+        // Bar is centered at hour + 0.5, so center is at (hour + 1) * barWidth
+        return (CGFloat(hour) + 1.0) * barWidth
     }
 }
 
