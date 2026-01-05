@@ -5,15 +5,13 @@
 
 import SwiftUI
 import Observation
-import OSLog
-
-private let logger = Logger(subsystem: "com.claudecodeusage", category: "InsightsStore")
 
 // MARK: - Insights Store
 
 @Observable
 @MainActor
 public final class InsightsStore {
+
     // MARK: - State
 
     private(set) var state: InsightsState = .loading
@@ -25,29 +23,20 @@ public final class InsightsStore {
 
     // MARK: - Dependencies
 
-    private let usageProvider: UsageProvider
-    private var directoryMonitor: DirectoryMonitor?
+    private let service: InsightsService
 
     // MARK: - Internal State
 
-    private var isCurrentlyLoading = false
     private var hasInitialized = false
 
     // MARK: - Initialization
 
     public init(basePath: String = AppConfiguration.default.basePath) {
-        self.usageProvider = UsageProvider(basePath: basePath)
-        self.directoryMonitor = nil
-
-        self.directoryMonitor = DirectoryMonitor(path: basePath) { [weak self] in
-            guard let self else { return }
-            Task { await self.loadData() }
-        }
+        self.service = InsightsService(basePath: basePath)
     }
 
-    init(usageProvider: UsageProvider, directoryMonitor: DirectoryMonitor) {
-        self.usageProvider = usageProvider
-        self.directoryMonitor = directoryMonitor
+    init(service: InsightsService) {
+        self.service = service
     }
 
     // MARK: - Public API
@@ -55,35 +44,28 @@ public final class InsightsStore {
     func initializeIfNeeded() async {
         guard !hasInitialized else { return }
         hasInitialized = true
-        await startMonitoring()
+
+        await service.startMonitoring { [weak self] in
+            Task { await self?.loadData() }
+        }
         await loadData()
     }
 
     func loadData() async {
-        guard !isCurrentlyLoading else { return }
+        guard let result = await service.loadStats() else { return }
 
-        isCurrentlyLoading = true
-        defer { isCurrentlyLoading = false }
-
-        do {
-            let stats = try await usageProvider.getUsageStats()
+        switch result {
+        case .success(let stats):
             state = .loaded(stats)
-        } catch {
+        case .failure(let error):
             state = .error(error)
-            logger.error("Failed to load: \(error.localizedDescription)")
         }
-    }
-
-    // MARK: - Monitoring
-
-    private func startMonitoring() async {
-        await directoryMonitor?.start()
     }
 }
 
 // MARK: - Insights State
 
-enum InsightsState {
+public enum InsightsState {
     case loading
     case loaded(UsageStats)
     case error(Error)
