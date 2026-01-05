@@ -42,10 +42,6 @@ public actor SessionProvider: SessionProviding {
         return session
     }
 
-    public func getBurnRate() async -> BurnRate? {
-        await getActiveSession()?.burnRate
-    }
-
     // MARK: - Cache Management
 
     public func clearCache() {
