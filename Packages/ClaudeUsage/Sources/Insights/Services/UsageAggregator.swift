@@ -49,14 +49,6 @@ public enum AggregationStrategies {
         build: DailyUsageBuilder.build,
         sort: { $0.sorted { $0.date < $1.date } }
     )
-
-    // MARK: - Project Strategy
-
-    public static let byProject: AggregationStrategy<[ProjectUsage]> = buildStrategy(
-        groupBy: \.project,
-        build: ProjectUsageBuilder.build,
-        sort: { $0.sorted { $0.totalCost > $1.totalCost } }
-    )
 }
 
 // MARK: - Model Usage Builder
@@ -93,25 +85,6 @@ private enum DailyUsageBuilder {
     }
 }
 
-// MARK: - Project Usage Builder
-
-private enum ProjectUsageBuilder {
-    static let build: @Sendable ((key: String, value: [UsageEntry])) -> ProjectUsage = { pair in
-        ProjectUsage(
-            projectPath: pair.key,
-            projectName: extractProjectName(from: pair.key),
-            totalCost: pair.value.reduce(0.0) { $0 + $1.costUSD },
-            totalTokens: pair.value.reduce(0) { $0 + $1.totalTokens },
-            sessionCount: Set(pair.value.compactMap(\.sessionId)).count,
-            lastUsed: pair.value.map(\.timestamp).max() ?? Date()
-        )
-    }
-
-    private static func extractProjectName(from path: String) -> String {
-        path.split(separator: "/").last.map(String.init) ?? path
-    }
-}
-
 // MARK: - UsageAggregator
 
 public enum UsageAggregator {
@@ -126,27 +99,7 @@ public enum UsageAggregator {
             tokens: sumTokens(entries),
             sessionCount: countUniqueSessions(entries),
             byModel: AggregationStrategies.byModel(entries),
-            byDate: AggregationStrategies.byDate(entries),
-            byProject: AggregationStrategies.byProject(entries)
-        )
-    }
-
-    /// Aggregate with custom strategies - open for extension
-    public static func aggregate(
-        _ entries: [UsageEntry],
-        modelStrategy: AggregationStrategy<[ModelUsage]> = AggregationStrategies.byModel,
-        dateStrategy: AggregationStrategy<[DailyUsage]> = AggregationStrategies.byDate,
-        projectStrategy: AggregationStrategy<[ProjectUsage]> = AggregationStrategies.byProject
-    ) -> UsageStats {
-        guard !entries.isEmpty else { return .empty }
-
-        return UsageStats(
-            totalCost: sumCosts(entries),
-            tokens: sumTokens(entries),
-            sessionCount: countUniqueSessions(entries),
-            byModel: modelStrategy(entries),
-            byDate: dateStrategy(entries),
-            byProject: projectStrategy(entries)
+            byDate: AggregationStrategies.byDate(entries)
         )
     }
 
@@ -158,10 +111,6 @@ public enum UsageAggregator {
 
     public static func aggregateByDate(_ entries: [UsageEntry]) -> [DailyUsage] {
         AggregationStrategies.byDate(entries)
-    }
-
-    public static func aggregateByProject(_ entries: [UsageEntry]) -> [ProjectUsage] {
-        AggregationStrategies.byProject(entries)
     }
 
     // MARK: - Today Filtering

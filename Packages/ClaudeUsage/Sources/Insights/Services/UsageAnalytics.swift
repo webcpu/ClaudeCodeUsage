@@ -134,27 +134,6 @@ public enum UsageAnalytics {
         return maxTime.timeIntervalSince(minTime) / 3600
     }
 
-    // MARK: - Cache Efficiency
-
-    public static func cacheSavings(from stats: UsageStats) -> CacheSavings {
-        let cacheReadTokens = stats.byModel.reduce(0) { $0 + $1.tokens.cacheRead }
-        let estimatedSaved = estimateCacheSavings(cacheReadTokens)
-        return CacheSavings(
-            tokensSaved: cacheReadTokens,
-            estimatedSaved: estimatedSaved,
-            description: cacheSavingsDescription(tokens: cacheReadTokens, saved: estimatedSaved)
-        )
-    }
-
-    private static func estimateCacheSavings(_ cacheReadTokens: Int) -> Double {
-        max(0, Double(cacheReadTokens) * 0.000009)
-    }
-
-    private static func cacheSavingsDescription(tokens: Int, saved: Double) -> String {
-        tokens > 0
-            ? "Saved ~$\(String(format: "%.2f", saved)) with cache (\(tokens.abbreviated) tokens)"
-            : "No cache usage yet"
-    }
 }
 
 // MARK: - Hourly Accumulation
@@ -247,16 +226,3 @@ public extension Double {
     }
 }
 
-// MARK: - Supporting Types
-
-public struct CacheSavings: Sendable {
-    public let tokensSaved: Int
-    public let estimatedSaved: Double
-    public let description: String
-
-    public init(tokensSaved: Int, estimatedSaved: Double, description: String) {
-        self.tokensSaved = tokensSaved
-        self.estimatedSaved = estimatedSaved
-        self.description = description
-    }
-}

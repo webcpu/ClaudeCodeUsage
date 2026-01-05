@@ -42,8 +42,7 @@ struct YearlyCostHeatmap_Previews: PreviewProvider {
             ),
             sessionCount: 150,
             byModel: [],
-            byDate: dailyUsage,
-            byProject: []
+            byDate: dailyUsage
         )
     }
 

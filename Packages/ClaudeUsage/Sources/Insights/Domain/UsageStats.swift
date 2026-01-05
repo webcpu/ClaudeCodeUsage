@@ -15,22 +15,19 @@ public struct UsageStats: Sendable, Hashable {
     public let sessionCount: Int
     public let byModel: [ModelUsage]
     public let byDate: [DailyUsage]
-    public let byProject: [ProjectUsage]
 
     public init(
         totalCost: Double,
         tokens: TokenCounts,
         sessionCount: Int,
         byModel: [ModelUsage] = [],
-        byDate: [DailyUsage] = [],
-        byProject: [ProjectUsage] = []
+        byDate: [DailyUsage] = []
     ) {
         self.totalCost = totalCost
         self.tokens = tokens
         self.sessionCount = sessionCount
         self.byModel = byModel
         self.byDate = byDate
-        self.byProject = byProject
     }
 
     public static var empty: UsageStats {
@@ -53,38 +50,5 @@ public extension UsageStats {
 
     var costPerMillionTokens: Double {
         totalTokens > 0 ? (totalCost / Double(totalTokens)) * 1_000_000 : 0
-    }
-}
-
-// MARK: - ProjectUsage
-
-public struct ProjectUsage: Sendable, Hashable, Identifiable {
-    public let projectPath: String
-    public let projectName: String
-    public let totalCost: Double
-    public let totalTokens: Int
-    public let sessionCount: Int
-    public let lastUsed: Date
-
-    public var id: String { projectPath }
-
-    public init(
-        projectPath: String,
-        projectName: String,
-        totalCost: Double,
-        totalTokens: Int,
-        sessionCount: Int,
-        lastUsed: Date
-    ) {
-        self.projectPath = projectPath
-        self.projectName = projectName
-        self.totalCost = totalCost
-        self.totalTokens = totalTokens
-        self.sessionCount = sessionCount
-        self.lastUsed = lastUsed
-    }
-
-    public var averageCostPerSession: Double {
-        sessionCount > 0 ? totalCost / Double(sessionCount) : 0
     }
 }
