@@ -152,9 +152,6 @@ public struct YearlyCostHeatmap: View {
                     .font(.title3)
                     .fontWeight(.semibold)
                     .foregroundColor(.primary)
-                Text("Last 365 days")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
             } else if viewModel.isLoading {
                 ProgressView()
                     .scaleEffect(0.8)

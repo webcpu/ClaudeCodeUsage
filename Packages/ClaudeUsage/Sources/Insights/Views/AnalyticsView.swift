@@ -53,7 +53,6 @@ private struct AnalyticsCards: View {
     var body: some View {
         VStack(spacing: 16) {
             YearlyCostHeatmapCard(stats: stats)
-            TokenDistributionCard(stats: stats)
             PredictionsCard(stats: stats)
             TrendsCard(stats: stats)
         }
