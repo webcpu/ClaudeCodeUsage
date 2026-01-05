@@ -21,7 +21,6 @@ struct UsageAggregatorTests {
         #expect(result.sessionCount == 0)
         #expect(result.byModel.isEmpty)
         #expect(result.byDate.isEmpty)
-        #expect(result.byProject.isEmpty)
     }
 
     @Test("aggregates single entry correctly")
@@ -114,38 +113,6 @@ struct UsageAggregatorTests {
 
         #expect(result.count == 5)
         #expect(result[0].date < result[4].date) // First is oldest
-    }
-
-    // MARK: - Aggregate By Project
-
-    @Test("groups entries by project path")
-    func groupsByProject() {
-        let entries = TestEntryFactory.entriesWithProjects([
-            (project: "/Users/dev/project-a", cost: 10.00),
-            (project: "/Users/dev/project-b", cost: 5.00),
-            (project: "/Users/dev/project-a", cost: 3.00)
-        ])
-        let result = UsageAggregator.aggregateByProject(entries)
-
-        #expect(result.count == 2)
-
-        let projectA = result.first { $0.projectPath == "/Users/dev/project-a" }
-        #expect(projectA?.totalCost == 13.00)
-        #expect(projectA?.projectName == "project-a")
-    }
-
-    @Test("sorts projects by cost descending")
-    func sortsProjectsByCostDescending() {
-        let entries = TestEntryFactory.entriesWithProjects([
-            (project: "cheap", cost: 1.00),
-            (project: "expensive", cost: 100.00),
-            (project: "medium", cost: 10.00)
-        ])
-        let result = UsageAggregator.aggregateByProject(entries)
-
-        #expect(result[0].projectPath == "expensive")
-        #expect(result[1].projectPath == "medium")
-        #expect(result[2].projectPath == "cheap")
     }
 
     // MARK: - Filter Today
