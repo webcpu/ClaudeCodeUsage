@@ -5,15 +5,13 @@
 
 import SwiftUI
 import Observation
-import OSLog
-
-private let logger = Logger(subsystem: "com.claudecodeusage", category: "GlanceStore")
 
 // MARK: - Glance Store
 
 @Observable
 @MainActor
 public final class GlanceStore {
+
     // MARK: - State
 
     private(set) var isLoading = true
@@ -32,14 +30,12 @@ public final class GlanceStore {
 
     // MARK: - Dependencies
 
-    private let todayCostProvider: TodayCostProvider
-    private let sessionProvider: SessionProvider
+    private let service: GlanceService
     private let clock: any ClockProtocol
     private let refreshCoordinator: RefreshCoordinator
 
     // MARK: - Internal State
 
-    private var isCurrentlyLoading = false
     private var hasInitialized = false
 
     // MARK: - Initialization
@@ -49,12 +45,7 @@ public final class GlanceStore {
         sessionDurationHours: Double = 5.0,
         clock: any ClockProtocol = SystemClock()
     ) {
-        let usageProvider = UsageProvider(basePath: basePath)
-        self.todayCostProvider = TodayCostProvider(usageProvider: usageProvider)
-        self.sessionProvider = SessionProvider(
-            basePath: basePath,
-            sessionDurationHours: sessionDurationHours
-        )
+        self.service = GlanceService(basePath: basePath, sessionDurationHours: sessionDurationHours)
         self.clock = clock
         self.refreshCoordinator = RefreshCoordinatorFactory.make(
             clock: clock,
@@ -67,13 +58,11 @@ public final class GlanceStore {
     }
 
     init(
-        todayCostProvider: TodayCostProvider,
-        sessionProvider: SessionProvider,
+        service: GlanceService,
         clock: any ClockProtocol,
         refreshCoordinator: RefreshCoordinator
     ) {
-        self.todayCostProvider = todayCostProvider
-        self.sessionProvider = sessionProvider
+        self.service = service
         self.clock = clock
         self.refreshCoordinator = refreshCoordinator
 
@@ -91,28 +80,17 @@ public final class GlanceStore {
     }
 
     func loadData(invalidateCache: Bool = true) async {
-        guard !isCurrentlyLoading else { return }
-
-        isCurrentlyLoading = true
         isLoading = true
-        defer {
-            isCurrentlyLoading = false
-            isLoading = false
-        }
+        defer { isLoading = false }
 
-        do {
-            if invalidateCache {
-                await todayCostProvider.clearCache()
-            }
+        guard let result = await service.loadData(invalidateCache: invalidateCache) else { return }
 
-            async let costTask = todayCostProvider.getTodayCost()
-            async let sessionTask = sessionProvider.getActiveSession()
-
-            todayCost = try await costTask
-            activeSession = await sessionTask
-
-        } catch {
-            logger.error("Failed to load: \(error.localizedDescription)")
+        switch result {
+        case .success(let data):
+            todayCost = data.todayCost
+            activeSession = data.activeSession
+        case .failure:
+            break
         }
     }
 
