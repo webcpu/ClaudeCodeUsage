@@ -1,6 +1,5 @@
 //
 //  SessionDetector.swift
-//  Pure domain logic for detecting session boundaries
 //
 
 import Foundation
