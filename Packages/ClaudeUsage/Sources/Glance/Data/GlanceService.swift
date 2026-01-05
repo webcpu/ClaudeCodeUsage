@@ -54,30 +54,29 @@ public actor GlanceService {
     /// Loads glance data. Returns nil if a load is already in progress.
     public func loadData(invalidateCache: Bool = true) async -> Result<GlanceData, Error>? {
         guard !isLoading else {
-            logger.debug("GlanceService: loadData skipped - already loading")
+            logger.debug("loadData: skipped - already loading")
             return nil
         }
-
         isLoading = true
         defer { isLoading = false }
 
-        logger.info("GlanceService: loadData started (invalidateCache: \(invalidateCache))")
+        if invalidateCache { await clearCache() }
 
+        // Pipeline: fetch → compose
+        return await executeFetch()
+            .map { cost, session in GlanceData(todayCost: cost, activeSession: session) }
+    }
+
+    private func executeFetch() async -> Result<(TodayCost, UsageSession?), Error> {
+        logger.info("loadData: fetching")
         do {
-            if invalidateCache {
-                await clearCache()
-            }
-
-            async let costTask = todayCostProvider.getTodayCost()
-            async let sessionTask = sessionProvider.getActiveSession()
-
-            let todayCost = try await costTask
-            let activeSession = await sessionTask
-
-            logger.info("GlanceService: loadData completed - cost: \(todayCost.total)")
-            return .success(GlanceData(todayCost: todayCost, activeSession: activeSession))
+            async let cost = todayCostProvider.getTodayCost()
+            async let session = sessionProvider.getActiveSession()
+            let result = (try await cost, await session)
+            logger.info("loadData: success - cost: \(result.0.total)")
+            return .success(result)
         } catch {
-            logger.error("GlanceService: loadData failed - \(error.localizedDescription)")
+            logger.error("loadData: failed - \(error.localizedDescription)")
             return .failure(error)
         }
     }
