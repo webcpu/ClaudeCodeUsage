@@ -12,11 +12,11 @@ import Foundation
 /// Responsibilities:
 /// - File discovery and loading (I/O)
 /// - Cache management
-/// - Delegates session detection to SessionDetector (Domain)
+/// - Delegates session finding to SessionFinder (Domain)
 public actor SessionProvider: SessionProviding {
     private let basePath: String
     private let parser = JSONLParser()
-    private let detector: SessionDetector
+    private let finder: SessionFinder
 
     private var lastFileTimestamps: [String: Date] = [:]
     private var allEntries: [UsageEntry] = []
@@ -27,7 +27,7 @@ public actor SessionProvider: SessionProviding {
 
     public init(basePath: String = NSHomeDirectory() + "/.claude", sessionDurationHours: Double = 5.0) {
         self.basePath = basePath
-        self.detector = SessionDetector(sessionDurationHours: sessionDurationHours)
+        self.finder = SessionFinder(sessionDurationHours: sessionDurationHours)
     }
 
     // MARK: - SessionProviding
@@ -56,9 +56,9 @@ public actor SessionProvider: SessionProviding {
     private func loadActiveSession() -> UsageSession? {
         loadModifiedFiles()
         let now = Date()
-        let blocks = detector.detectSessions(from: allEntries, now: now)
-        cachedTokenLimit = detector.maxTokensFromCompletedSessions(blocks)
-        return detector.findActiveSession(in: blocks)?
+        let blocks = finder.findSessions(from: allEntries, now: now)
+        cachedTokenLimit = finder.maxTokensFromCompletedSessions(blocks)
+        return finder.findActiveSession(in: blocks)?
             .with(tokenLimit: cachedTokenLimit > 0 ? cachedTokenLimit : nil)
     }
 
@@ -76,7 +76,7 @@ public actor SessionProvider: SessionProviding {
         guard let allFiles = try? FileDiscovery.discoverFiles(in: basePath) else {
             return []
         }
-        let windowHours = detector.sessionDurationHours * 2
+        let windowHours = finder.sessionDurationHours * 2
         return FileDiscovery.filter(allFiles, by: FileFilters.modifiedWithin(hours: windowHours))
     }
 

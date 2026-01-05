@@ -18,7 +18,6 @@ public final class GlanceStore {
 
     private(set) var isLoading = true
     private(set) var activeSession: UsageSession?
-    private(set) var burnRate: BurnRate?
     private(set) var todayCost: TodayCost = .zero
 
     // MARK: - Derived Properties
@@ -33,7 +32,7 @@ public final class GlanceStore {
 
     // MARK: - Dependencies
 
-    private let usageProvider: UsageProvider
+    private let todayCostProvider: TodayCostProvider
     private let sessionProvider: SessionProvider
     private let clock: any ClockProtocol
     private let refreshCoordinator: RefreshCoordinator
@@ -50,7 +49,8 @@ public final class GlanceStore {
         sessionDurationHours: Double = 5.0,
         clock: any ClockProtocol = SystemClock()
     ) {
-        self.usageProvider = UsageProvider(basePath: basePath)
+        let usageProvider = UsageProvider(basePath: basePath)
+        self.todayCostProvider = TodayCostProvider(usageProvider: usageProvider)
         self.sessionProvider = SessionProvider(
             basePath: basePath,
             sessionDurationHours: sessionDurationHours
@@ -67,12 +67,12 @@ public final class GlanceStore {
     }
 
     init(
-        usageProvider: UsageProvider,
+        todayCostProvider: TodayCostProvider,
         sessionProvider: SessionProvider,
         clock: any ClockProtocol,
         refreshCoordinator: RefreshCoordinator
     ) {
-        self.usageProvider = usageProvider
+        self.todayCostProvider = todayCostProvider
         self.sessionProvider = sessionProvider
         self.clock = clock
         self.refreshCoordinator = refreshCoordinator
@@ -102,16 +102,14 @@ public final class GlanceStore {
 
         do {
             if invalidateCache {
-                await usageProvider.clearCache()
+                await todayCostProvider.clearCache()
             }
 
-            async let entriesTask = usageProvider.getTodayEntries()
+            async let costTask = todayCostProvider.getTodayCost()
             async let sessionTask = sessionProvider.getActiveSession()
 
-            let entries = try await entriesTask
-            todayCost = TodayCost(entries: entries)
+            todayCost = try await costTask
             activeSession = await sessionTask
-            burnRate = activeSession?.burnRate
 
         } catch {
             logger.error("Failed to load: \(error.localizedDescription)")

@@ -1,16 +1,16 @@
 //
-//  SessionDetector.swift
+//  SessionFinder.swift
 //
 
 import Foundation
 
-// MARK: - SessionDetector
+// MARK: - SessionFinder
 
-/// Detects session boundaries from usage entries.
+/// Finds session boundaries from usage entries.
 ///
 /// Pure domain logic with no I/O or side effects.
 /// All methods are deterministic given the same inputs.
-public struct SessionDetector: Sendable {
+public struct SessionFinder: Sendable {
     public let sessionDurationHours: Double
 
     public init(sessionDurationHours: Double = 5.0) {
@@ -19,8 +19,8 @@ public struct SessionDetector: Sendable {
 
     // MARK: - Public API
 
-    /// Detects all session blocks from sorted usage entries.
-    public func detectSessions(from entries: [UsageEntry], now: Date) -> [UsageSession] {
+    /// Finds all session blocks from sorted usage entries.
+    public func findSessions(from entries: [UsageEntry], now: Date) -> [UsageSession] {
         guard !entries.isEmpty else { return [] }
         let groups = splitAtSessionGaps(entries)
         return mapGroupsToBlocks(groups, now: now)
@@ -44,7 +44,7 @@ public struct SessionDetector: Sendable {
 
 // MARK: - Session Gap Detection
 
-private extension SessionDetector {
+private extension SessionFinder {
     func splitAtSessionGaps(_ entries: [UsageEntry]) -> [[UsageEntry]] {
         guard !entries.isEmpty else { return [] }
         let splitIndices = findSplitIndices(in: entries)
@@ -71,7 +71,7 @@ private extension SessionDetector {
 
 // MARK: - Block Mapping
 
-private extension SessionDetector {
+private extension SessionFinder {
     func mapGroupsToBlocks(_ groups: [[UsageEntry]], now: Date) -> [UsageSession] {
         guard !groups.isEmpty else { return [] }
         let historicalBlocks = groups.dropLast().compactMap { createHistoricalBlock($0, now: now) }
@@ -103,7 +103,7 @@ private extension SessionDetector {
 
 // MARK: - Block Creation
 
-private extension SessionDetector {
+private extension SessionFinder {
     func createBlock(
         entries: [UsageEntry],
         displayStartTime: Date,
@@ -135,7 +135,7 @@ private extension SessionDetector {
 
 // MARK: - Aggregations
 
-private extension SessionDetector {
+private extension SessionFinder {
     func aggregateTokens(from entries: [UsageEntry]) -> TokenCounts {
         entries.reduce(TokenCounts.zero) { $0 + $1.tokens }
     }
@@ -151,7 +151,7 @@ private extension SessionDetector {
 
 // MARK: - Burn Rate
 
-private extension SessionDetector {
+private extension SessionFinder {
     func calculateBurnRate(entries: [UsageEntry]) -> BurnRate {
         guard let duration = sessionDuration(from: entries),
               duration > Constants.minimumDuration else {
@@ -175,7 +175,7 @@ private extension SessionDetector {
 
 // MARK: - Constants
 
-private extension SessionDetector {
+private extension SessionFinder {
     var sessionDurationSeconds: TimeInterval {
         sessionDurationHours * 3600
     }
