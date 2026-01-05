@@ -1,12 +1,22 @@
 //
 //  UsageAggregatorTests.swift
-//  ClaudeUsageCoreTests
+//
+//  Specification for UsageAggregator - pure functions for usage data aggregation.
+//
+//  This test suite specifies:
+//  - aggregate([UsageEntry]) → UsageStats: sums costs/tokens, counts sessions, groups by model/date
+//  - aggregateByModel: groups by model, sorts by cost descending
+//  - aggregateByDate: groups by date string (yyyy-MM-dd), sorts ascending
+//  - filterToday: filters entries to reference date
+//  - todayHourlyCosts: returns 24-element array of hourly costs
 //
 
 import Testing
 import Foundation
 @testable import ClaudeUsage
 
+/// UsageAggregator is an enum with static methods for aggregating usage entries.
+/// All methods are pure functions with no side effects.
 @Suite("UsageAggregator")
 struct UsageAggregatorTests {
 

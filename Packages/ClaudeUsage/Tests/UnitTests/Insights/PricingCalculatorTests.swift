@@ -1,11 +1,19 @@
 //
 //  PricingCalculatorTests.swift
-//  ClaudeUsageCoreTests
+//
+//  Specification for PricingCalculator - pure functions for cost calculation.
+//
+//  This test suite specifies:
+//  - Model family detection from model strings (case insensitive, first match wins)
+//  - Cost calculation formula: sum of (tokens × rate) for each token type
+//  - Pricing values for each model family
 //
 
 import Testing
 @testable import ClaudeUsage
 
+/// PricingCalculator is an enum with static methods for cost calculation.
+/// It detects model families from strings and calculates costs based on token usage.
 @Suite("PricingCalculator")
 struct PricingCalculatorTests {
 

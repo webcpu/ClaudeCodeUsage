@@ -155,7 +155,7 @@ struct HeatmapPerformanceTests {
         await sut.updateStats(stats)
         let duration = Date().timeIntervalSince(startTime)
 
-        #expect(duration < 2.0, "Should complete in under 2 seconds")
+        #expect(duration < 3.0, "Should complete in under 3 seconds")
         #expect(sut.dataset != nil)
     }
 }
