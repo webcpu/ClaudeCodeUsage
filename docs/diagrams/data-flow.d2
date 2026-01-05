@@ -1,0 +1,47 @@
+# Data Flow
+
+direction: right
+
+# Global style - make it readable (larger to compensate for wider diagram scaling)
+*.style.font-size: 36
+
+# Left: Source & Parsing
+fs: .jsonl {
+  shape: cylinder
+  style.fill: "#f5f5f7"
+}
+
+FileDiscovery
+JSONLParser
+
+UsageProvider {
+  style.fill: "#ffcc80"
+}
+
+# Right: Two parallel feature tracks
+GlanceService
+GlanceStore
+MenuBar: Menu Bar {
+  style.fill: "#0071e3"
+  style.font-color: white
+}
+
+InsightsService
+InsightsStore
+MainWindow: Main Window {
+  style.fill: "#1d1d1f"
+  style.font-color: white
+}
+
+# Parsing chain (vertical)
+fs -> FileDiscovery
+FileDiscovery -> JSONLParser
+JSONLParser -> UsageProvider
+
+# Branch to features
+UsageProvider -> GlanceService: today
+UsageProvider -> InsightsService: all
+
+# Feature flows
+GlanceService -> GlanceStore -> MenuBar
+InsightsService -> InsightsStore -> MainWindow

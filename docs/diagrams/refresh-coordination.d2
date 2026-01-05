@@ -1,0 +1,48 @@
+# Refresh Coordination
+
+direction: right
+
+# Global style
+*.style.font-size: 28
+
+# Event Monitors (vertical stack on left, uniform size)
+FileChangeMonitor {
+  width: 280
+  height: 80
+}
+DayChangeMonitor {
+  width: 280
+  height: 80
+}
+FallbackTimer {
+  width: 280
+  height: 80
+}
+WakeMonitor {
+  width: 280
+  height: 80
+}
+
+# Core flow
+RefreshCoordinator {
+  style.fill: "#ffcc80"
+}
+
+GlanceStore {
+  style.fill: "#e1bee7"
+}
+
+GlanceView {
+  style.fill: "#7b1fa2"
+  style.font-color: white
+}
+
+# Connections - monitors to coordinator
+FileChangeMonitor -> RefreshCoordinator: file changed
+DayChangeMonitor -> RefreshCoordinator: midnight
+FallbackTimer -> RefreshCoordinator: periodic
+WakeMonitor -> RefreshCoordinator: wake
+
+# Core flow
+RefreshCoordinator -> GlanceStore: invalidate?
+GlanceStore -> GlanceView: update
