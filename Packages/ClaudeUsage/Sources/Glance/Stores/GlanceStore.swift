@@ -19,24 +19,16 @@ public final class GlanceStore {
     private(set) var isLoading = true
     private(set) var activeSession: UsageSession?
     private(set) var burnRate: BurnRate?
-    private(set) var todayEntries: [UsageEntry] = []
+    private(set) var todayCost: TodayCost = .zero
 
     // MARK: - Derived Properties
 
-    var todaysCost: Double {
-        todayEntries.reduce(0.0) { $0 + $1.costUSD }
-    }
-
-    var formattedTodaysCost: String {
-        todaysCost.asCurrency
-    }
+    var todaysCost: Double { todayCost.total }
+    var formattedTodaysCost: String { todayCost.formatted }
+    var todayHourlyCosts: [Double] { todayCost.hourlyCosts }
 
     var sessionTimeProgress: Double {
         activeSession.map { sessionProgress($0, now: clock.now) } ?? 0
-    }
-
-    var todayHourlyCosts: [Double] {
-        UsageAggregator.todayHourlyCosts(from: todayEntries, referenceDate: clock.now)
     }
 
     // MARK: - Dependencies
@@ -116,7 +108,8 @@ public final class GlanceStore {
             async let entriesTask = usageProvider.getTodayEntries()
             async let sessionTask = sessionProvider.getActiveSession()
 
-            todayEntries = try await entriesTask
+            let entries = try await entriesTask
+            todayCost = TodayCost(entries: entries)
             activeSession = await sessionTask
             burnRate = activeSession?.burnRate
 

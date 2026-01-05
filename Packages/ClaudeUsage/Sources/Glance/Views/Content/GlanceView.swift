@@ -24,7 +24,6 @@ struct GlanceView: View {
     var body: some View {
         VStack(spacing: 0) {
             liveSessionSection
-            usageSection
             costSection
             actionsSection
         }
@@ -48,23 +47,6 @@ struct GlanceView: View {
                 badge: "ACTIVE"
             )
             SessionMetricsSection()
-                .padding(.horizontal, 12)
-                .padding(.vertical, 4)
-            sectionDivider
-                .padding(.horizontal, 12)
-        }
-    }
-
-    @ViewBuilder
-    private var usageSection: some View {
-        if store.activeSession != nil {
-            SectionHeader(
-                title: "Usage",
-                icon: "chart.bar.fill",
-                color: GlanceTheme.Colors.Sections.usage,
-                badge: nil
-            )
-            UsageMetricsSection()
                 .padding(.horizontal, 12)
                 .padding(.vertical, 4)
             sectionDivider
