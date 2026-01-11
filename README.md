@@ -41,7 +41,7 @@ A macOS menu bar app for tracking Claude Code usage and costs in real-time.
   <img src="docs/screenshots/installation.png" width="600" alt="Installation">
 </p>
 
-**Required:** Grant Full Disk Access in System Settings → Privacy & Security → Full Disk Access. The app reads usage data from `~/.claude/projects/` which requires this permission.
+The app reads usage data from `~/.claude/projects/` (Claude Code's local storage).
 
 ## Development
 
