@@ -66,3 +66,4 @@ fastlane/screenshots/**/*.png
 fastlane/test_output
 .DS_Store
 /CLAUDE.md
+build/
