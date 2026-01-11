@@ -4,109 +4,88 @@ A macOS menu bar app for tracking Claude Code usage and costs in real-time.
 
 ## Features
 
-- **Menu Bar Cost Display** - Today's cost always visible in menu bar
-- **Live Session Monitoring** - Active session indicator with real-time updates
-- **Usage Analytics** - Daily, weekly, and monthly breakdowns
-- **Yearly Heatmap** - GitHub-style contribution heatmap for cost visualization
-- **Cost Alerts** - Visual warnings when daily spending exceeds threshold
-- **Open at Login** - Optional automatic launch on system startup
+### Menu Bar
+- Today's cost always visible
+- Live session indicator with duration, tokens, and cost
+- Color-coded cost warnings (green → orange → red)
 
-## Data Source
+<p align="center">
+  <img src="docs/screenshots/menu.png" width="280" alt="Menu Bar">
+</p>
 
-Reads usage data from `~/.claude/projects/` (Claude Code's local storage).
+### Daily Usage
+- Day-by-day breakdown of your usage
+- Hourly cost charts for each day
 
-## Build & Run
+<p align="center">
+  <img src="docs/screenshots/daily-usage.png" width="600" alt="Daily Usage">
+</p>
 
-```bash
-cd Packages/ClaudeUsage
-swift build        # Build all targets
-swift test         # Run all tests
-```
+### Analytics
+- Yearly heatmap (GitHub-style)
+- Predictions and usage trends
 
-## Architecture
-
-### High-Level Overview
-
-The application consists of two main features built on a shared foundation:
-
-- **Glance** - Menu bar app for real-time monitoring (today's cost, active session, burn rate)
-- **Insights** - Main window for analytics and history (model breakdown, daily trends, yearly heatmap)
-- **App** - Shared foundation layer (data access, parsing, file system monitoring)
-
-### Package Structure
-
-```
-Packages/ClaudeUsage/Sources/
-├── App/                          # Shared foundation layer
-│   ├── Domain/                   # Core types (UsageEntry, TokenCounts)
-│   ├── Data/                     # Data access (UsageProvider, JSONLParser)
-│   ├── Infrastructure/           # System services (DirectoryMonitor)
-│   └── Shared/                   # Utilities (Composition, AppEnvironment)
-│
-├── Glance/                       # Menu bar feature
-│   ├── Domain/                   # TodayCost, UsageSession, SessionFinder
-│   ├── Data/                     # GlanceService, TodayCostProvider, SessionProvider
-│   ├── Stores/                   # GlanceStore (@Observable)
-│   ├── Infrastructure/           # RefreshCoordinator, Clock, Monitors
-│   └── Views/                    # GlanceView, GlanceLabel, components
-│
-└── Insights/                     # Main window feature
-    ├── Domain/                   # UsageStats, UsageAggregator, PricingCalculator
-    ├── Data/                     # InsightsService
-    ├── Stores/                   # InsightsStore (@Observable)
-    └── Views/                    # InsightsView, AnalyticsView, Heatmap
-```
-
-### Clean Architecture Layers
-
-Each feature follows this consistent layered architecture:
-
-| Layer | Responsibility | Examples |
-|-------|----------------|----------|
-| **Views** | SwiftUI rendering, @Environment injection | `GlanceView`, `InsightsView` |
-| **Stores** | @Observable state containers | `GlanceStore`, `InsightsStore` |
-| **Data** | Actor-based orchestration, caching | `GlanceService`, `InsightsService` |
-| **Domain** | Pure business logic, no I/O | `SessionFinder`, `UsageAggregator` |
-
-### Data Flow
-
-![Data Flow](docs/diagrams/data-flow.svg)
-
-Data flows from the filesystem through parsing and caching layers to the UI:
-
-1. **FileDiscovery** scans `~/.claude/projects/` for `.jsonl` files
-2. **JSONLParser** parses entries with deduplication
-3. **UsageProvider** (actor) caches parsed entries by file modification date
-4. **Feature Services** transform raw entries into domain objects
-5. **Stores** hold observable state for SwiftUI views
-
-### Refresh Coordination (Glance)
-
-![Refresh Coordination](docs/diagrams/refresh-coordination.svg)
-
-The Glance feature stays up-to-date through multiple event monitors:
-
-| Monitor | Trigger | Cache |
-|---------|---------|-------|
-| FileChangeMonitor | `.jsonl` file changes | Invalidate |
-| DayChangeMonitor | Midnight transition | Invalidate |
-| FallbackTimer | Periodic (5-10 min) | Preserve |
-| WakeMonitor | System wake | Invalidate |
-
-### Key Design Patterns
-
-| Pattern | Implementation |
-|---------|----------------|
-| **Actor Isolation** | `UsageProvider`, `GlanceService`, `InsightsService` |
-| **@Observable** | `GlanceStore`, `InsightsStore` for SwiftUI |
-| **Protocol-Oriented** | `UsageProviding`, `SessionProviding`, `RefreshMonitor` |
-| **Strategy Pattern** | `AggregationStrategy<T>` with functional composition |
-| **Factory Pattern** | `RefreshCoordinatorFactory` for OCP-compliant assembly |
+<p align="center">
+  <img src="docs/screenshots/analytics.png" width="600" alt="Analytics">
+</p>
 
 ## Requirements
 
 - macOS 15.0+
-- Swift 6.0+
+
+## Installation
+
+[Download the latest DMG](https://github.com/webcpu/ClaudeCodeUsage/releases/latest/download/ClaudeCodeUsage.dmg), open it, and drag ClaudeCodeUsage to Applications.
+
+<p align="center">
+  <img src="docs/screenshots/installation.png" width="600" alt="Installation">
+</p>
+
+**Required:** Grant Full Disk Access in System Settings → Privacy & Security → Full Disk Access. The app reads usage data from `~/.claude/projects/` which requires this permission.
+
+## Development
+
+### Build & Run
+
+Open `ClaudeCodeUsage.xcodeproj` in Xcode, then build and run (⌘R).
+
+### Develop UI with Claude Code
+
+#### Setup
+
+1. Open `ClaudeCodeUsage.xcodeproj` in Xcode
+2. Show Canvas: Editor → Canvas (or ⌥⌘↩)
+3. Select a SwiftUI view file to see its preview
+
+<p align="center">
+  <img src="docs/previews/xcode-daily-usage-previews.png" width="600" alt="Xcode Previews">
+</p>
+
+#### Workflow
+
+Give Claude Code a prompt like this:
+
+> Make the menu bar chart use a gradient from blue to purple.
+>
+> After making changes, run:
+> ```
+> swift run --package-path Packages/ClaudeUsage ScreenshotCapture
+> ```
+> Then read the screenshot from `/tmp/ClaudeUsage/` to verify. If it doesn't look right, keep iterating until it matches expectations.
+
+You can also provide a reference image:
+
+> Update the Analytics view to match the style in this image: @reference-design.png
+>
+> Use ScreenshotCapture to verify your changes match the reference.
+
+Claude Code will edit → capture → verify → repeat until the result looks correct.
+
+The best part: you can see the visual effects of changes immediately in Xcode previews. All views have previews with real data for rapid iteration without running the full app.
+
+## Architecture
+
+See [ARCHITECTURE.md](Packages/ClaudeUsage/ARCHITECTURE.md) for detailed design documentation.
 
 ## License
 
