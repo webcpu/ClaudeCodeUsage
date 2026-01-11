@@ -35,7 +35,7 @@ A macOS menu bar app for tracking Claude Code usage and costs in real-time.
 
 ## Installation
 
-[Download the latest DMG](https://github.com/webcpu/ClaudeCodeUsage/releases/latest/download/ClaudeCodeUsage.dmg), open it, and drag ClaudeCodeUsage to Applications.
+[Download the latest DMG](https://github.com/webcpu/ClaudeCodeUsage/releases), open it, and drag ClaudeCodeUsage to Applications.
 
 <p align="center">
   <img src="docs/screenshots/installation.png" width="600" alt="Installation">
