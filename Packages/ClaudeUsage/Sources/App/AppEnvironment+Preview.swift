@@ -18,12 +18,11 @@ public struct PreviewEnvironment: PreviewModifier {
     public static func makeSharedContext() async throws -> AppEnvironment {
         print("\(timestamp()) PreviewEnvironment: Making shared context")
         let env = AppEnvironment.live()
-        print("\(timestamp()) PreviewEnvironment: glanceStore.loadData start")
-        await env.glanceStore.loadData()
-        print("\(timestamp()) PreviewEnvironment: glanceStore.loadData end")
-        print("\(timestamp()) PreviewEnvironment: insightsStore.loadData start")
-        await env.insightsStore.loadData()
-        print("\(timestamp()) PreviewEnvironment: insightsStore.loadData end")
+        print("\(timestamp()) PreviewEnvironment: loading stores in parallel")
+        async let glance: () = env.glanceStore.loadData()
+        async let insights: () = env.insightsStore.initializeIfNeeded(startMonitoring: false)
+        _ = await (glance, insights)
+        print("\(timestamp()) PreviewEnvironment: stores loaded")
         return env
     }
 

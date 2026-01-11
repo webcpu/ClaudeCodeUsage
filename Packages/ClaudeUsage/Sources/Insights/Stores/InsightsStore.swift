@@ -41,12 +41,14 @@ public final class InsightsStore {
 
     // MARK: - Public API
 
-    func initializeIfNeeded() async {
+    func initializeIfNeeded(startMonitoring: Bool = true) async {
         guard !hasInitialized else { return }
         hasInitialized = true
 
-        await service.startMonitoring { [weak self] in
-            Task { await self?.loadData() }
+        if startMonitoring {
+            await service.startMonitoring { [weak self] in
+                Task { await self?.loadData() }
+            }
         }
         await loadData()
     }
