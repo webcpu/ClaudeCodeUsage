@@ -39,4 +39,9 @@ public struct DailyUsage: Sendable, Hashable, Identifiable {
         f.dateFormat = "yyyy-MM-dd"
         return f
     }()
+
+    /// Creates an empty DailyUsage for a given date string (yyyy-MM-dd format)
+    public static func empty(for date: String) -> DailyUsage {
+        DailyUsage(date: date, totalCost: 0, totalTokens: 0, modelsUsed: [], hourlyCosts: [])
+    }
 }

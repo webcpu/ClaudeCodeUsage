@@ -125,6 +125,64 @@ struct UsageAggregatorTests {
         #expect(result[0].date < result[4].date) // First is oldest
     }
 
+    // MARK: - Ensure Today
+
+    @Test("ensureToday adds empty today when missing")
+    func ensureTodayAddsMissingToday() {
+        let yesterday = TestEntryFactory.dateOffset(days: -1)
+        let twoDaysAgo = TestEntryFactory.dateOffset(days: -2)
+        let referenceDate = Date()
+        let todayString = dateString(from: referenceDate)
+
+        let existingDates = [
+            DailyUsage(date: dateString(from: twoDaysAgo), totalCost: 5.0, totalTokens: 1000),
+            DailyUsage(date: dateString(from: yesterday), totalCost: 10.0, totalTokens: 2000)
+        ]
+
+        let result = UsageAggregator.ensureToday(in: existingDates, referenceDate: referenceDate)
+
+        #expect(result.count == 3)
+        #expect(result.last?.date == todayString)
+        #expect(result.last?.totalCost == 0)
+        #expect(result.last?.totalTokens == 0)
+        #expect(result.last?.modelsUsed.isEmpty == true)
+    }
+
+    @Test("ensureToday preserves existing today")
+    func ensureTodayPreservesExisting() {
+        let referenceDate = Date()
+        let todayString = dateString(from: referenceDate)
+
+        let existingDates = [
+            DailyUsage(date: todayString, totalCost: 25.0, totalTokens: 5000, modelsUsed: ["opus"])
+        ]
+
+        let result = UsageAggregator.ensureToday(in: existingDates, referenceDate: referenceDate)
+
+        #expect(result.count == 1)
+        #expect(result[0].totalCost == 25.0)
+        #expect(result[0].modelsUsed == ["opus"])
+    }
+
+    @Test("ensureToday maintains sort order")
+    func ensureTodayMaintainsSortOrder() {
+        let yesterday = TestEntryFactory.dateOffset(days: -1)
+        let tomorrow = TestEntryFactory.dateOffset(days: 1)
+        let referenceDate = Date()
+
+        let existingDates = [
+            DailyUsage(date: dateString(from: yesterday), totalCost: 5.0, totalTokens: 1000),
+            DailyUsage(date: dateString(from: tomorrow), totalCost: 15.0, totalTokens: 3000)
+        ]
+
+        let result = UsageAggregator.ensureToday(in: existingDates, referenceDate: referenceDate)
+
+        #expect(result.count == 3)
+        #expect(result[0].date == dateString(from: yesterday))
+        #expect(result[1].date == dateString(from: referenceDate))
+        #expect(result[2].date == dateString(from: tomorrow))
+    }
+
     // MARK: - Filter Today
 
     @Test("filters to today's entries only")
@@ -187,6 +245,13 @@ struct UsageAggregatorTests {
     /// Sums costs from entries (pure function)
     private func sumCosts(_ entries: [UsageEntry]) -> Double {
         entries.reduce(0) { $0 + $1.costUSD }
+    }
+
+    /// Formats date as yyyy-MM-dd string (pure function)
+    private func dateString(from date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
     }
 }
 

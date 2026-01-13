@@ -99,8 +99,21 @@ public enum UsageAggregator {
             tokens: sumTokens(entries),
             sessionCount: countUniqueSessions(entries),
             byModel: AggregationStrategies.byModel(entries),
-            byDate: AggregationStrategies.byDate(entries)
+            byDate: ensureToday(in: AggregationStrategies.byDate(entries))
         )
+    }
+
+    /// Ensures today's date is always present in the daily usage array.
+    /// If today is missing, inserts an empty placeholder so the UI always shows today.
+    public static func ensureToday(
+        in dates: [DailyUsage],
+        referenceDate: Date = Date()
+    ) -> [DailyUsage] {
+        let todayString = DateFormatters.yearMonthDay.string(from: referenceDate)
+        if dates.contains(where: { $0.date == todayString }) {
+            return dates
+        }
+        return (dates + [DailyUsage.empty(for: todayString)]).sorted { $0.date < $1.date }
     }
 
     // MARK: - Individual Aggregations (for direct use)

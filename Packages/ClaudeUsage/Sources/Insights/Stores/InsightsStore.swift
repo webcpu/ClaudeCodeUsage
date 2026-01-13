@@ -24,19 +24,27 @@ public final class InsightsStore {
     // MARK: - Dependencies
 
     private let service: InsightsService
+    private let clock: any ClockProtocol
 
     // MARK: - Internal State
 
     private var hasInitialized = false
+    private var dayChangeMonitor: DayChangeMonitor?
+    private var dayTracker: DayTracker?
 
     // MARK: - Initialization
 
-    public init(basePath: String = AppConfiguration.default.basePath) {
+    public init(
+        basePath: String = AppConfiguration.default.basePath,
+        clock: any ClockProtocol = SystemClock()
+    ) {
         self.service = InsightsService(basePath: basePath)
+        self.clock = clock
     }
 
-    init(service: InsightsService) {
+    init(service: InsightsService, clock: any ClockProtocol = SystemClock()) {
         self.service = service
+        self.clock = clock
     }
 
     // MARK: - Public API
@@ -49,8 +57,25 @@ public final class InsightsStore {
             await service.startMonitoring { [weak self] in
                 Task { await self?.loadData() }
             }
+            startDayChangeMonitoring()
         }
         await loadData()
+    }
+
+    // MARK: - Day Change Monitoring
+
+    private func startDayChangeMonitoring() {
+        let tracker = DayTracker(clock: clock)
+        dayTracker = tracker
+
+        dayChangeMonitor = DayChangeMonitor(
+            clock: clock,
+            dayTracker: tracker,
+            onRefresh: { [weak self] _ in
+                Task { await self?.loadData() }
+            }
+        )
+        dayChangeMonitor?.start()
     }
 
     func loadData() async {
