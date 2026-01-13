@@ -223,6 +223,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				ECF4108B2F03EC6700DFC0C8 /* XCLocalSwiftPackageReference "Packages/ClaudeUsage" */,
+				ECF4108C2F03EC6800DFC0C8 /* XCRemoteSwiftPackageReference "ScreenshotKit" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = ECF4102C2F03E6AD00DFC0C8 /* Products */;
@@ -613,6 +614,17 @@
 			relativePath = Packages/ClaudeUsage;
 		};
 /* End XCLocalSwiftPackageReference section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		ECF4108C2F03EC6800DFC0C8 /* XCRemoteSwiftPackageReference "ScreenshotKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/webcpu/ScreenshotKit";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
 		ECF410562F03E6FD00DFC0C8 /* ClaudeUsageCore */ = {

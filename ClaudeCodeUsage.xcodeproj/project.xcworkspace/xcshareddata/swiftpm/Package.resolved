@@ -1,0 +1,15 @@
+{
+  "originHash" : "cb94b49003f29aebe7e30cc179539e892ed74066fb0adea70a71259196d721cb",
+  "pins" : [
+    {
+      "identity" : "screenshotkit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/webcpu/ScreenshotKit",
+      "state" : {
+        "branch" : "main",
+        "revision" : "aa91cd9e21866a2317597abc2d7726de00d54b75"
+      }
+    }
+  ],
+  "version" : 3
+}

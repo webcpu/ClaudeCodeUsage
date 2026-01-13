@@ -17,7 +17,7 @@ let package = Package(
         .executable(name: "ScreenshotCapture", targets: ["ScreenshotCapture"]),
     ],
     dependencies: [
-        .package(path: "../ScreenshotKit"),
+        .package(url: "https://github.com/webcpu/ScreenshotKit", branch: "main"),
     ],
     targets: [
         // Single target with vertical slice architecture
