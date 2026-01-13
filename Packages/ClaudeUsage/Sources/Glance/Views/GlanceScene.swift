@@ -52,5 +52,6 @@ public struct GlanceScene: Scene {
         hasInitialized = true
         lifecycleManager.configure(with: env.glanceStore)
         await env.glanceStore.initializeIfNeeded()
+        await env.insightsStore.initializeIfNeeded()
     }
 }
